@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <link href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
+    <title>XuanKen Music Official</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://kit-pro.fontawesome.com/releases/v7.2.0/css/pro.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div id="toast-msg"></div>
+    <div id="custom-notification" class="notification">
+        <div class="notification-icon">
+            <i class="fal fa-headphones"></i>
+        </div>
+        <div class="notification-content">
+            <div class="notification-title"></div>
+            <div class="notification-message"></div>
+        </div>
+    </div>
+
+    <div id="interaction-hint">
+        <div class="hint-logo">
+            <img src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Logo Xuanken Music">
+        </div>
+        <div class="hint-title">XUANKEN MUSIC</div>
+        <div class="hint-subtitle">OFFICIAL</div>
+        <div class="hint-button">
+            <div class="hint-button-icon">
+                <i class="fas fa-play"></i>
+            </div>
+            <div class="hint-button-text">CHẠM ĐỂ BẮT ĐẦU</div>
+        </div>
+        <div class="hint-decoration">
+            <i class="fas fa-heart"></i> DESIGNER BY XUANKEN OFFICIAL<i class="fas fa-heart"></i>
+        </div>
+    </div>
+
+    <div class="player-container" id="player-container" style="display: none;">
+        <div class="header-section">
+            <div class="top-left-action">
+                <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
+                    <i class="fa-regular fa-stopwatch"></i>
+                </div>
+                <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
+                    <i class="fa-regular fa-headphones"></i>
+                </div>
+            </div>
+
+            <div class="top-right-action">
+                <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
+                    <i class="fa-regular fa-sun"></i>
+                </div>
+                <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
+                    <i class="fa-regular fa-list-music"></i>
+                </div>
+            </div>
+            
+            <div class="album-art">
+                <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
+            </div>
+            <div class="song-info-main">
+                <span class="song-title" id="current-title">Sẵn sàng</span>
+                <span class="artist-name" id="current-artist">XuanKen Official</span>
+                <div class="lyric-container" id="lyric-container">
+                    <div class="current-lyric" id="lyric-text"><i class="fa-regular fa-face-grin-hearts"></i> Chọn bài hát để phát <i class="fa-regular fa-face-grin-hearts"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="progress-wrapper">
+                <div class="progress-bar-container" id="progress-area">
+                    <div class="progress-filled" id="progress-fill"></div>
+                    <div class="progress-thumb" id="progress-thumb"></div>
+                </div>
+                <div class="time-info">
+                    <span id="time-current">00:00</span>
+                    <span id="time-total">00:00</span>
+                </div>
+            </div>
+
+            <div class="main-actions">
+                <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
+                    <i class="fas fa-random"></i>
+                </div>
+                <div class="btn-icon" id="prev-btn" title="Bài trước">
+                    <i class="fas fa-backward-step"></i>
+                </div>
+                <div class="btn-icon play-btn" id="play-pause-btn" title="Phát / Tạm dừng">
+                    <i class="fas fa-play" id="play-icon"></i>
+                </div>
+                <div class="btn-icon" id="next-btn" title="Bài tiếp">
+                    <i class="fas fa-forward-step"></i>
+                </div>
+                <div class="btn-icon" id="repeat-btn" title="Lặp lại 1 bài">
+                    <i class="fas fa-arrow-rotate-left"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="playlist" id="playlist">
+            <div class="playlist-header" id="playlist-header">
+                <div class="close-playlist" id="close-playlist-btn">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="playlist-title"><i class="fa-regular fa-music"></i> DANH SÁCH BÀI HÁT <i class="fa-regular fa-music"></i></div>
+                <div style="width: 40px;"></div> 
+            </div>
+            <div id="playlist-content"></div>
+        </div>
+
+        <div id="timer-overlay" class="timer-overlay"></div>
+        <div id="timer-modal" class="timer-modal">
+            <div class="timer-modal-header">
+                <div class="close-timer" id="close-timer-modal">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="timer-title"><i class="fa-regular fa-stopwatch"></i> HẸN GIỜ TẮT NHẠC <i class="fa-regular fa-stopwatch"></i></div>
+                <div style="width: 40px;"></div>
+            </div>
+            <div class="timer-modal-content">
+                <div class="timer-status-box">
+                    <i class="fa-regular fa-alarm-clock"></i>
+                    <div class="timer-status-text" id="timer-status">CHƯA ĐẶT HẸN GIỜ</div>
+                </div>
+                
+                <div class="timer-preset-group">
+                    <button class="timer-preset" data-minutes="15">15</button>
+                    <button class="timer-preset" data-minutes="30">30</button>
+                    <button class="timer-preset" data-minutes="60">60</button>
+                    <button class="timer-preset" data-minutes="90">90</button>
+                    <button class="timer-preset" data-minutes="120">120</button>
+                </div>
+                
+                <input type="number" id="timer-minutes" class="timer-input" placeholder="NHẬP SỐ PHÚT...">
+                
+                <button id="start-timer-btn" class="timer-start-btn">
+                    <i class="fas fa-play"></i> BẮT ĐẦU
+                </button>
+                
+                <button id="cancel-timer-btn" class="timer-cancel-btn">
+                    <i class="fas fa-trash-alt"></i> HỦY HẸN GIỜ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-player" preload="auto" crossorigin="anonymous" playsinline></audio>
+
+    <script src="js/music.js"></script>
+</body>
+</html>
