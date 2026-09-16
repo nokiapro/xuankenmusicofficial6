@@ -184,7 +184,7 @@ async function checkForUpdates() {
             
             if (addedSongs.length > 0) {
                 addedSongs.forEach(song => {
-                    showNotification('BÀI HÁT MỚI THÊM:', `<i data-lucide="star"></i> ${song.id} <i data-lucide="star"></i>`, '#4ade80', 'plus-circle');
+                    showNotification('BÀI HÁT MỚI THÊM:', `<i class="fa-regular fa-star"></i> ${song.id} <i class="fa-regular fa-star"></i>`, '#4ade80', 'plus-circle');
                 });
             }
             
@@ -466,16 +466,14 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     }
     
     let formattedMessage = message;
+    // Bọc toàn bộ message (gồm ☆) trong gradient text — giống music2 (FA star là font nên nhận gradient)
     if (typeof message === 'string' && !message.includes('<span')) {
         const gradient = getGradientByTheme();
-        formattedMessage = `<span style="font-weight: 700; background: ${gradient}; -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.5px; font-size: inherit; display: inline-block; white-space: nowrap;">${message}</span>`;
+        formattedMessage = `<span style="font-weight: 700; background: ${gradient}; background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.5px; font-size: inherit; display: inline-block; white-space: nowrap; animation: titleGradientMove 3s ease infinite;">${message}</span>`;
     }
     
     noti.querySelector('.notification-title').innerHTML = title;
     noti.querySelector('.notification-message').innerHTML = formattedMessage;
-    
-    // Refresh icons in message if any
-    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(noti.querySelectorAll('[data-lucide]')) });
     
     // Force reflow rồi bật lại để luôn có fade in
     void noti.offsetWidth;
@@ -493,7 +491,8 @@ function showToastMsg(msg, isListen = false) {
     if (isListen) {
         const match = msg.match(/\+1 LISTEN: "(.+)" \((.+)\)/);
         if (match) {
-            showNotification('+1 LISTEN:', match[1], '#4ade80', 'headphones');
+            const songId = match[2] || match[1];
+            showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
         } else {
             showNotification('THÔNG BÁO:', msg, '#4ade80', 'info');
         }
@@ -526,7 +525,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
             localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
             console.log(`GHI NHẬN: ${songName} (${songId}) - ${result.count}`);
             
-            showNotification('+1 LISTEN:', `<i data-lucide="star"></i> ${songId} <i data-lucide="star"></i>`, '#4ade80', 'headphones');
+            showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
         }
     } catch (error) {
         console.error('LỖI TĂNG LƯỢT NGHE:', error);
