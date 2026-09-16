@@ -29,15 +29,19 @@
         </div>
         <div class="hint-title">XUANKEN MUSIC</div>
         <div class="hint-subtitle">OFFICIAL</div>
-        <div class="hint-button">
-            <div class="hint-button-icon">
+        <form id="username-form" class="username-form" autocomplete="username">
+            <label class="username-label" for="username-input">NHẬP USERNAME</label>
+            <input type="text" id="username-input" class="username-input" placeholder="Tên của bạn..." maxlength="20" required>
+            <div id="username-error" class="username-error" style="display:none;"></div>
+            <button type="submit" id="username-start-btn" class="username-start-btn">
                 <i data-lucide="play"></i>
-            </div>
-            <div class="hint-button-text">CHẠM ĐỂ BẮT ĐẦU</div>
-        </div>
+                <span>BẮT ĐẦU</span>
+            </button>
+        </form>
         <div class="hint-decoration">
             <i data-lucide="heart"></i> DESIGNER BY XUANKEN OFFICIAL <i data-lucide="heart"></i>
         </div>
+        <a href="admin.html" class="admin-link-hint" onclick="event.stopPropagation()">Admin</a>
     </div>
 
     <div class="player-container" id="player-container" style="display: none;">
@@ -65,6 +69,13 @@
                 </div>
             </div>
             
+            <div class="user-badge" id="user-badge" style="display:none;">
+                <i data-lucide="user"></i>
+                <span id="user-badge-name"></span>
+                <span class="user-badge-sep">·</span>
+                <i class="fa-solid fa-coins"></i>
+                <span id="user-badge-coins">0</span>
+            </div>
             <div class="album-art">
                 <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
             </div>
