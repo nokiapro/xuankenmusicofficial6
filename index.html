@@ -55,8 +55,13 @@
                 <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
                     <i data-lucide="sun" id="theme-icon"></i>
                 </div>
-                <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
-                    <i data-lucide="list-music"></i>
+                <div class="top-right-stack">
+                    <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
+                        <i data-lucide="list-music"></i>
+                    </div>
+                    <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
+                        <i data-lucide="store"></i>
+                    </div>
                 </div>
             </div>
             
@@ -147,6 +152,29 @@
                     <i data-lucide="trash-2"></i> HỦY HẸN GIỜ
                 </button>
             </div>
+        </div>
+
+        <!-- Cửa hàng XK -->
+        <div id="shop-modal" class="shop-modal">
+            <div class="shop-modal-header">
+                <div class="close-shop" id="close-shop-btn">
+                    <i data-lucide="x"></i>
+                </div>
+                <div class="shop-title"><i data-lucide="store"></i> CỬA HÀNG XK</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="shop-balance-bar">
+                <div class="shop-coins">
+                    <i class="fa-solid fa-coins"></i>
+                    <span id="shop-coin-count">0</span> XK
+                </div>
+                <button type="button" id="checkin-btn" class="checkin-btn">
+                    <i data-lucide="calendar-check"></i>
+                    <span id="checkin-btn-text">ĐIỂM DANH</span>
+                </button>
+            </div>
+            <div class="shop-hint" id="shop-hint">Chưa sở hữu bài → chỉ nghe demo 30 giây. Điểm danh mỗi ngày nhận xu XK để mua nhạc.</div>
+            <div class="shop-list" id="shop-list"></div>
         </div>
     </div>
 
