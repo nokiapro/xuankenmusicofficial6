@@ -1163,6 +1163,14 @@ audio.ontimeupdate = () => {
         }
     }
     
+    // Demo 30s nếu chưa sở hữu bài
+    if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
+        audio.pause();
+        audio.currentTime = 0;
+        showNotification('DEMO:', 'HẾT 30 GIÂY — MUA BÀI ĐỂ NGHE FULL', '#ff9800', 'store');
+        openShopModal();
+    }
+    
     if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && dur && dur > 5 && songs[index] && hasUserInteracted) {
         hasRecordedCurrentSong = true;
         incrementListenCount(songs[index].id, songs[index].name, currentSource);
@@ -1539,4 +1547,215 @@ window.addEventListener('beforeunload', () => {
 window.adjustLyricFontSize = adjustLyricFontSize;
 window.selectSongFromList = selectSongFromList;
 
+// ========== CỬA HÀNG XK / ĐIỂM DANH / DEMO 30S ==========
+const DEMO_SECONDS = 30;
+const DEFAULT_SONG_PRICE = 10;
+const CHECKIN_REWARD = 15;
+const STARTER_COINS = 20;
+const STORAGE_COINS = 'xuanken_xk_coins';
+const STORAGE_OWNED = 'xuanken_owned_songs';
+const STORAGE_CHECKIN = 'xuanken_last_checkin';
+
+function getTodayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function loadCoins() {
+    const n = parseInt(localStorage.getItem(STORAGE_COINS), 10);
+    if (Number.isNaN(n) || n < 0) {
+        localStorage.setItem(STORAGE_COINS, String(STARTER_COINS));
+        return STARTER_COINS;
+    }
+    return n;
+}
+
+function saveCoins(n) {
+    localStorage.setItem(STORAGE_COINS, String(Math.max(0, n | 0)));
+    updateShopBalanceUI();
+}
+
+function loadOwnedSongs() {
+    try {
+        const raw = localStorage.getItem(STORAGE_OWNED);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.map(String) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveOwnedSongs(ids) {
+    localStorage.setItem(STORAGE_OWNED, JSON.stringify([...new Set(ids.map(String))]));
+}
+
+function isSongOwned(songId) {
+    if (songId == null || songId === '') return true;
+    const owned = loadOwnedSongs();
+    return owned.includes(String(songId));
+}
+
+function getSongPrice(song) {
+    if (!song) return DEFAULT_SONG_PRICE;
+    if (song.price != null && song.price !== '') {
+        const p = Number(song.price);
+        if (!Number.isNaN(p) && p >= 0) return p;
+    }
+    return DEFAULT_SONG_PRICE;
+}
+
+function hasCheckedInToday() {
+    return localStorage.getItem(STORAGE_CHECKIN) === getTodayKey();
+}
+
+function doDailyCheckin() {
+    if (hasCheckedInToday()) {
+        showNotification('ĐIỂM DANH:', 'HÔM NAY ĐÃ ĐIỂM DANH RỒI', '#ff9800', 'calendar-check');
+        return false;
+    }
+    const coins = loadCoins() + CHECKIN_REWARD;
+    saveCoins(coins);
+    localStorage.setItem(STORAGE_CHECKIN, getTodayKey());
+    showNotification('ĐIỂM DANH:', `+${CHECKIN_REWARD} XU XK`, '#4ade80', 'coins');
+    updateCheckinButtonUI();
+    renderShopList();
+    return true;
+}
+
+function buySong(songId) {
+    const song = songs.find(s => String(s.id) === String(songId));
+    if (!song) {
+        showNotification('LỖI:', 'KHÔNG TÌM THẤY BÀI HÁT', '#ff4444', 'alert-circle');
+        return false;
+    }
+    if (isSongOwned(songId)) {
+        showNotification('CỬA HÀNG:', 'BẠN ĐÃ SỞ HỮU BÀI NÀY', '#4ade80', 'check');
+        return false;
+    }
+    const price = getSongPrice(song);
+    const coins = loadCoins();
+    if (coins < price) {
+        showNotification('THIẾU XU:', `CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        return false;
+    }
+    saveCoins(coins - price);
+    const owned = loadOwnedSongs();
+    owned.push(String(songId));
+    saveOwnedSongs(owned);
+    showNotification('MUA THÀNH CÔNG:', song.name || String(songId), '#4ade80', 'shopping-bag');
+    renderShopList();
+    updateShopBalanceUI();
+    return true;
+}
+
+function updateShopBalanceUI() {
+    const el = document.getElementById('shop-coin-count');
+    if (el) el.textContent = String(loadCoins());
+}
+
+function updateCheckinButtonUI() {
+    const btn = document.getElementById('checkin-btn');
+    const txt = document.getElementById('checkin-btn-text');
+    if (!btn) return;
+    if (hasCheckedInToday()) {
+        btn.disabled = true;
+        btn.classList.add('done');
+        if (txt) txt.textContent = 'ĐÃ ĐIỂM DANH';
+    } else {
+        btn.disabled = false;
+        btn.classList.remove('done');
+        if (txt) txt.textContent = 'ĐIỂM DANH';
+    }
+}
+
+function renderShopList() {
+    const list = document.getElementById('shop-list');
+    if (!list) return;
+    if (!songs || !songs.length) {
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:0.8rem;">CHƯA CÓ BÀI HÁT</div>';
+        return;
+    }
+    list.innerHTML = songs.map(s => {
+        const id = String(s.id);
+        const owned = isSongOwned(id);
+        const price = getSongPrice(s);
+        const name = escapeHtml(s.name || id);
+        const artist = escapeHtml(s.artist || 'ĐANG CẬP NHẬT');
+        const action = owned
+            ? `<span class="shop-owned-badge">ĐÃ MUA</span>`
+            : `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
+        const priceLabel = owned ? '' : `<div class="shop-item-price">${price} XK</div>`;
+        return `<div class="shop-item ${owned ? 'owned' : ''}" data-song-id="${id}">
+            <div class="shop-item-info">
+                <div class="shop-item-name">${name}${owned ? '' : ' <span class="demo-badge">DEMO 30S</span>'}</div>
+                <div class="shop-item-artist">${artist}</div>
+                ${priceLabel}
+            </div>
+            ${action}
+        </div>`;
+    }).join('');
+    
+    list.querySelectorAll('.shop-buy-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            buySong(btn.getAttribute('data-buy-id'));
+        };
+    });
+}
+
+function openShopModal() {
+    const modal = document.getElementById('shop-modal');
+    if (!modal) return;
+    updateShopBalanceUI();
+    updateCheckinButtonUI();
+    renderShopList();
+    modal.classList.remove('show');
+    void modal.offsetWidth;
+    requestAnimationFrame(() => {
+        modal.classList.add('show');
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
+        }
+    });
+}
+
+function closeShopModal() {
+    const modal = document.getElementById('shop-modal');
+    if (modal) modal.classList.remove('show');
+}
+
+// Gắn sự kiện cửa hàng
+const shopBtn = document.getElementById('shop-btn');
+if (shopBtn) {
+    shopBtn.onclick = (e) => {
+        e.stopPropagation();
+        openShopModal();
+    };
+}
+const closeShopBtn = document.getElementById('close-shop-btn');
+if (closeShopBtn) {
+    closeShopBtn.onclick = (e) => {
+        e.stopPropagation();
+        closeShopModal();
+    };
+}
+const checkinBtn = document.getElementById('checkin-btn');
+if (checkinBtn) {
+    checkinBtn.onclick = (e) => {
+        e.stopPropagation();
+        doDailyCheckin();
+    };
+}
+
+// Khởi tạo xu lần đầu
+loadCoins();
+updateShopBalanceUI();
+updateCheckinButtonUI();
+
+window.buySong = buySong;
+window.isSongOwned = isSongOwned;
+window.openShopModal = openShopModal;
+
 loadSongsFromSheet();
+
