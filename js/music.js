@@ -27,6 +27,23 @@ const artistNameEl = document.getElementById('current-artist');
 
 const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbzbol-IvEkdzsJwUsfecA_0SDRjReA1skMmfCEz8ibFe6oj4hx9AzLGik_tsMH-c4A/exec';
 
+// Helper đổi icon Lucide mà không phá animation của nút
+function setLucideIcon(container, iconName) {
+    if (!container) return;
+    // Giữ nguyên container (btn), chỉ thay nội dung icon bên trong
+    container.innerHTML = `<i data-lucide="${iconName}"></i>`;
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ nodes: [container] });
+    }
+}
+
+function refreshLucideIcons(container = document) {
+    if (typeof lucide !== 'undefined') {
+        const nodes = container.querySelectorAll ? Array.from(container.querySelectorAll('[data-lucide]')) : [container];
+        if (nodes.length) lucide.createIcons({ nodes });
+    }
+}
+
 let listenData = {};
 let isUpdatingListen = false;
 let hasRecordedCurrentSong = false;
@@ -167,7 +184,7 @@ async function checkForUpdates() {
             
             if (addedSongs.length > 0) {
                 addedSongs.forEach(song => {
-                    showNotification('BÀI HÁT MỚI THÊM:', `<i class="fa-regular fa-star"></i> ${song.id} <i class="fa-regular fa-star"></i>`, '#4ade80', 'fa-plus-circle');
+                    showNotification('BÀI HÁT MỚI THÊM:', `<i data-lucide="star"></i> ${song.id} <i data-lucide="star"></i>`, '#4ade80', 'plus-circle');
                 });
             }
             
@@ -430,17 +447,22 @@ function forceScaleNotification() {
     setTimeout(() => autoScaleNotificationMessage(), 150);
 }
 
-function showNotification(title, message, color = "#4ade80", icon = "fa-headphones") {
+function showNotification(title, message, color = "#4ade80", icon = "headphones") {
     const noti = document.getElementById('custom-notification');
     if (!noti) return;
     
     if (notificationTimeout) clearTimeout(notificationTimeout);
     
+    // Luôn tắt show trước để reset animation
+    noti.classList.remove('show');
+    
     noti.style.borderBottomColor = color;
-    const iconElem = noti.querySelector('.notification-icon i');
-    if (iconElem) {
-        iconElem.className = `fal ${icon}`;
-        iconElem.style.color = color;
+    const iconContainer = noti.querySelector('.notification-icon');
+    if (iconContainer) {
+        iconContainer.innerHTML = `<i data-lucide="${icon}"></i>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [iconContainer] });
+        const svg = iconContainer.querySelector('svg');
+        if (svg) svg.style.color = color;
     }
     
     let formattedMessage = message;
@@ -452,11 +474,15 @@ function showNotification(title, message, color = "#4ade80", icon = "fa-headphon
     noti.querySelector('.notification-title').innerHTML = title;
     noti.querySelector('.notification-message').innerHTML = formattedMessage;
     
-    noti.classList.remove('show');
-    void noti.offsetHeight;
-    noti.classList.add('show');
+    // Refresh icons in message if any
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(noti.querySelectorAll('[data-lucide]')) });
     
-    forceScaleNotification();
+    // Force reflow rồi bật lại để luôn có fade in
+    void noti.offsetWidth;
+    requestAnimationFrame(() => {
+        noti.classList.add('show');
+        forceScaleNotification();
+    });
     
     notificationTimeout = setTimeout(() => {
         noti.classList.remove('show');
@@ -467,12 +493,12 @@ function showToastMsg(msg, isListen = false) {
     if (isListen) {
         const match = msg.match(/\+1 LISTEN: "(.+)" \((.+)\)/);
         if (match) {
-            showNotification('+1 LISTEN:', match[1], '#4ade80', 'fa-headphones');
+            showNotification('+1 LISTEN:', match[1], '#4ade80', 'headphones');
         } else {
-            showNotification('THÔNG BÁO:', msg, '#4ade80', 'fa-circle-info');
+            showNotification('THÔNG BÁO:', msg, '#4ade80', 'info');
         }
     } else {
-        showNotification('THÔNG BÁO:', msg, 'var(--accent-color)', 'fa-circle-info');
+        showNotification('THÔNG BÁO:', msg, 'var(--accent-color)', 'info');
     }
 }
 
@@ -500,7 +526,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
             localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
             console.log(`GHI NHẬN: ${songName} (${songId}) - ${result.count}`);
             
-            showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'fa-headphones');
+            showNotification('+1 LISTEN:', `<i data-lucide="star"></i> ${songId} <i data-lucide="star"></i>`, '#4ade80', 'headphones');
         }
     } catch (error) {
         console.error('LỖI TĂNG LƯỢT NGHE:', error);
@@ -595,20 +621,40 @@ function scrollToCurrentListenSong() {
 
 function showListenStats() {
     let modal = document.getElementById('listen-stats-modal');
+    const isFirstCreate = !modal;
+    
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'listen-stats-modal';
         modal.className = 'listen-modal';
-        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i class="fas fa-times"></i></div><div class="listen-title"><i class="fal fa-headphones"></i> THỐNG KÊ LƯỢT NGHE</div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
+        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i data-lucide="x"></i></div><div class="listen-title"><i data-lucide="headphones" class="listen-title-icon"></i><span>THỐNG KÊ LƯỢT NGHE</span></div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
         const playerContainer = document.querySelector('.player-container');
         if (playerContainer) playerContainer.appendChild(modal);
         else document.body.appendChild(modal);
+        // createIcons SAU khi append vào DOM để màu sắc tính đúng
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
         const closeBtn = document.getElementById('close-listen-modal');
         if (closeBtn) closeBtn.onclick = () => modal.classList.remove('show');
     }
+    
     updateListenStatsModal();
-    modal.classList.add('show');
-    setTimeout(() => scrollToCurrentListenSong(), 300);
+    
+    // Force reflow + rAF để luôn có animation slide in (kể cả lần đầu tạo modal)
+    const openWithAnimation = () => {
+        void modal.offsetWidth;
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+            setTimeout(() => scrollToCurrentListenSong(), 300);
+        });
+    };
+    
+    if (isFirstCreate || modal.classList.contains('show')) {
+        // Lần đầu hoặc đang mở → reset rồi mở lại để có animation
+        modal.classList.remove('show');
+        openWithAnimation();
+    } else {
+        openWithAnimation();
+    }
 }
 
 function updateCurrentSongHighlightAndScroll() {
@@ -1040,7 +1086,7 @@ function togglePlay() {
 
 audio.onerror = () => {
     if (!songs[index]) return;
-    showNotification('LỖI:', 'KHÔNG THỂ PHÁT BÀI HÁT!', '#ff4444', 'fa-circle-exclamation');
+    showNotification('LỖI:', 'KHÔNG THỂ PHÁT BÀI HÁT!', '#ff4444', 'alert-circle');
     hidePlayerLoading();
 };
 
@@ -1155,7 +1201,7 @@ audio.onended = () => {
 
 audio.onplay = () => {
     isPlaying = true;
-    if (playIcon) playIcon.className = 'fas fa-pause';
+    setLucideIcon(document.getElementById('play-pause-btn'), 'pause');
     if (art) art.style.animationPlayState = 'running';
     requestWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
@@ -1164,7 +1210,7 @@ audio.onplay = () => {
 
 audio.onpause = () => {
     isPlaying = false;
-    if (playIcon) playIcon.className = 'fas fa-play';
+    setLucideIcon(document.getElementById('play-pause-btn'), 'play');
     if (art) art.style.animationPlayState = 'paused';
     releaseWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
@@ -1192,11 +1238,12 @@ function renderPlaylist() {
         return `<div class="song-item ${i === index ? 'active' : ''}" onclick="window.selectSongFromList(${i})">
             <div class="flex-1">
                 <div class="item-title text-sm uppercase font-bold break-words pr-2">${escapeHtml(s.name)}</div>
-                <div class="text-xs text-gray-500"><i class="fa-regular fa-microphone"></i> ${escapeHtml(artistName)}</div>
+                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
-            ${i === index ? '<i class="fa-sharp fa-light fa-face-grin-tongue-squint"></i>' : ''}
+            ${i === index ? '<i data-lucide="smile"></i>' : ''}
         </div>`;
     }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(list.querySelectorAll('[data-lucide]')) });
 }
 
 const playerContainer = document.getElementById('player-container');
@@ -1239,9 +1286,9 @@ if (shuffleBtn) {
         this.classList.toggle('active', isShuffle);
         if (isShuffle) {
             resetShuffleState(index);
-            showNotification('XÁO TRỘN:', 'BẬT XÁO TRỘN THÔNG MINH', 'var(--accent-color)', 'fa-random');
+            showNotification('XÁO TRỘN:', 'BẬT XÁO TRỘN THÔNG MINH', 'var(--accent-color)', 'shuffle');
         } else {
-            showNotification('TUẦN TỰ:', 'TẮT XÁO TRỘN, PHÁT TUẦN TỰ', 'var(--accent-color)', 'fa-list');
+            showNotification('TUẦN TỰ:', 'TẮT XÁO TRỘN, PHÁT TUẦN TỰ', 'var(--accent-color)', 'list');
         }
     };
 }
@@ -1251,10 +1298,13 @@ if (repeatBtn) {
         isRepeatOne = !isRepeatOne;
         this.classList.toggle('active', isRepeatOne);
         isLoopingHandled = false;
+        // Đổi icon: bình thường = repeat, khi bật lặp 1 bài = repeat-1
+        setLucideIcon(this, isRepeatOne ? 'repeat-1' : 'repeat');
+        
         if (isRepeatOne) {
-            showNotification('LẶP LẠI:', 'LẶP LẠI 1 BÀI', 'var(--accent-color)', 'fa-arrow-rotate-left');
+            showNotification('LẶP LẠI:', 'LẶP LẠI 1 BÀI', 'var(--accent-color)', 'repeat-1');
         } else {
-            showNotification('TẮT LẶP:', 'ĐÃ TẮT LẶP', 'var(--accent-color)', 'fa-arrow-rotate-left');
+            showNotification('TẮT LẶP:', 'ĐÃ TẮT LẶP', 'var(--accent-color)', 'repeat');
         }
     };
 }
@@ -1307,7 +1357,7 @@ function cancelTimer() {
     remainSeconds = 0;
     if (timerStatus) timerStatus.innerHTML = 'BẠN CHƯA ĐẶT HẸN GIỜ';
     if (openTimerBtn) openTimerBtn.classList.remove('active');
-    showNotification('HỦY HẸN GIỜ:', 'ĐÃ HỦY HẸN GIỜ', '#ff9800', 'fa-trash-alt');
+    showNotification('HỦY HẸN GIỜ:', 'ĐÃ HỦY HẸN GIỜ', '#ff9800', 'trash-2');
 }
 
 function updateTimerDisplay() {
@@ -1335,7 +1385,7 @@ function startCountdown(seconds) {
                 sleepTimerId = null;
             }
             if (audio && !audio.paused) audio.pause();
-            showNotification('HẾT GIỜ:', 'ĐÃ TẮT NHẠC!', '#ff9800', 'fa-bell');
+            showNotification('HẾT GIỜ:', 'ĐÃ TẮT NHẠC!', '#ff9800', 'bell');
             if (timerStatus) timerStatus.innerHTML = 'ĐÃ TẮT NHẠC';
             if (openTimerBtn) openTimerBtn.classList.remove('active');
         } else {
@@ -1347,7 +1397,7 @@ function startCountdown(seconds) {
 
 window.setTimer = function(minutes) {
     if (!minutes || minutes <= 0) {
-        showNotification('LỖI:', 'NHẬP SỐ PHÚT HỢP LỆ!', '#ff4444', 'fa-circle-exclamation');
+        showNotification('LỖI:', 'NHẬP SỐ PHÚT HỢP LỆ!', '#ff4444', 'alert-circle');
         return;
     }
     cancelTimer();
@@ -1358,14 +1408,14 @@ window.setTimer = function(minutes) {
             clearInterval(countdownInterval);
             countdownInterval = null;
         }
-        showNotification('HẾT GIỜ:', 'ĐÃ TẮT NHẠC THEO HẸN GIỜ!', '#ff9800', 'fa-bell');
+        showNotification('HẾT GIỜ:', 'ĐÃ TẮT NHẠC THEO HẸN GIỜ!', '#ff9800', 'bell');
         if (timerStatus) timerStatus.innerHTML = 'ĐÃ TẮT NHẠC';
         if (openTimerBtn) openTimerBtn.classList.remove('active');
         remainSeconds = 0;
     }, seconds * 1000);
     startCountdown(seconds);
     toggleTimerModal();
-    showNotification('HẸN GIỜ:', `TẮT SAU ${minutes} PHÚT`, '#4ade80', 'fa-stopwatch');
+    showNotification('HẸN GIỜ:', `TẮT SAU ${minutes} PHÚT`, '#4ade80', 'timer');
 };
 
 presetBtns.forEach(btn => {
@@ -1394,7 +1444,7 @@ if (startTimerBtn) {
     startTimerBtn.onclick = () => {
         const mins = parseInt(timerMinutesInput?.value);
         if (!isNaN(mins) && mins > 0) window.setTimer(mins);
-        else showNotification('LỖI:', 'NHẬP SỐ PHÚT HỢP LỆ!', '#ff4444', 'fa-circle-exclamation');
+        else showNotification('LỖI:', 'NHẬP SỐ PHÚT HỢP LỆ!', '#ff4444', 'alert-circle');
     };
 }
 if (cancelTimerBtn) {
@@ -1412,36 +1462,50 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 const themeToggle = document.getElementById('theme-toggle');
-const themeIcon = themeToggle ? themeToggle.querySelector('i') : null;
+
+function setThemeIcon(isDark) {
+    if (!themeToggle) return;
+    setLucideIcon(themeToggle, isDark ? 'moon' : 'sun');
+}
 
 function loadTheme() {
     const savedTheme = localStorage.getItem('xuanken_theme');
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (savedTheme === 'dark' || (!savedTheme && systemDark)) {
         document.body.classList.add('dark');
-        if (themeIcon) themeIcon.className = 'fal fa-moon';
+        setThemeIcon(true);
     } else {
         document.body.classList.remove('dark');
-        if (themeIcon) themeIcon.className = 'fal fa-sun';
+        setThemeIcon(false);
     }
     applyGradientToSongTitle();
     applyGradientToArtistName();
 }
 
 function toggleTheme() {
+    // Tắt transition tạm thời để tránh nháy nút khi đổi theme
+    document.body.classList.add('no-transition');
+    
     if (document.body.classList.contains('dark')) {
         document.body.classList.remove('dark');
         localStorage.setItem('xuanken_theme', 'light');
-        if (themeIcon) themeIcon.className = 'fal fa-sun';
-        showNotification('LIGHT MODE:', 'ĐÃ CHUYỂN LIGHT', '#ff9800', 'fa-sun');
+        setThemeIcon(false);
+        showNotification('LIGHT MODE:', 'ĐÃ CHUYỂN LIGHT', '#ff9800', 'sun');
     } else {
         document.body.classList.add('dark');
         localStorage.setItem('xuanken_theme', 'dark');
-        if (themeIcon) themeIcon.className = 'fal fa-moon';
-        showNotification('DARK MODE:', 'ĐÃ CHUYỂN DARK', '#bb86fc', 'fa-moon');
+        setThemeIcon(true);
+        showNotification('DARK MODE:', 'ĐÃ CHUYỂN DARK', '#bb86fc', 'moon');
     }
     applyGradientToSongTitle();
     applyGradientToArtistName();
+    
+    // Bật lại transition sau 1 frame
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            document.body.classList.remove('no-transition');
+        });
+    });
 }
 
 if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
@@ -1451,10 +1515,10 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     if (!savedTheme) {
         if (e.matches) {
             document.body.classList.add('dark');
-            if (themeIcon) themeIcon.className = 'fal fa-moon';
+            setThemeIcon(true);
         } else {
             document.body.classList.remove('dark');
-            if (themeIcon) themeIcon.className = 'fal fa-sun';
+            setThemeIcon(false);
         }
         applyGradientToSongTitle();
         applyGradientToArtistName();

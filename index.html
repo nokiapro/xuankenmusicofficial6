@@ -6,7 +6,7 @@
     <link href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
     <title>XuanKen Music Official</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://kit-pro.fontawesome.com/releases/v7.2.0/css/pro.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
     <div id="toast-msg"></div>
     <div id="custom-notification" class="notification">
         <div class="notification-icon">
-            <i class="fal fa-headphones"></i>
+            <i data-lucide="headphones"></i>
         </div>
         <div class="notification-content">
             <div class="notification-title"></div>
@@ -30,12 +30,12 @@
         <div class="hint-subtitle">OFFICIAL</div>
         <div class="hint-button">
             <div class="hint-button-icon">
-                <i class="fas fa-play"></i>
+                <i data-lucide="play"></i>
             </div>
             <div class="hint-button-text">CHẠM ĐỂ BẮT ĐẦU</div>
         </div>
         <div class="hint-decoration">
-            <i class="fas fa-heart"></i> DESIGNER BY XUANKEN OFFICIAL<i class="fas fa-heart"></i>
+            <i data-lucide="heart"></i> DESIGNER BY XUANKEN OFFICIAL <i data-lucide="heart"></i>
         </div>
     </div>
 
@@ -43,19 +43,19 @@
         <div class="header-section">
             <div class="top-left-action">
                 <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
-                    <i class="fa-regular fa-stopwatch"></i>
+                    <i data-lucide="timer"></i>
                 </div>
                 <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
-                    <i class="fa-regular fa-headphones"></i>
+                    <i data-lucide="headphones"></i>
                 </div>
             </div>
 
             <div class="top-right-action">
                 <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
-                    <i class="fa-regular fa-sun"></i>
+                    <i data-lucide="sun" id="theme-icon"></i>
                 </div>
                 <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
-                    <i class="fa-regular fa-list-music"></i>
+                    <i data-lucide="list-music"></i>
                 </div>
             </div>
             
@@ -66,7 +66,7 @@
                 <span class="song-title" id="current-title">Sẵn sàng</span>
                 <span class="artist-name" id="current-artist">XuanKen Official</span>
                 <div class="lyric-container" id="lyric-container">
-                    <div class="current-lyric" id="lyric-text"><i class="fa-regular fa-face-grin-hearts"></i> Chọn bài hát để phát <i class="fa-regular fa-face-grin-hearts"></i></div>
+                    <div class="current-lyric" id="lyric-text"><i data-lucide="smile"></i> Chọn bài hát để phát <i data-lucide="smile"></i></div>
                 </div>
             </div>
         </div>
@@ -85,19 +85,19 @@
 
             <div class="main-actions">
                 <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
-                    <i class="fas fa-random"></i>
+                    <i data-lucide="shuffle"></i>
                 </div>
                 <div class="btn-icon" id="prev-btn" title="Bài trước">
-                    <i class="fas fa-backward-step"></i>
+                    <i data-lucide="skip-back"></i>
                 </div>
                 <div class="btn-icon play-btn" id="play-pause-btn" title="Phát / Tạm dừng">
-                    <i class="fas fa-play" id="play-icon"></i>
+                    <i data-lucide="play" id="play-icon"></i>
                 </div>
                 <div class="btn-icon" id="next-btn" title="Bài tiếp">
-                    <i class="fas fa-forward-step"></i>
+                    <i data-lucide="skip-forward"></i>
                 </div>
-                <div class="btn-icon" id="repeat-btn" title="Lặp lại 1 bài">
-                    <i class="fas fa-arrow-rotate-left"></i>
+                <div class="btn-icon" id="repeat-btn" title="Lặp lại">
+                    <i data-lucide="repeat"></i>
                 </div>
             </div>
         </div>
@@ -105,9 +105,9 @@
         <div class="playlist" id="playlist">
             <div class="playlist-header" id="playlist-header">
                 <div class="close-playlist" id="close-playlist-btn">
-                    <i class="fas fa-times"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="playlist-title"><i class="fa-regular fa-music"></i> DANH SÁCH BÀI HÁT <i class="fa-regular fa-music"></i></div>
+                <div class="playlist-title"><i data-lucide="music"></i> DANH SÁCH BÀI HÁT <i data-lucide="music"></i></div>
                 <div style="width: 40px;"></div> 
             </div>
             <div id="playlist-content"></div>
@@ -117,14 +117,14 @@
         <div id="timer-modal" class="timer-modal">
             <div class="timer-modal-header">
                 <div class="close-timer" id="close-timer-modal">
-                    <i class="fas fa-times"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="timer-title"><i class="fa-regular fa-stopwatch"></i> HẸN GIỜ TẮT NHẠC <i class="fa-regular fa-stopwatch"></i></div>
+                <div class="timer-title"><i data-lucide="timer"></i> HẸN GIỜ TẮT NHẠC <i data-lucide="timer"></i></div>
                 <div style="width: 40px;"></div>
             </div>
             <div class="timer-modal-content">
                 <div class="timer-status-box">
-                    <i class="fa-regular fa-alarm-clock"></i>
+                    <i data-lucide="alarm-clock"></i>
                     <div class="timer-status-text" id="timer-status">CHƯA ĐẶT HẸN GIỜ</div>
                 </div>
                 
@@ -139,11 +139,11 @@
                 <input type="number" id="timer-minutes" class="timer-input" placeholder="NHẬP SỐ PHÚT...">
                 
                 <button id="start-timer-btn" class="timer-start-btn">
-                    <i class="fas fa-play"></i> BẮT ĐẦU
+                    <i data-lucide="play"></i> BẮT ĐẦU
                 </button>
                 
                 <button id="cancel-timer-btn" class="timer-cancel-btn">
-                    <i class="fas fa-trash-alt"></i> HỦY HẸN GIỜ
+                    <i data-lucide="trash-2"></i> HỦY HẸN GIỜ
                 </button>
             </div>
         </div>
@@ -152,5 +152,11 @@
     <audio id="audio-player" preload="auto" crossorigin="anonymous" playsinline></audio>
 
     <script src="js/music.js"></script>
+    <script>
+        // Khởi tạo Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    </script>
 </body>
 </html>

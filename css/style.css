@@ -42,6 +42,49 @@ body.dark {
     box-sizing: border-box;
 }
 
+/* Lucide icons styling - icon nhỏ gọn hơn cho vừa nút */
+i[data-lucide],
+.btn-icon svg,
+.notification-icon svg,
+.hint-button-icon svg,
+.timer-status-box svg,
+.playlist-title svg,
+.timer-title svg,
+.hint-decoration svg,
+.current-lyric svg,
+.listen-title svg,
+.close-playlist svg,
+.close-timer svg,
+.close-listen svg,
+.timer-start-btn svg,
+.timer-cancel-btn svg {
+    width: 1em;
+    height: 1em;
+    stroke-width: 2;
+    vertical-align: middle;
+    display: inline-block;
+}
+
+.btn-icon svg {
+    width: 1.05em;
+    height: 1.05em;
+}
+
+.play-btn svg {
+    width: 1.15em;
+    height: 1.15em;
+}
+
+.notification-icon svg {
+    width: 1.2em;
+    height: 1.2em;
+}
+
+.hint-button-icon svg {
+    width: 1.4em;
+    height: 1.4em;
+}
+
 body {
     font-family: "Roboto Condensed", sans-serif;
     background-color: var(--bg-color);
@@ -55,6 +98,12 @@ body {
     user-select: none;
     overflow: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Tắt transition khi đổi theme để tránh nháy nút (giữ nguyên animation của notification) */
+body.no-transition,
+body.no-transition *:not(.notification):not(.notification *) {
+    transition: none !important;
 }
 
 .player-container {
@@ -96,7 +145,7 @@ body.dark .player-container {
     .album-art { width: 140px; height: 140px; }
     .controls-bar { padding: 20px; }
     .btn-icon { width: 38px; height: 38px; font-size: 1rem; }
-    .play-btn { width: 52px; height: 52px; }
+    .play-btn { width: 46px; height: 46px; }
     .song-title { font-size: 1.2rem; }
 }
 
@@ -139,7 +188,7 @@ body.dark .player-container {
 }
 
 .btn-icon {
-    font-size: 1.2rem;
+    font-size: 1.05rem;
     cursor: pointer;
     color: var(--text-secondary);
     width: 42px;
@@ -148,11 +197,21 @@ body.dark .player-container {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                background 0.25s ease,
+                color 0.25s ease,
+                box-shadow 0.25s ease;
     position: relative;
     overflow: hidden;
     background: var(--btn-bg);
     backdrop-filter: blur(4px);
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* SVG không chặn sự kiện click / animation của nút */
+.btn-icon svg {
+    pointer-events: none;
+    flex-shrink: 0;
 }
 
 .btn-icon::before {
@@ -165,7 +224,8 @@ body.dark .player-container {
     border-radius: 50%;
     background: var(--btn-hover);
     transform: translate(-50%, -50%);
-    transition: width 0.4s, height 0.4s;
+    transition: width 0.35s ease, height 0.35s ease;
+    pointer-events: none;
 }
 
 .btn-icon:active::before {
@@ -199,27 +259,14 @@ body.dark .btn-icon.active {
 }
 
 .play-btn {
-    background: #000;
-    color: #fff !important;
-    width: 55px;
-    height: 55px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    /* Giống các nút khác, chỉ hơi to hơn một chút */
+    width: 50px;
+    height: 50px;
     transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-body.dark .play-btn {
-    background: #fff;
-    color: #000 !important;
 }
 
 .play-btn:hover {
     transform: scale(1.08);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    background: #1a1a1a;
-}
-
-body.dark .play-btn:hover {
-    background: #e0e0e0;
 }
 
 .play-btn:active {
@@ -230,6 +277,10 @@ body.dark .play-btn:hover {
 .top-left-action .btn-icon {
     background: rgba(0, 0, 0, 0.03);
     backdrop-filter: blur(4px);
+    transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                background 0.25s ease,
+                color 0.25s ease,
+                box-shadow 0.25s ease;
 }
 
 body.dark .top-right-action .btn-icon,
@@ -240,7 +291,8 @@ body.dark .top-left-action .btn-icon {
 .top-right-action .btn-icon:hover,
 .top-left-action .btn-icon:hover {
     background: rgba(0, 0, 0, 0.1);
-    transform: rotate(5deg) scale(1.05);
+    transform: rotate(6deg) scale(1.1);
+    color: var(--text-primary);
 }
 
 body.dark .top-right-action .btn-icon:hover,
@@ -250,7 +302,7 @@ body.dark .top-left-action .btn-icon:hover {
 
 .top-right-action .btn-icon:active,
 .top-left-action .btn-icon:active {
-    transform: rotate(0deg) scale(0.92);
+    transform: rotate(0deg) scale(0.9);
 }
 
 .album-art {
@@ -458,11 +510,17 @@ body.dark .album-art {
 }
 
 .main-actions .btn-icon {
-    transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    transition: transform 0.22s cubic-bezier(0.68, -0.55, 0.265, 1.55),
+                background 0.22s ease,
+                color 0.22s ease;
+}
+
+.main-actions .btn-icon:hover {
+    transform: scale(1.1);
 }
 
 .main-actions .btn-icon:active {
-    transform: scale(0.92);
+    transform: scale(0.9);
 }
 
 .playlist {
@@ -588,6 +646,34 @@ body.dark .song-item.active {
     line-height: 1.4;
     color: var(--text-primary);
     transition: color 0.3s ease;
+}
+
+/* Dòng nghệ sĩ + icon mic */
+.song-artist-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.song-artist-line svg,
+.song-artist-line [data-lucide] {
+    width: 0.75em !important;
+    height: 0.75em !important;
+    min-width: 11px;
+    min-height: 11px;
+    stroke-width: 2;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.song-item svg,
+.song-item [data-lucide] {
+    width: 0.75em !important;
+    height: 0.75em !important;
+    min-width: 12px;
+    min-height: 12px;
+    stroke-width: 2;
 }
 
 #interaction-hint {
@@ -742,8 +828,11 @@ body.dark .song-item.active {
     border: 1px solid var(--border-color);
 }
 
-.timer-status-box i {
+.timer-status-box i,
+.timer-status-box svg {
     font-size: 1.5rem;
+    width: 1.5em;
+    height: 1.5em;
     color: var(--accent-color);
     margin-bottom: 8px;
 }
@@ -897,7 +986,9 @@ body.dark .song-item.active {
     background: var(--playlist-bg);
     z-index: 200;
     transform: translateY(-100%);
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.35s ease;
     display: flex;
     flex-direction: column;
     border-radius: 32px;
@@ -905,6 +996,7 @@ body.dark .song-item.active {
 
 .listen-modal.show {
     transform: translateY(0);
+    opacity: 1;
 }
 
 .listen-modal-header {
@@ -932,6 +1024,16 @@ body.dark .song-item.active {
     background: var(--progress-bg);
 }
 
+.listen-modal-header .close-listen svg,
+.close-playlist svg,
+.close-timer svg {
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--text-primary);
+    stroke: currentColor;
+    stroke-width: 2;
+}
+
 .listen-modal-header .close-listen:hover {
     background: var(--btn-hover);
     transform: rotate(90deg);
@@ -946,10 +1048,26 @@ body.dark .song-item.active {
     text-transform: uppercase;
     letter-spacing: 1.5px;
     font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-primary);
+}
+
+.listen-modal-header .listen-title span {
     background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+}
+
+.listen-modal-header .listen-title svg,
+.listen-modal-header .listen-title-icon {
+    color: var(--text-primary) !important;
+    stroke: currentColor !important;
+    width: 1em !important;
+    height: 1em !important;
+    flex-shrink: 0;
 }
 
 .listen-stats {
@@ -980,8 +1098,11 @@ body.dark .song-item.active {
     gap: 8px;
 }
 
-.listen-total span:first-child i {
+.listen-total span:first-child i,
+.listen-total span:first-child svg {
     font-size: 1rem;
+    width: 1em;
+    height: 1em;
     color: var(--accent-color);
 }
 
@@ -1228,10 +1349,13 @@ body.dark .listen-stat-item.current-playing {
     font-weight: 600;
 }
 
-.hint-decoration i.fa-heart {
+.hint-decoration [data-lucide="heart"],
+.hint-decoration svg {
     color: #ff4d4d;
     margin: 0 3px;
     animation: heartBeat 1.5s ease infinite;
+    width: 1em;
+    height: 1em;
 }
 
 @keyframes heartBeat {
@@ -1316,8 +1440,11 @@ body.dark .hint-decoration {
     flex-shrink: 0;
 }
 
-.notification-icon i {
+.notification-icon i,
+.notification-icon svg {
     font-size: 0.9rem;
+    width: 1em;
+    height: 1em;
     color: #4ade80;
 }
 
@@ -1377,8 +1504,11 @@ body.dark .notification-message {
         height: 24px;
     }
     
-    .notification-icon i {
+    .notification-icon i,
+    .notification-icon svg {
         font-size: 0.8rem;
+        width: 0.9em;
+        height: 0.9em;
     }
     
     .notification-title {
