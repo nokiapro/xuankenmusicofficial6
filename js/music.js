@@ -350,12 +350,16 @@ function loadSongInfoOnly(i) {
     document.documentElement.style.setProperty('--accent-color', colors.accent);
     
     fetchLyricWithFallback(song.lrc1, song.lrc2).then(lyricData => {
-        lyrics = lyricData;
+        lyrics = lyricData || [];
         if (lyrics.length === 0) {
             adjustLyricFontSize("BÀI HÁT TẠM CHƯA CÓ LYRIC NHA HIHI");
         } else {
             adjustLyricFontSize("NHẤN PLAY ĐỂ NGHE NHẠC");
         }
+    }).catch(e => {
+        console.error("LỖI TẢI LYRIC:", e);
+        lyrics = [];
+        adjustLyricFontSize("BÀI HÁT TẠM CHƯA CÓ LYRIC NHA HIHI");
     });
     
     renderPlaylist();
@@ -733,23 +737,37 @@ function formatTime(sec) {
 }
 
 function parseLRC(text) {
-    const lines = text.split('\n');
-    const result = [];
-    const timeReg = /\[(\d+):(\d+\.\d+)\]/;
-    lines.forEach(line => {
-        const match = timeReg.exec(line);
-        if (match) result.push({ time: parseInt(match[1]) * 60 + parseFloat(match[2]), text: line.replace(timeReg, '').trim() });
-    });
-    return result.sort((a, b) => a.time - b.time);
+    try {
+        if (!text || typeof text !== 'string') return [];
+        const lines = text.split('\n');
+        const result = [];
+        const timeReg = /\[(\d+):(\d+\.\d+)\]/;
+        lines.forEach(line => {
+            const match = timeReg.exec(line);
+            if (match) result.push({ time: parseInt(match[1]) * 60 + parseFloat(match[2]), text: line.replace(timeReg, '').trim() });
+        });
+        return result.sort((a, b) => a.time - b.time);
+    } catch (e) {
+        console.error("LỖI PARSE LRC:", e);
+        return [];
+    }
 }
 
 async function fetchLyricWithFallback(lrc1, lrc2) {
-    const urls = [lrc1, lrc2].filter(url => url && url.trim() !== "");
-    for (let i = 0; i < urls.length; i++) {
-        try {
-            const res = await fetch(urls[i]);
-            if (res.ok) return parseLRC(await res.text());
-        } catch (e) { console.error("LỖI FETCH LYRIC:", e); }
+    try {
+        const urls = [lrc1, lrc2].filter(url => url && typeof url === 'string' && url.trim() !== "");
+        for (let i = 0; i < urls.length; i++) {
+            try {
+                const res = await fetch(urls[i]);
+                if (res.ok) {
+                    const text = await res.text();
+                    const parsed = parseLRC(text);
+                    if (parsed && parsed.length > 0) return parsed;
+                }
+            } catch (e) { console.error("LỖI FETCH LYRIC:", e); }
+        }
+    } catch (e) {
+        console.error("LỖI FETCH LYRIC FALLBACK:", e);
     }
     return [];
 }
@@ -859,8 +877,17 @@ async function loadSong(i) {
     lastLyric = "";
     adjustLyricFontSize("ĐANG TẢI LỜI BÀI HÁT...");
     
-    lyrics = await fetchLyricWithFallback(song.lrc1, song.lrc2);
-    if (lyrics.length === 0) adjustLyricFontSize("BÀI HÁT TẠM CHƯA CÓ LYRIC NHA HIHI");
+    try {
+        lyrics = await fetchLyricWithFallback(song.lrc1, song.lrc2);
+        if (!lyrics || lyrics.length === 0) {
+            lyrics = [];
+            adjustLyricFontSize("BÀI HÁT TẠM CHƯA CÓ LYRIC NHA HIHI");
+        }
+    } catch (e) {
+        console.error("LỖI TẢI LYRIC:", e);
+        lyrics = [];
+        adjustLyricFontSize("BÀI HÁT TẠM CHƯA CÓ LYRIC NHA HIHI");
+    }
     
     renderPlaylist();
     updateMediaSession();
@@ -878,6 +905,9 @@ function changeSong(i, source = 'normal') {
             updateCurrentSongHighlightAndScroll();
             updateListenStatsModal();
         }, 100);
+    }).catch(e => {
+        console.error("LỖI LOAD SONG:", e);
+        isChanging = false;
     });
 }
 
