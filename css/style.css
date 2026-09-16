@@ -1904,3 +1904,125 @@ body.dark .notification-message {
     vertical-align: middle;
     letter-spacing: 0.3px;
 }
+
+/* Username gate */
+.username-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: min(320px, 88%);
+    margin-top: 8px;
+    z-index: 2;
+}
+
+.username-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary, #555);
+    text-transform: uppercase;
+}
+
+.username-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.9);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+    font-family: inherit;
+    outline: none;
+    color: #111;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+
+body.dark .username-input {
+    background: rgba(40,40,48,0.95);
+    border-color: #333;
+    color: #fff;
+}
+
+.username-input:focus {
+    border-color: #8c00ff;
+    box-shadow: 0 0 0 3px rgba(140,0,255,0.15);
+}
+
+.username-error {
+    font-size: 0.72rem;
+    color: #ff4444;
+    font-weight: 600;
+}
+
+.username-start-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.92);
+    color: #111;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.username-start-btn:hover {
+    transform: scale(1.03);
+}
+
+.username-start-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.admin-link-hint {
+    margin-top: 14px;
+    font-size: 0.7rem;
+    color: rgba(0,0,0,0.35);
+    text-decoration: none;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+body.dark .admin-link-hint {
+    color: rgba(255,255,255,0.35);
+}
+
+.user-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: var(--btn-bg);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    max-width: 90%;
+}
+
+.user-badge svg {
+    width: 13px;
+    height: 13px;
+}
+
+.user-badge .fa-coins {
+    color: #f5b942;
+    font-size: 0.75rem;
+}
+
+.user-badge-sep {
+    opacity: 0.4;
+}
