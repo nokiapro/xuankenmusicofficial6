@@ -16,6 +16,10 @@
     --song-item-hover: rgba(0, 0, 0, 0.04);
     --input-bg: #fafafa;
     --modal-bg: rgba(255, 255, 255, 0.98);
+    /* Gradient icon như music2 */
+    --icon-gradient: linear-gradient(135deg, #ff0040, #8c00ff, #ff0040);
+    --icon-gradient-hover: linear-gradient(135deg, #ff6b6b, #c2185b, #ff6b6b);
+    --icon-gradient-active: linear-gradient(135deg, #ff0040, #ffd700, #ff0040);
 }
 
 body.dark {
@@ -34,6 +38,9 @@ body.dark {
     --song-item-hover: rgba(255, 255, 255, 0.05);
     --input-bg: #2a2a2a;
     --modal-bg: rgba(30, 30, 35, 0.98);
+    --icon-gradient: linear-gradient(135deg, #ffd89b, #c7e9fb, #ffd89b);
+    --icon-gradient-hover: linear-gradient(135deg, #fbc2eb, #a6c1ee, #fbc2eb);
+    --icon-gradient-active: linear-gradient(135deg, #ffd89b, #ff6b6b, #ffd89b);
 }
 
 * {
@@ -76,8 +83,8 @@ i[data-lucide],
 }
 
 .notification-icon svg {
-    width: 1.2em;
-    height: 1.2em;
+    width: 16px !important;
+    height: 16px !important;
 }
 
 .hint-button-icon svg {
@@ -212,6 +219,78 @@ body.dark .player-container {
 .btn-icon svg {
     pointer-events: none;
     flex-shrink: 0;
+}
+
+/* Gradient chạy trên icon FA (và text) như music2 */
+.btn-icon i,
+.play-btn i,
+#repeat-btn i {
+    background: var(--icon-gradient);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradientShift 3s ease infinite;
+}
+
+.btn-icon:hover i,
+.play-btn:hover i,
+#repeat-btn:hover i {
+    background: var(--icon-gradient-hover);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradientShift 0.8s ease infinite;
+}
+
+.btn-icon.active i,
+.play-btn.playing i,
+#repeat-btn.active i {
+    background: var(--icon-gradient-active);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 900;
+    animation: gradientShift 1s ease infinite;
+}
+
+/* Lucide SVG: dùng stroke theo màu gradient (xấp xỉ music2) */
+.btn-icon svg {
+    stroke: #ff0040;
+    animation: lucideStrokeShift 3s ease infinite;
+}
+
+body.dark .btn-icon svg {
+    stroke: #ffd89b;
+}
+
+.btn-icon:hover svg {
+    stroke: #c2185b;
+}
+
+body.dark .btn-icon:hover svg {
+    stroke: #fbc2eb;
+}
+
+.btn-icon.active svg {
+    stroke: #ffd700;
+}
+
+body.dark .btn-icon.active svg {
+    stroke: #ff6b6b;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes lucideStrokeShift {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
 }
 
 .btn-icon::before {
@@ -1442,10 +1521,13 @@ body.dark .hint-decoration {
 
 .notification-icon i,
 .notification-icon svg {
-    font-size: 0.9rem;
-    width: 1em;
-    height: 1em;
+    font-size: 0.9rem !important;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
     color: #4ade80;
+    stroke-width: 2;
 }
 
 .notification-content {
@@ -1480,6 +1562,24 @@ body.dark .hint-decoration {
     transition: transform 0.1s ease;
 }
 
+.notification-message svg {
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px !important;
+    min-height: 14px !important;
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 3px;
+}
+
+/* Sao FA trong toast — nhận gradient từ span cha (background-clip: text) */
+.notification-message i.fa-star,
+.notification-message .fa-star {
+    font-size: 0.85em;
+    margin: 0 3px;
+    vertical-align: middle;
+}
+
 body.dark .notification {
     background: rgba(30, 30, 35, 0.98);
     border-bottom-color: #4ade80;
@@ -1506,9 +1606,11 @@ body.dark .notification-message {
     
     .notification-icon i,
     .notification-icon svg {
-        font-size: 0.8rem;
-        width: 0.9em;
-        height: 0.9em;
+        font-size: 0.8rem !important;
+        width: 14px !important;
+        height: 14px !important;
+        min-width: 14px !important;
+        min-height: 14px !important;
     }
     
     .notification-title {
