@@ -984,6 +984,18 @@ function prevSong() {
 }
 
 function startPlayback() {
+    // Bắt buộc có username
+    if (typeof getCurrentUsername === 'function' && !getCurrentUsername()) {
+        const input = document.getElementById('username-input');
+        const err = document.getElementById('username-error');
+        if (input) input.focus();
+        if (err) {
+            err.textContent = 'Vui lòng nhập username để bắt đầu';
+            err.style.display = 'block';
+        }
+        return;
+    }
+    
     const playerContainer = document.getElementById('player-container');
     const hintEl = document.getElementById('interaction-hint');
     
@@ -1027,6 +1039,16 @@ function togglePlay() {
     const hintEl = document.getElementById('interaction-hint');
     
     if (!hasUserInteracted) {
+        if (typeof getCurrentUsername === 'function' && !getCurrentUsername()) {
+            const input = document.getElementById('username-input');
+            const err = document.getElementById('username-error');
+            if (input) input.focus();
+            if (err) {
+                err.textContent = 'Vui lòng nhập username để bắt đầu';
+                err.style.display = 'block';
+            }
+            return;
+        }
         if (isHidingHint) return;
         isHidingHint = true;
         
@@ -1256,13 +1278,10 @@ function renderPlaylist() {
 const playerContainer = document.getElementById('player-container');
 if (playerContainer) playerContainer.style.display = 'none';
 
+// interaction-hint: bắt buộc username trước khi vào (xử lý trong setupUsernameGate)
 if (hint) {
-    const newHint = hint.cloneNode(true);
-    hint.parentNode.replaceChild(newHint, hint);
-    newHint.onclick = function(e) {
-        e.stopPropagation();
-        togglePlay();
-    };
+    // Xóa handler cũ nếu có
+    hint.onclick = null;
 }
 
 const playPauseBtn = document.getElementById('play-pause-btn');
@@ -1547,14 +1566,103 @@ window.addEventListener('beforeunload', () => {
 window.adjustLyricFontSize = adjustLyricFontSize;
 window.selectSongFromList = selectSongFromList;
 
-// ========== CỬA HÀNG XK / ĐIỂM DANH / DEMO 30S ==========
+// ========== USERNAME + CỬA HÀNG XK / ĐIỂM DANH / DEMO 30S ==========
 const DEMO_SECONDS = 30;
-const DEFAULT_SONG_PRICE = 10;
-const CHECKIN_REWARD = 15;
-const STARTER_COINS = 20;
-const STORAGE_COINS = 'xuanken_xk_coins';
-const STORAGE_OWNED = 'xuanken_owned_songs';
-const STORAGE_CHECKIN = 'xuanken_last_checkin';
+const STORAGE_ACCOUNTS = 'xuanken_accounts';
+const STORAGE_CURRENT_USER = 'xuanken_current_user';
+const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
+const STORAGE_SONG_PRICES = 'xuanken_song_prices';
+
+const DEFAULT_ADMIN_SETTINGS = {
+    adminPassword: 'xuanken2024',
+    songPrice: 10,
+    checkinReward: 15,
+    starterCoins: 20
+};
+
+function getAdminSettings() {
+    try {
+        const raw = localStorage.getItem(STORAGE_ADMIN_SETTINGS);
+        if (!raw) return { ...DEFAULT_ADMIN_SETTINGS };
+        return { ...DEFAULT_ADMIN_SETTINGS, ...JSON.parse(raw) };
+    } catch (e) {
+        return { ...DEFAULT_ADMIN_SETTINGS };
+    }
+}
+
+function saveAdminSettings(settings) {
+    localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
+}
+
+function getSongPriceOverrides() {
+    try {
+        const raw = localStorage.getItem(STORAGE_SONG_PRICES);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveSongPriceOverrides(map) {
+    localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(map || {}));
+}
+
+function getAllAccounts() {
+    try {
+        const raw = localStorage.getItem(STORAGE_ACCOUNTS);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveAllAccounts(accounts) {
+    localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(accounts || {}));
+}
+
+function getCurrentUsername() {
+    return (localStorage.getItem(STORAGE_CURRENT_USER) || '').trim();
+}
+
+function setCurrentUsername(name) {
+    localStorage.setItem(STORAGE_CURRENT_USER, String(name || '').trim());
+}
+
+function ensureUserAccount(username) {
+    const name = String(username || '').trim();
+    if (!name) return null;
+    const accounts = getAllAccounts();
+    const settings = getAdminSettings();
+    if (!accounts[name]) {
+        accounts[name] = {
+            coins: settings.starterCoins,
+            owned: [],
+            lastCheckin: '',
+            createdAt: Date.now()
+        };
+        saveAllAccounts(accounts);
+    }
+    return accounts[name];
+}
+
+function getCurrentAccount() {
+    const name = getCurrentUsername();
+    if (!name) return null;
+    return ensureUserAccount(name);
+}
+
+function updateCurrentAccount(mutator) {
+    const name = getCurrentUsername();
+    if (!name) return null;
+    const accounts = getAllAccounts();
+    if (!accounts[name]) {
+        const settings = getAdminSettings();
+        accounts[name] = { coins: settings.starterCoins, owned: [], lastCheckin: '', createdAt: Date.now() };
+    }
+    mutator(accounts[name]);
+    saveAllAccounts(accounts);
+    return accounts[name];
+}
 
 function getTodayKey() {
     const d = new Date();
@@ -1562,68 +1670,78 @@ function getTodayKey() {
 }
 
 function loadCoins() {
-    const n = parseInt(localStorage.getItem(STORAGE_COINS), 10);
-    if (Number.isNaN(n) || n < 0) {
-        localStorage.setItem(STORAGE_COINS, String(STARTER_COINS));
-        return STARTER_COINS;
-    }
-    return n;
+    const acc = getCurrentAccount();
+    return acc ? (acc.coins | 0) : 0;
 }
 
 function saveCoins(n) {
-    localStorage.setItem(STORAGE_COINS, String(Math.max(0, n | 0)));
+    updateCurrentAccount(acc => { acc.coins = Math.max(0, n | 0); });
     updateShopBalanceUI();
+    updateUsernameBadge();
 }
 
 function loadOwnedSongs() {
-    try {
-        const raw = localStorage.getItem(STORAGE_OWNED);
-        if (!raw) return [];
-        const arr = JSON.parse(raw);
-        return Array.isArray(arr) ? arr.map(String) : [];
-    } catch (e) {
-        return [];
-    }
+    const acc = getCurrentAccount();
+    return acc && Array.isArray(acc.owned) ? acc.owned.map(String) : [];
 }
 
 function saveOwnedSongs(ids) {
-    localStorage.setItem(STORAGE_OWNED, JSON.stringify([...new Set(ids.map(String))]));
+    updateCurrentAccount(acc => {
+        acc.owned = [...new Set((ids || []).map(String))];
+    });
 }
 
 function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
-    const owned = loadOwnedSongs();
-    return owned.includes(String(songId));
+    return loadOwnedSongs().includes(String(songId));
 }
 
 function getSongPrice(song) {
-    if (!song) return DEFAULT_SONG_PRICE;
-    if (song.price != null && song.price !== '') {
+    const settings = getAdminSettings();
+    const overrides = getSongPriceOverrides();
+    if (song && song.id != null && overrides[String(song.id)] != null) {
+        const p = Number(overrides[String(song.id)]);
+        if (!Number.isNaN(p) && p >= 0) return p;
+    }
+    if (song && song.price != null && song.price !== '') {
         const p = Number(song.price);
         if (!Number.isNaN(p) && p >= 0) return p;
     }
-    return DEFAULT_SONG_PRICE;
+    return settings.songPrice;
 }
 
 function hasCheckedInToday() {
-    return localStorage.getItem(STORAGE_CHECKIN) === getTodayKey();
+    const acc = getCurrentAccount();
+    return !!(acc && acc.lastCheckin === getTodayKey());
 }
 
 function doDailyCheckin() {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
     if (hasCheckedInToday()) {
         showNotification('ĐIỂM DANH:', 'HÔM NAY ĐÃ ĐIỂM DANH RỒI', '#ff9800', 'calendar-check');
         return false;
     }
-    const coins = loadCoins() + CHECKIN_REWARD;
-    saveCoins(coins);
-    localStorage.setItem(STORAGE_CHECKIN, getTodayKey());
-    showNotification('ĐIỂM DANH:', `+${CHECKIN_REWARD} XU XK`, '#4ade80', 'coins');
+    const reward = getAdminSettings().checkinReward;
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) + reward;
+        acc.lastCheckin = getTodayKey();
+    });
+    showNotification('ĐIỂM DANH:', `+${reward} XU XK`, '#4ade80', 'coins');
     updateCheckinButtonUI();
+    updateShopBalanceUI();
+    updateUsernameBadge();
     renderShopList();
     return true;
 }
 
 function buySong(songId) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
     const song = songs.find(s => String(s.id) === String(songId));
     if (!song) {
         showNotification('LỖI:', 'KHÔNG TÌM THẤY BÀI HÁT', '#ff4444', 'alert-circle');
@@ -1639,19 +1757,32 @@ function buySong(songId) {
         showNotification('THIẾU XU:', `CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
         return false;
     }
-    saveCoins(coins - price);
-    const owned = loadOwnedSongs();
-    owned.push(String(songId));
-    saveOwnedSongs(owned);
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) - price;
+        if (!Array.isArray(acc.owned)) acc.owned = [];
+        acc.owned.push(String(songId));
+        acc.owned = [...new Set(acc.owned)];
+    });
     showNotification('MUA THÀNH CÔNG:', song.name || String(songId), '#4ade80', 'shopping-bag');
     renderShopList();
     updateShopBalanceUI();
+    updateUsernameBadge();
     return true;
 }
 
 function updateShopBalanceUI() {
     const el = document.getElementById('shop-coin-count');
     if (el) el.textContent = String(loadCoins());
+}
+
+function updateUsernameBadge() {
+    const badge = document.getElementById('user-badge');
+    const nameEl = document.getElementById('user-badge-name');
+    const coinEl = document.getElementById('user-badge-coins');
+    const name = getCurrentUsername();
+    if (badge) badge.style.display = name ? 'flex' : 'none';
+    if (nameEl) nameEl.textContent = name || '';
+    if (coinEl) coinEl.textContent = String(loadCoins());
 }
 
 function updateCheckinButtonUI() {
@@ -1725,6 +1856,89 @@ function closeShopModal() {
     if (modal) modal.classList.remove('show');
 }
 
+function loginWithUsername(rawName) {
+    const name = String(rawName || '').trim().replace(/\s+/g, ' ');
+    if (!name || name.length < 2) {
+        return { ok: false, message: 'Username tối thiểu 2 ký tự' };
+    }
+    if (name.length > 20) {
+        return { ok: false, message: 'Username tối đa 20 ký tự' };
+    }
+    if (!/^[\w\u00C0-\u024F\u1E00-\u1EFF .-]+$/i.test(name)) {
+        return { ok: false, message: 'Username không hợp lệ' };
+    }
+    setCurrentUsername(name);
+    ensureUserAccount(name);
+    updateUsernameBadge();
+    updateShopBalanceUI();
+    updateCheckinButtonUI();
+    return { ok: true, username: name };
+}
+
+function setupUsernameGate() {
+    const form = document.getElementById('username-form');
+    const input = document.getElementById('username-input');
+    const err = document.getElementById('username-error');
+    const startBtn = document.getElementById('username-start-btn');
+    const existing = getCurrentUsername();
+    
+    if (existing && input) {
+        input.value = existing;
+        ensureUserAccount(existing);
+        updateUsernameBadge();
+    }
+    
+    const submit = () => {
+        if (!input) return;
+        const result = loginWithUsername(input.value);
+        if (!result.ok) {
+            if (err) {
+                err.textContent = result.message;
+                err.style.display = 'block';
+            }
+            return;
+        }
+        if (err) err.style.display = 'none';
+        // Sau khi có username → vào player như nút bắt đầu cũ
+        startPlayback();
+    };
+    
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            submit();
+        };
+    }
+    if (startBtn) {
+        startBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            submit();
+        };
+    }
+    
+    // Chặn chạm vùng hint nếu chưa nhập user (trừ form)
+    const hintEl = document.getElementById('interaction-hint');
+    if (hintEl) {
+        hintEl.onclick = (e) => {
+            // Chỉ cho submit form / input, không auto start
+            if (e.target.closest('#username-form') || e.target.closest('#username-start-btn')) return;
+            if (!getCurrentUsername()) {
+                if (input) input.focus();
+                if (err) {
+                    err.textContent = 'Vui lòng nhập username để bắt đầu';
+                    err.style.display = 'block';
+                }
+                return;
+            }
+            // Đã có username thì chạm ngoài form vẫn start
+            if (!e.target.closest('input') && !e.target.closest('button')) {
+                startPlayback();
+            }
+        };
+    }
+}
+
 // Gắn sự kiện cửa hàng
 const shopBtn = document.getElementById('shop-btn');
 if (shopBtn) {
@@ -1748,14 +1962,18 @@ if (checkinBtn) {
     };
 }
 
-// Khởi tạo xu lần đầu
-loadCoins();
+setupUsernameGate();
+updateUsernameBadge();
 updateShopBalanceUI();
 updateCheckinButtonUI();
 
 window.buySong = buySong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
+window.getCurrentUsername = getCurrentUsername;
+window.getAllAccounts = getAllAccounts;
+window.getAdminSettings = getAdminSettings;
 
 loadSongsFromSheet();
+
 
