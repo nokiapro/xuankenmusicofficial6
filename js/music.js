@@ -127,6 +127,7 @@ function songsObjectToArray(obj) {
             name: s.name || id,
             artist: s.artist || '',
             audio: s.audio || '',
+            audioFull: s.audioFull || '',
             albumArt: s.albumArt || '',
             listenCount: Number(s.listenCount) || 0,
             lrc1: s.lrc1 || '',
@@ -141,6 +142,13 @@ function songsObjectToArray(obj) {
         return String(a.id || '').localeCompare(String(b.id || ''), 'vi', { sensitivity: 'base' });
     });
     return list;
+}
+
+/** Link phát: đã mua → audioFull (nếu có), chưa mua → audio (demo) */
+function getPlayableAudio(song) {
+    if (!song) return '';
+    if (isSongOwned(song.id) && song.audioFull) return song.audioFull;
+    return song.audio || '';
 }
 
 async function fetchSongsFromFirebase() {
@@ -426,39 +434,48 @@ function getArtistGradientByTheme() {
 function autoScaleNotificationMessage() {
     const noti = document.getElementById('custom-notification');
     if (!noti || !noti.classList.contains('show')) return;
-    
-    let targetElement = noti.querySelector('.notification-message span');
-    if (!targetElement) {
-        targetElement = noti.querySelector('.notification-message');
+
+    const content = noti.querySelector('.notification-content');
+    if (!content) return;
+
+    // Reset trước khi đo
+    content.style.transform = 'none';
+    content.style.maxWidth = '';
+    content.style.whiteSpace = 'nowrap';
+
+    const titleEl = content.querySelector('.notification-title');
+    const msgEl = content.querySelector('.notification-message');
+    const msgSpan = msgEl ? (msgEl.querySelector('span') || msgEl) : null;
+
+    if (msgSpan) {
+        msgSpan.style.transform = 'none';
+        msgSpan.style.whiteSpace = 'nowrap';
+        msgSpan.style.display = 'inline-block';
     }
-    if (!targetElement) return;
-    
-    targetElement.style.transform = 'none';
-    targetElement.style.whiteSpace = 'nowrap';
-    targetElement.style.display = 'inline-block';
-    
-    const container = noti.querySelector('.notification-content');
-    if (!container) return;
-    
-    let containerWidth = container.clientWidth;
-    let textWidth = targetElement.scrollWidth;
-    
+    if (titleEl) {
+        titleEl.style.transform = 'none';
+        titleEl.style.whiteSpace = 'nowrap';
+    }
+
+    // Chiều rộng tối đa toast được phép chiếm (trừ icon + padding)
     const isMobile = window.innerWidth <= 768;
     const isSmallMobile = window.innerWidth <= 480;
-    
-    let paddingReduce = 15;
-    if (isSmallMobile) paddingReduce = 25;
-    else if (isMobile) paddingReduce = 20;
-    
-    if (textWidth > containerWidth - paddingReduce) {
-        let scale = (containerWidth - paddingReduce) / textWidth;
-        let minScale = isSmallMobile ? 0.75 : (isMobile ? 0.7 : 0.5);
-        scale = scale * 0.95;
-        const finalScale = Math.max(scale, minScale);
-        targetElement.style.transform = `scale(${finalScale})`;
-        targetElement.style.transformOrigin = 'left center';
+    const maxToastW = Math.min(window.innerWidth * 0.92, isSmallMobile ? 340 : (isMobile ? 420 : 520));
+    const iconW = 40;
+    const maxContentW = Math.max(120, maxToastW - iconW - 24);
+
+    content.style.maxWidth = maxContentW + 'px';
+
+    // Đo tổng chiều rộng title + message → scale cả khối nếu dài
+    const totalW = content.scrollWidth;
+    if (totalW > maxContentW) {
+        let scale = (maxContentW / totalW) * 0.96;
+        const minScale = isSmallMobile ? 0.55 : (isMobile ? 0.5 : 0.45);
+        scale = Math.max(scale, minScale);
+        content.style.transform = `scale(${scale})`;
+        content.style.transformOrigin = 'center center';
     } else {
-        targetElement.style.transform = 'none';
+        content.style.transform = 'none';
     }
 }
 
@@ -969,7 +986,7 @@ async function loadSong(i) {
     document.documentElement.style.setProperty('--accent-color', colors.accent);
     
     audio.pause();
-    audio.src = song.audio;
+    audio.src = getPlayableAudio(song);
     audio.load();
     
     lyrics = [];
@@ -1074,7 +1091,7 @@ function startPlayback() {
     hidePlayerLoading();
     
     if (songs.length > 0 && songs[index]) {
-        if (!audio.src || audio.src !== songs[index].audio) {
+        if (!audio.src || audio.src !== getPlayableAudio(songs[index])) {
             loadSong(index);
             setTimeout(() => {
                 audio.play().catch(e => console.log("LỖI PHÁT:", e));
@@ -1131,7 +1148,7 @@ function togglePlay() {
         
         if (songs.length > 0 && !isLoadingSongs) {
             hidePlayerLoading();
-            if (songs[index] && (!audio.src || audio.src !== songs[index].audio)) {
+            if (songs[index] && (!audio.src || audio.src !== getPlayableAudio(songs[index]))) {
                 loadSong(index);
                 setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
             } else if (songs[index]) {
@@ -1239,12 +1256,13 @@ audio.ontimeupdate = () => {
         }
     }
     
-    // Demo 30s nếu chưa sở hữu bài
+    // Demo 60s nếu chưa sở hữu bài → mở cửa hàng và highlight đúng bài đang nghe
     if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
+        const demoSong = songs[index];
         audio.pause();
         audio.currentTime = 0;
-        showNotification('DEMO:', 'MUA ĐỂ NGHE FULL BÀI', '#ff9800', 'store');
-        openShopModal();
+        showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
+        openShopModal(demoSong.id);
     }
     
     if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && dur && dur > 5 && songs[index] && hasUserInteracted) {
@@ -1621,7 +1639,7 @@ window.adjustLyricFontSize = adjustLyricFontSize;
 window.selectSongFromList = selectSongFromList;
 
 // ========== USERNAME + CỬA HÀNG XK (Firebase Realtime Database) ==========
-const DEMO_SECONDS = 30;
+const DEMO_SECONDS = 60;
 const STORAGE_ACCOUNTS = 'xuanken_accounts';
 const STORAGE_CURRENT_USER = 'xuanken_current_user';
 const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
@@ -1934,6 +1952,21 @@ function buySong(songId) {
     renderShopList();
     updateShopBalanceUI();
     updateUsernameBadge();
+    // Nếu đang nghe đúng bài vừa mua → chuyển sang link full
+    if (songs[index] && String(songs[index].id) === String(songId)) {
+        const fullUrl = getPlayableAudio(songs[index]);
+        if (fullUrl && audio.src !== fullUrl) {
+            const t = audio.currentTime;
+            const wasPlaying = !audio.paused;
+            audio.src = fullUrl;
+            audio.load();
+            audio.addEventListener('loadedmetadata', function once() {
+                audio.removeEventListener('loadedmetadata', once);
+                try { audio.currentTime = Math.min(t, audio.duration || t); } catch (e) {}
+                if (wasPlaying) audio.play().catch(() => {});
+            });
+        }
+    }
     return true;
 }
 
@@ -1967,26 +2000,32 @@ function updateCheckinButtonUI() {
     }
 }
 
-function renderShopList() {
+function renderShopList(highlightSongId) {
     const list = document.getElementById('shop-list');
     if (!list) return;
     if (!songs || !songs.length) {
         list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:0.8rem;">CHƯA CÓ BÀI HÁT</div>';
         return;
     }
-    list.innerHTML = songs.map(s => {
+    const focusId = highlightSongId != null ? String(highlightSongId) : '';
+    const focusSong = focusId ? songs.find(s => String(s.id) === focusId) : null;
+    const hintHtml = focusSong
+        ? `<div class="shop-buy-hint">Bạn vừa nghe demo « ${escapeHtml(focusSong.name || focusSong.id)} » — mua để nghe full bài nhé!</div>`
+        : '';
+    list.innerHTML = hintHtml + songs.map(s => {
         const id = String(s.id);
         const owned = isSongOwned(id);
         const price = getSongPrice(s);
         const name = escapeHtml(s.name || id);
         const artist = escapeHtml(s.artist || 'ĐANG CẬP NHẬT');
+        const isFocus = focusId && id === focusId;
         const action = owned
             ? `<span class="shop-owned-badge">ĐÃ MUA</span>`
             : `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
         const priceLabel = owned ? '' : `<div class="shop-item-price">${price} XK</div>`;
-        return `<div class="shop-item ${owned ? 'owned' : ''}" data-song-id="${id}">
+        return `<div class="shop-item ${owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
             <div class="shop-item-info">
-                <div class="shop-item-name">${name}${owned ? '' : ' <span class="demo-badge">DEMO 30S</span>'}</div>
+                <div class="shop-item-name">${name}${owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
                 <div class="shop-item-artist">${artist}</div>
                 ${priceLabel}
             </div>
@@ -2000,14 +2039,23 @@ function renderShopList() {
             buySong(btn.getAttribute('data-buy-id'));
         };
     });
+
+    if (focusId) {
+        const el = list.querySelector(`.shop-item[data-song-id="${CSS.escape ? CSS.escape(focusId) : focusId}"]`);
+        if (el) {
+            setTimeout(() => {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 120);
+        }
+    }
 }
 
-function openShopModal() {
+function openShopModal(highlightSongId) {
     const modal = document.getElementById('shop-modal');
     if (!modal) return;
     updateShopBalanceUI();
     updateCheckinButtonUI();
-    renderShopList();
+    renderShopList(highlightSongId);
     modal.classList.remove('show');
     void modal.offsetWidth;
     requestAnimationFrame(() => {

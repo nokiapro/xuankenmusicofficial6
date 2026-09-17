@@ -170,8 +170,12 @@
                         <input id="s-price" type="number" min="0" value="10">
                     </div>
                     <div class="full">
-                        <label>Link audio (MP3) *</label>
-                        <input id="s-audio" placeholder="https://.../bai.mp3">
+                        <label>Link audio DEMO 1 phút *</label>
+                        <input id="s-audio" placeholder="https://.../demo-1p.mp3">
+                    </div>
+                    <div class="full">
+                        <label>Link audio FULL (sau khi mua)</label>
+                        <input id="s-audio-full" placeholder="https://.../full.mp3 — để trống = dùng link demo">
                     </div>
                     <div class="full">
                         <label>Link ảnh bìa</label>
@@ -311,6 +315,7 @@
                 name: obj[id].name || id,
                 artist: obj[id].artist || '',
                 audio: obj[id].audio || '',
+                audioFull: obj[id].audioFull || '',
                 albumArt: obj[id].albumArt || '',
                 listenCount: Number(obj[id].listenCount) || 0,
                 lrc1: obj[id].lrc1 || '',
@@ -369,13 +374,14 @@
             document.getElementById('s-artist').value = song.artist || '';
             document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
             document.getElementById('s-audio').value = song.audio || '';
+            document.getElementById('s-audio-full').value = song.audioFull || '';
             document.getElementById('s-art').value = song.albumArt || '';
             document.getElementById('s-lrc1').value = song.lrc1 || '';
             document.getElementById('s-lrc2').value = song.lrc2 || '';
         }
 
         function clearSongForm() {
-            ['s-id','s-name','s-artist','s-audio','s-art','s-lrc1','s-lrc2'].forEach(id => {
+            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-art','s-lrc1','s-lrc2'].forEach(id => {
                 document.getElementById(id).value = '';
             });
             document.getElementById('s-price').value = settingsCache.songPrice;
@@ -504,11 +510,13 @@
                 return;
             }
             const existing = songsCache.find(s => s.id === id);
+            const audioFull = document.getElementById('s-audio-full').value.trim();
             const payload = {
                 id,
                 name,
                 artist: document.getElementById('s-artist').value.trim(),
                 audio,
+                audioFull: audioFull || null,
                 albumArt: document.getElementById('s-art').value.trim(),
                 lrc1: document.getElementById('s-lrc1').value,
                 lrc2: document.getElementById('s-lrc2').value,
