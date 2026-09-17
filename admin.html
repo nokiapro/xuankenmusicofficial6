@@ -6,7 +6,9 @@
     <link href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
     <title>Admin | XuanKen Music</title>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="https://kit-pro.fontawesome.com/releases/v7.2.0/css/pro.min.css">
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700;800&display=swap');
         :root {
@@ -41,7 +43,6 @@
             color: var(--muted); text-decoration: none; font-size: 0.85rem;
             padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
         }
-        .header a:hover { color: var(--text); border-color: var(--accent); }
         .card {
             background: var(--card); border: 1px solid var(--border);
             border-radius: 16px; padding: 18px; margin-bottom: 16px;
@@ -51,22 +52,20 @@
             margin-bottom: 14px; color: var(--muted);
         }
         .grid-stats {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 12px;
         }
         .stat {
             background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px;
             border: 1px solid var(--border);
         }
-        .stat .n { font-size: 1.5rem; font-weight: 800; }
-        .stat .l { font-size: 0.72rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .tabs {
-            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
-        }
+        .stat .n { font-size: 1.4rem; font-weight: 800; word-break: break-all; }
+        .stat .l { font-size: 0.7rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
         .tab {
             padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
             background: transparent; color: var(--muted); cursor: pointer;
-            font-family: inherit; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.5px;
+            font-family: inherit; font-weight: 700; font-size: 0.78rem;
         }
         .tab.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
@@ -74,24 +73,25 @@
         }
         .panel { display: none; }
         .panel.active { display: block; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        input, select {
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
+        input, select, textarea {
             background: #121218; border: 1px solid var(--border); color: var(--text);
             border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem;
+            width: 100%;
         }
-        input:focus, select:focus { outline: none; border-color: var(--accent); }
+        textarea { min-height: 64px; resize: vertical; }
+        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
         .btn {
             border: none; border-radius: 10px; padding: 8px 12px; cursor: pointer;
-            font-family: inherit; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.4px;
-            text-transform: uppercase;
+            font-family: inherit; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.4px;
+            text-transform: uppercase; white-space: nowrap;
         }
         .btn-primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; }
         .btn-ok { background: rgba(74,222,128,0.15); color: var(--ok); }
         .btn-warn { background: rgba(255,152,0,0.15); color: var(--warn); }
         .btn-danger { background: rgba(255,68,68,0.15); color: #ff6666; }
-        .btn:hover { filter: brightness(1.08); }
         .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .login-box {
             max-width: 380px; margin: 80px auto; padding: 28px;
@@ -102,9 +102,8 @@
         .login-box input { width: 100%; margin-bottom: 12px; }
         .login-box .btn { width: 100%; padding: 12px; }
         .error { color: #ff6666; font-size: 0.8rem; margin-bottom: 10px; display: none; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-        .form-grid label { display: block; font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
-        .form-grid input { width: 100%; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+        .form-grid label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
         .muted { color: var(--muted); font-size: 0.8rem; }
         .toast {
             position: fixed; top: 16px; right: 16px; background: #222; border: 1px solid var(--border);
@@ -113,9 +112,7 @@
         }
         .toast.show { opacity: 1; transform: translateY(0); }
         .search { width: 100%; margin-bottom: 12px; }
-        @media (max-width: 640px) {
-            th:nth-child(3), td:nth-child(3) { display: none; }
-        }
+        .full { grid-column: 1 / -1; }
     </style>
 </head>
 <body>
@@ -124,17 +121,16 @@
             <h1>ADMIN XUANKEN</h1>
             <div class="error" id="login-error">Sai mật khẩu</div>
             <label for="admin-pass">Mật khẩu admin</label>
-            <input type="password" id="admin-pass" placeholder="Nhập mật khẩu...">
+            <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
             <button class="btn btn-primary" id="admin-login-btn">Đăng nhập</button>
-            <p class="muted" style="margin-top:14px;text-align:center;">Mặc định: <b>xuanken2024</b></p>
-            <p style="margin-top:10px;text-align:center;"><a href="index.html" style="color:var(--muted);font-size:0.8rem;">← Về player</a></p>
+            <p style="margin-top:14px;text-align:center;"><a href="index.html" style="color:var(--muted);font-size:0.8rem;">← Về player</a></p>
         </div>
     </div>
 
     <div id="admin-app" class="wrap" style="display:none;">
         <div class="header">
             <h1>XUANKEN ADMIN</h1>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <button class="btn btn-warn" id="logout-btn">Đăng xuất</button>
                 <a href="index.html">Về player</a>
             </div>
@@ -145,15 +141,77 @@
         </div>
 
         <div class="tabs">
-            <button class="tab active" data-tab="users">Người dùng</button>
-            <button class="tab" data-tab="songs">Bài hát / Giá</button>
+            <button class="tab active" data-tab="songs">Bài hát</button>
+            <button class="tab" data-tab="users">Người dùng</button>
             <button class="tab" data-tab="settings">Cài đặt</button>
-            <button class="tab" data-tab="tools">Công cụ</button>
         </div>
 
-        <div class="panel active" id="panel-users">
+        <div class="panel active" id="panel-songs">
             <div class="card">
-                <h2>Quản lý người dùng</h2>
+                <h2>Thêm / sửa bài hát (Firebase)</h2>
+                <div class="form-grid">
+                    <div>
+                        <label>ID bài *</label>
+                        <input id="s-id" placeholder="VD: ABR">
+                    </div>
+                    <div>
+                        <label>Tên bài *</label>
+                        <input id="s-name" placeholder="Tên bài hát">
+                    </div>
+                    <div>
+                        <label>Ca sĩ</label>
+                        <input id="s-artist" placeholder="XuanKen">
+                    </div>
+                    <div>
+                        <label>Giá XK</label>
+                        <input id="s-price" type="number" min="0" value="10">
+                    </div>
+                    <div class="full">
+                        <label>Link audio (MP3) *</label>
+                        <input id="s-audio" placeholder="https://.../bai.mp3">
+                    </div>
+                    <div class="full">
+                        <label>Link ảnh bìa</label>
+                        <input id="s-art" placeholder="https://.../anh.jpg">
+                    </div>
+                    <div class="full">
+                        <label>Lyric LRC 1 (text hoặc URL)</label>
+                        <textarea id="s-lrc1" placeholder="[00:12.00] Lời..."></textarea>
+                    </div>
+                    <div class="full">
+                        <label>Lyric LRC 2 (tuỳ chọn)</label>
+                        <textarea id="s-lrc2"></textarea>
+                    </div>
+                </div>
+                <div class="row-actions" style="margin-top:14px;">
+                    <button class="btn btn-primary" id="save-song-btn">Lưu bài hát</button>
+                    <button class="btn btn-warn" id="clear-song-form-btn">Xoá form</button>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Danh sách bài trên Firebase</h2>
+                <input class="search" id="song-search" placeholder="Tìm bài / ID...">
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên</th>
+                                <th>Ca sĩ</th>
+                                <th>Nghe</th>
+                                <th>Giá</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="songs-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-users">
+            <div class="card">
+                <h2>Người dùng (Firebase)</h2>
                 <input class="search" id="user-search" placeholder="Tìm username...">
                 <div style="overflow-x:auto;">
                     <table>
@@ -167,29 +225,6 @@
                             </tr>
                         </thead>
                         <tbody id="users-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel" id="panel-songs">
-            <div class="card">
-                <h2>Bài hát & giá bán</h2>
-                <p class="muted" style="margin-bottom:10px;">Giá tùy chỉnh lưu trên trình duyệt (local). Giá mặc định lấy từ Cài đặt.</p>
-                <input class="search" id="song-search" placeholder="Tìm bài hát / ID...">
-                <div style="overflow-x:auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên bài</th>
-                                <th>Ca sĩ</th>
-                                <th>Lượt nghe</th>
-                                <th>Giá XK</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="songs-tbody"></tbody>
                     </table>
                 </div>
             </div>
@@ -213,25 +248,13 @@
                     </div>
                     <div>
                         <label>Đổi mật khẩu admin</label>
-                        <input type="text" id="set-password" placeholder="Mật khẩu mới...">
+                        <input type="password" id="set-password" placeholder="Để trống nếu không đổi" autocomplete="new-password">
                     </div>
                 </div>
                 <div style="margin-top:14px;">
                     <button class="btn btn-primary" id="save-settings-btn">Lưu cài đặt</button>
                 </div>
-            </div>
-        </div>
-
-        <div class="panel" id="panel-tools">
-            <div class="card">
-                <h2>Công cụ</h2>
-                <div class="row-actions" style="margin-bottom:12px;">
-                    <button class="btn btn-ok" id="refresh-songs-btn">Tải lại danh sách bài từ Sheet</button>
-                    <button class="btn btn-warn" id="export-data-btn">Xuất JSON dữ liệu</button>
-                    <button class="btn btn-danger" id="reset-users-btn">Xóa toàn bộ user (local)</button>
-                    <button class="btn btn-danger" id="reset-prices-btn">Xóa giá tùy chỉnh</button>
-                </div>
-                <p class="muted">Lưu ý: Username / xu / bài đã mua lưu trên <b>localStorage trình duyệt</b>. Mỗi thiết bị có dữ liệu riêng. Google Sheet vẫn là nguồn danh sách bài & lượt nghe.</p>
+                <p class="muted" style="margin-top:12px;">Firebase Realtime Database · project <b>music6-dfd59</b></p>
             </div>
         </div>
     </div>
@@ -239,12 +262,8 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const API = 'https://script.google.com/macros/s/AKfycbzbol-IvEkdzsJwUsfecA_0SDRjReA1skMmfCEz8ibFe6oj4hx9AzLGik_tsMH-c4A/exec';
-        const STORAGE_ACCOUNTS = 'xuanken_accounts';
-        const STORAGE_CURRENT_USER = 'xuanken_current_user';
-        const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
-        const STORAGE_SONG_PRICES = 'xuanken_song_prices';
         const STORAGE_ADMIN_SESSION = 'xuanken_admin_session';
+        const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
         const DEFAULT_SETTINGS = {
             adminPassword: 'xuanken2024',
             songPrice: 10,
@@ -253,6 +272,12 @@
         };
 
         let songsCache = [];
+        let usersCache = {};
+        let settingsCache = { ...DEFAULT_SETTINGS };
+
+        function db() {
+            return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
+        }
 
         function toast(msg) {
             const el = document.getElementById('toast');
@@ -261,27 +286,11 @@
             setTimeout(() => el.classList.remove('show'), 2200);
         }
 
-        function getSettings() {
-            try {
-                return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(STORAGE_ADMIN_SETTINGS) || '{}') };
-            } catch (e) { return { ...DEFAULT_SETTINGS }; }
+        function escapeHtml(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
-        function saveSettings(s) {
-            localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_SETTINGS, ...s }));
-        }
-        function getAccounts() {
-            try { return JSON.parse(localStorage.getItem(STORAGE_ACCOUNTS) || '{}'); }
-            catch (e) { return {}; }
-        }
-        function saveAccounts(a) {
-            localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(a || {}));
-        }
-        function getPrices() {
-            try { return JSON.parse(localStorage.getItem(STORAGE_SONG_PRICES) || '{}'); }
-            catch (e) { return {}; }
-        }
-        function savePrices(p) {
-            localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(p || {}));
+        function sanitizeKey(name) {
+            return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
         }
 
         function isLoggedIn() {
@@ -291,142 +300,101 @@
             localStorage.setItem(STORAGE_ADMIN_SESSION, v ? '1' : '0');
         }
 
-        function showApp() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('admin-app').style.display = 'block';
-            refreshAll();
-            loadSongs();
-        }
-        function showLogin() {
-            document.getElementById('login-screen').style.display = 'block';
-            document.getElementById('admin-app').style.display = 'none';
-        }
-
-        document.getElementById('admin-login-btn').onclick = () => {
-            const pass = document.getElementById('admin-pass').value;
-            const settings = getSettings();
-            if (pass === settings.adminPassword) {
-                setLoggedIn(true);
-                document.getElementById('login-error').style.display = 'none';
-                showApp();
-            } else {
-                document.getElementById('login-error').style.display = 'block';
+        async function loadSettings() {
+            try {
+                const snap = await db().ref('settings').once('value');
+                const val = snap.val();
+                settingsCache = { ...DEFAULT_SETTINGS, ...(val || {}) };
+                localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify(settingsCache));
+            } catch (e) {
+                try {
+                    settingsCache = { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(STORAGE_ADMIN_SETTINGS) || '{}') };
+                } catch (e2) {
+                    settingsCache = { ...DEFAULT_SETTINGS };
+                }
             }
-        };
-        document.getElementById('admin-pass').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') document.getElementById('admin-login-btn').click();
-        });
-        document.getElementById('logout-btn').onclick = () => {
-            setLoggedIn(false);
-            showLogin();
-        };
+            document.getElementById('set-song-price').value = settingsCache.songPrice;
+            document.getElementById('set-checkin').value = settingsCache.checkinReward;
+            document.getElementById('set-starter').value = settingsCache.starterCoins;
+            document.getElementById('set-password').value = '';
+        }
 
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.onclick = () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-            };
-        });
+        async function loadSongs() {
+            const snap = await db().ref('songs').once('value');
+            const obj = snap.val() || {};
+            songsCache = Object.keys(obj).map(id => ({
+                id: String(obj[id].id || id),
+                name: obj[id].name || id,
+                artist: obj[id].artist || '',
+                audio: obj[id].audio || '',
+                albumArt: obj[id].albumArt || '',
+                listenCount: Number(obj[id].listenCount) || 0,
+                lrc1: obj[id].lrc1 || '',
+                lrc2: obj[id].lrc2 || '',
+                price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice
+            }));
+            // Sắp xếp theo bảng chữ cái (tên bài, rồi ID)
+            songsCache.sort((a, b) => {
+                const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
+                if (na !== 0) return na;
+                return String(a.id || '').localeCompare(String(b.id || ''), 'vi', { sensitivity: 'base' });
+            });
+            renderSongs(document.getElementById('song-search').value);
+            refreshStats();
+        }
+
+        async function loadUsers() {
+            const snap = await db().ref('users').once('value');
+            const obj = snap.val() || {};
+            usersCache = {};
+            Object.keys(obj).forEach(k => {
+                const u = obj[k];
+                const name = u.username || k;
+                usersCache[name] = {
+                    key: k,
+                    coins: u.coins | 0,
+                    owned: Array.isArray(u.owned) ? u.owned : [],
+                    lastCheckin: u.lastCheckin || '',
+                    createdAt: u.createdAt || 0
+                };
+            });
+            renderUsers(document.getElementById('user-search').value);
+            refreshStats();
+        }
 
         function refreshStats() {
-            const accounts = getAccounts();
-            const users = Object.keys(accounts);
-            let totalCoins = 0;
-            let totalOwned = 0;
-            users.forEach(u => {
-                totalCoins += accounts[u].coins | 0;
-                totalOwned += (accounts[u].owned || []).length;
+            const users = Object.keys(usersCache);
+            let totalCoins = 0, totalOwned = 0;
+            users.forEach(n => {
+                totalCoins += usersCache[n].coins | 0;
+                totalOwned += (usersCache[n].owned || []).length;
             });
-            const totalListens = songsCache.reduce((s, x) => s + (Number(x.listenCount) || 0), 0);
+            const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
             document.getElementById('stats-grid').innerHTML = `
                 <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
                 <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
                 <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng xu XK</div></div>
-                <div class="stat"><div class="n">${totalOwned}</div><div class="l">Lượt mua bài</div></div>
-                <div class="stat"><div class="n">${totalListens}</div><div class="l">Tổng lượt nghe</div></div>
-                <div class="stat"><div class="n">${localStorage.getItem(STORAGE_CURRENT_USER) || '—'}</div><div class="l">User hiện tại</div></div>
+                <div class="stat"><div class="n">${totalOwned}</div><div class="l">Lượt mua</div></div>
+                <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
             `;
         }
 
-        function renderUsers(filter = '') {
-            const accounts = getAccounts();
-            const tbody = document.getElementById('users-tbody');
-            const q = filter.trim().toLowerCase();
-            const names = Object.keys(accounts).sort().filter(n => !q || n.toLowerCase().includes(q));
-            if (!names.length) {
-                tbody.innerHTML = `<tr><td colspan="5" class="muted">Chưa có user nào</td></tr>`;
-                return;
-            }
-            tbody.innerHTML = names.map(name => {
-                const a = accounts[name];
-                const owned = (a.owned || []).length;
-                const checkin = a.lastCheckin || '—';
-                return `<tr>
-                    <td><b>${escapeHtml(name)}</b></td>
-                    <td>
-                        <input type="number" min="0" value="${a.coins | 0}" data-user="${escapeAttr(name)}" class="coin-input" style="width:90px">
-                    </td>
-                    <td>${owned}</td>
-                    <td>${escapeHtml(checkin)}</td>
-                    <td>
-                        <div class="row-actions">
-                            <button class="btn btn-ok" data-save-user="${escapeAttr(name)}">Lưu xu</button>
-                            <button class="btn btn-warn" data-gift-user="${escapeAttr(name)}">+50 xu</button>
-                            <button class="btn btn-danger" data-del-user="${escapeAttr(name)}">Xóa</button>
-                        </div>
-                    </td>
-                </tr>`;
-            }).join('');
-
-            tbody.querySelectorAll('[data-save-user]').forEach(btn => {
-                btn.onclick = () => {
-                    const u = btn.getAttribute('data-save-user');
-                    const input = tbody.querySelector(`.coin-input[data-user="${cssEscape(u)}"]`);
-                    const accounts = getAccounts();
-                    if (!accounts[u]) return;
-                    accounts[u].coins = Math.max(0, parseInt(input.value, 10) || 0);
-                    saveAccounts(accounts);
-                    toast('Đã lưu xu cho ' + u);
-                    refreshStats();
-                };
-            });
-            tbody.querySelectorAll('[data-gift-user]').forEach(btn => {
-                btn.onclick = () => {
-                    const u = btn.getAttribute('data-gift-user');
-                    const accounts = getAccounts();
-                    if (!accounts[u]) return;
-                    accounts[u].coins = (accounts[u].coins | 0) + 50;
-                    saveAccounts(accounts);
-                    toast('+50 xu cho ' + u);
-                    renderUsers(document.getElementById('user-search').value);
-                    refreshStats();
-                };
-            });
-            tbody.querySelectorAll('[data-del-user]').forEach(btn => {
-                btn.onclick = () => {
-                    const u = btn.getAttribute('data-del-user');
-                    if (!confirm('Xóa user "' + u + '"?')) return;
-                    const accounts = getAccounts();
-                    delete accounts[u];
-                    saveAccounts(accounts);
-                    if (localStorage.getItem(STORAGE_CURRENT_USER) === u) {
-                        localStorage.removeItem(STORAGE_CURRENT_USER);
-                    }
-                    toast('Đã xóa ' + u);
-                    renderUsers(document.getElementById('user-search').value);
-                    refreshStats();
-                };
-            });
+        function fillSongForm(song) {
+            document.getElementById('s-id').value = song.id || '';
+            document.getElementById('s-name').value = song.name || '';
+            document.getElementById('s-artist').value = song.artist || '';
+            document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
+            document.getElementById('s-audio').value = song.audio || '';
+            document.getElementById('s-art').value = song.albumArt || '';
+            document.getElementById('s-lrc1').value = song.lrc1 || '';
+            document.getElementById('s-lrc2').value = song.lrc2 || '';
         }
 
-        function songPrice(song) {
-            const overrides = getPrices();
-            const settings = getSettings();
-            if (overrides[String(song.id)] != null) return Number(overrides[String(song.id)]);
-            if (song.price != null && song.price !== '') return Number(song.price);
-            return settings.songPrice;
+        function clearSongForm() {
+            ['s-id','s-name','s-artist','s-audio','s-art','s-lrc1','s-lrc2'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('s-price').value = settingsCache.songPrice;
         }
 
         function renderSongs(filter = '') {
@@ -439,116 +407,198 @@
                     || String(s.artist || '').toLowerCase().includes(q);
             });
             if (!list.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="muted">Không có bài hát</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
                 return;
             }
-            tbody.innerHTML = list.map(s => {
-                const id = String(s.id);
-                const price = songPrice(s);
-                return `<tr>
-                    <td><code>${escapeHtml(id)}</code></td>
-                    <td>${escapeHtml(s.name || '')}</td>
-                    <td>${escapeHtml(s.artist || '')}</td>
-                    <td>${Number(s.listenCount) || 0}</td>
-                    <td><input type="number" min="0" value="${price}" data-song-price="${escapeAttr(id)}" style="width:80px"></td>
-                    <td><button class="btn btn-ok" data-save-price="${escapeAttr(id)}">Lưu giá</button></td>
-                </tr>`;
-            }).join('');
+            tbody.innerHTML = list.map(s => `<tr>
+                <td><code>${escapeHtml(s.id)}</code></td>
+                <td>${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.artist)}</td>
+                <td>${s.listenCount || 0}</td>
+                <td>${s.price != null ? s.price : settingsCache.songPrice}</td>
+                <td>
+                    <div class="row-actions">
+                        <button class="btn btn-ok" data-edit="${escapeHtml(s.id)}">Sửa</button>
+                        <button class="btn btn-danger" data-del="${escapeHtml(s.id)}">Xóa</button>
+                    </div>
+                </td>
+            </tr>`).join('');
 
-            tbody.querySelectorAll('[data-save-price]').forEach(btn => {
+            tbody.querySelectorAll('[data-edit]').forEach(btn => {
                 btn.onclick = () => {
-                    const id = btn.getAttribute('data-save-price');
-                    const input = tbody.querySelector(`[data-song-price="${cssEscape(id)}"]`);
-                    const prices = getPrices();
-                    prices[id] = Math.max(0, parseInt(input.value, 10) || 0);
-                    savePrices(prices);
-                    toast('Đã lưu giá bài ' + id);
+                    const song = songsCache.find(x => x.id === btn.getAttribute('data-edit'));
+                    if (song) {
+                        fillSongForm(song);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                };
+            });
+            tbody.querySelectorAll('[data-del]').forEach(btn => {
+                btn.onclick = async () => {
+                    const id = btn.getAttribute('data-del');
+                    if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
+                    await db().ref('songs/' + id).remove();
+                    toast('Đã xóa ' + id);
+                    await loadSongs();
                 };
             });
         }
 
-        async function loadSongs() {
+        function renderUsers(filter = '') {
+            const tbody = document.getElementById('users-tbody');
+            const q = filter.trim().toLowerCase();
+            const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
+            if (!names.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="muted">Chưa có user</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = names.map(name => {
+                const a = usersCache[name];
+                return `<tr>
+                    <td><b>${escapeHtml(name)}</b></td>
+                    <td><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input" style="width:90px"></td>
+                    <td>${(a.owned || []).length}</td>
+                    <td>${escapeHtml(a.lastCheckin || '—')}</td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="btn btn-ok" data-save-user="${escapeHtml(name)}">Lưu xu</button>
+                            <button class="btn btn-warn" data-gift="${escapeHtml(name)}">+50</button>
+                            <button class="btn btn-danger" data-del-user="${escapeHtml(name)}">Xóa</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.querySelectorAll('[data-save-user]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-save-user');
+                    const input = tbody.querySelector('.coin-input[data-user="' + name.replace(/"/g, '') + '"]');
+                    const coins = Math.max(0, parseInt(input.value, 10) || 0);
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    await db().ref('users/' + key + '/coins').set(coins);
+                    usersCache[name].coins = coins;
+                    toast('Đã lưu xu ' + name);
+                    refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-gift]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-gift');
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    const coins = (usersCache[name].coins | 0) + 50;
+                    await db().ref('users/' + key + '/coins').set(coins);
+                    usersCache[name].coins = coins;
+                    toast('+50 xu ' + name);
+                    renderUsers(document.getElementById('user-search').value);
+                    refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-del-user]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-del-user');
+                    if (!confirm('Xóa user "' + name + '"?')) return;
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    await db().ref('users/' + key).remove();
+                    delete usersCache[name];
+                    toast('Đã xóa ' + name);
+                    renderUsers(document.getElementById('user-search').value);
+                    refreshStats();
+                };
+            });
+        }
+
+        document.getElementById('save-song-btn').onclick = async () => {
+            const id = document.getElementById('s-id').value.trim();
+            const name = document.getElementById('s-name').value.trim();
+            const audio = document.getElementById('s-audio').value.trim();
+            if (!id || !name || !audio) {
+                toast('Cần ID, tên bài và link audio');
+                return;
+            }
+            if (/[.#$\\[\\]\\/]/.test(id)) {
+                toast('ID không được chứa . # $ [ ] /');
+                return;
+            }
+            const existing = songsCache.find(s => s.id === id);
+            const payload = {
+                id,
+                name,
+                artist: document.getElementById('s-artist').value.trim(),
+                audio,
+                albumArt: document.getElementById('s-art').value.trim(),
+                lrc1: document.getElementById('s-lrc1').value,
+                lrc2: document.getElementById('s-lrc2').value,
+                price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
+                listenCount: existing ? (existing.listenCount || 0) : 0
+            };
+            await db().ref('songs/' + id).set(payload);
+            toast('Đã lưu bài ' + id);
+            await loadSongs();
+        };
+
+        document.getElementById('clear-song-form-btn').onclick = () => clearSongForm();
+        document.getElementById('song-search').oninput = e => renderSongs(e.target.value);
+        document.getElementById('user-search').oninput = e => renderUsers(e.target.value);
+
+        document.getElementById('save-settings-btn').onclick = async () => {
+            settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
+            settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
+            settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
+            const newPass = document.getElementById('set-password').value.trim();
+            if (newPass) settingsCache.adminPassword = newPass;
+            await db().ref('settings').set({
+                songPrice: settingsCache.songPrice,
+                checkinReward: settingsCache.checkinReward,
+                starterCoins: settingsCache.starterCoins,
+                adminPassword: settingsCache.adminPassword
+            });
+            localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify(settingsCache));
+            toast('Đã lưu cài đặt Firebase');
+            document.getElementById('set-password').value = '';
+        };
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.onclick = () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+            };
+        });
+
+        async function showApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-app').style.display = 'block';
             try {
-                const res = await fetch(API + '?action=getSongs&t=' + Date.now());
-                const data = await res.json();
-                songsCache = (data && data.songs) ? data.songs : [];
-                renderSongs(document.getElementById('song-search').value);
-                refreshStats();
-                toast('Đã tải ' + songsCache.length + ' bài');
+                await loadSettings();
+                await Promise.all([loadSongs(), loadUsers()]);
             } catch (e) {
-                toast('Lỗi tải bài từ Sheet');
+                console.error(e);
+                toast('Lỗi Firebase — kiểm tra Rules / kết nối');
             }
         }
 
-        function loadSettingsForm() {
-            const s = getSettings();
-            document.getElementById('set-song-price').value = s.songPrice;
-            document.getElementById('set-checkin').value = s.checkinReward;
-            document.getElementById('set-starter').value = s.starterCoins;
-            document.getElementById('set-password').value = '';
-        }
-
-        function refreshAll() {
-            refreshStats();
-            renderUsers(document.getElementById('user-search').value);
-            renderSongs(document.getElementById('song-search').value);
-            loadSettingsForm();
-        }
-
-        document.getElementById('user-search').oninput = (e) => renderUsers(e.target.value);
-        document.getElementById('song-search').oninput = (e) => renderSongs(e.target.value);
-        document.getElementById('save-settings-btn').onclick = () => {
-            const s = getSettings();
-            s.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
-            s.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
-            s.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
-            const newPass = document.getElementById('set-password').value.trim();
-            if (newPass) s.adminPassword = newPass;
-            saveSettings(s);
-            toast('Đã lưu cài đặt');
-            loadSettingsForm();
+        document.getElementById('admin-login-btn').onclick = async () => {
+            await loadSettings();
+            const pass = document.getElementById('admin-pass').value;
+            if (pass === settingsCache.adminPassword) {
+                setLoggedIn(true);
+                document.getElementById('login-error').style.display = 'none';
+                showApp();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
         };
-        document.getElementById('refresh-songs-btn').onclick = () => loadSongs();
-        document.getElementById('export-data-btn').onclick = () => {
-            const payload = {
-                accounts: getAccounts(),
-                settings: getSettings(),
-                prices: getPrices(),
-                currentUser: localStorage.getItem(STORAGE_CURRENT_USER),
-                exportedAt: new Date().toISOString()
-            };
-            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'xuanken-admin-export.json';
-            a.click();
-            toast('Đã xuất JSON');
+        document.getElementById('admin-pass').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('admin-login-btn').click();
+        });
+        document.getElementById('logout-btn').onclick = () => {
+            setLoggedIn(false);
+            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('admin-app').style.display = 'none';
         };
-        document.getElementById('reset-users-btn').onclick = () => {
-            if (!confirm('Xóa TOÀN BỘ user local?')) return;
-            saveAccounts({});
-            localStorage.removeItem(STORAGE_CURRENT_USER);
-            refreshAll();
-            toast('Đã xóa users');
-        };
-        document.getElementById('reset-prices-btn').onclick = () => {
-            if (!confirm('Xóa toàn bộ giá tùy chỉnh?')) return;
-            savePrices({});
-            renderSongs(document.getElementById('song-search').value);
-            toast('Đã xóa giá tùy chỉnh');
-        };
-
-        function escapeHtml(s) {
-            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        }
-        function escapeAttr(s) { return escapeHtml(s); }
-        function cssEscape(s) {
-            if (window.CSS && CSS.escape) return CSS.escape(s);
-            return String(s).replace(/"/g, '\\"');
-        }
 
         if (isLoggedIn()) showApp();
-        else showLogin();
     </script>
 </body>
 </html>

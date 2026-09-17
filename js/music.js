@@ -25,7 +25,10 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbzbol-IvEkdzsJwUsfecA_0SDRjReA1skMmfCEz8ibFe6oj4hx9AzLGik_tsMH-c4A/exec';
+// Dữ liệu trên Firebase Realtime Database (js/firebase-config.js)
+function getDb() {
+    return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
+}
 
 // Helper đổi icon Lucide mà không phá animation của nút
 function setLucideIcon(container, iconName) {
@@ -115,28 +118,54 @@ function generateDataHash(data) {
     return JSON.stringify(data.map(s => ({ id: s.id, listenCount: s.listenCount })));
 }
 
+function songsObjectToArray(obj) {
+    if (!obj) return [];
+    const list = Object.keys(obj).map(id => {
+        const s = obj[id] || {};
+        return {
+            id: String(s.id || id),
+            name: s.name || id,
+            artist: s.artist || '',
+            audio: s.audio || '',
+            albumArt: s.albumArt || '',
+            listenCount: Number(s.listenCount) || 0,
+            lrc1: s.lrc1 || '',
+            lrc2: s.lrc2 || '',
+            price: s.price != null ? Number(s.price) : null
+        };
+    }).filter(s => s.audio);
+    // Sắp xếp theo bảng chữ cái (tên bài)
+    list.sort((a, b) => {
+        const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
+        if (na !== 0) return na;
+        return String(a.id || '').localeCompare(String(b.id || ''), 'vi', { sensitivity: 'base' });
+    });
+    return list;
+}
+
+async function fetchSongsFromFirebase() {
+    const db = getDb();
+    if (!db) throw new Error('Firebase chưa sẵn sàng');
+    const snap = await db.ref('songs').once('value');
+    return songsObjectToArray(snap.val());
+}
+
 async function checkForUpdates() {
     if (isRefreshing || !songs.length) return;
     
     try {
         isRefreshing = true;
-        const response = await fetch(`${GOOGLE_SHEET_API}?action=getSongs&t=${Date.now()}`);
+        const newSongs = await fetchSongsFromFirebase();
+        if (!newSongs.length) return;
         
-        if (!response.ok) throw new Error('Fetch failed');
-        
-        const data = await response.json();
-        if (!data || !data.songs || !data.songs.length) return;
-        
-        const newSongs = data.songs;
         const newHash = generateDataHash(newSongs);
         
         if (lastDataHash !== null && lastDataHash !== newHash) {
-            console.log("PHÁT HIỆN THAY ĐỔI DỮ LIỆU, ĐANG CẬP NHẬT...");
+            console.log("PHÁT HIỆN THAY ĐỔI DỮ LIỆU (Firebase)...");
             
             const oldSongIds = new Set(songs.map(s => s.id));
             const addedSongs = newSongs.filter(s => !oldSongIds.has(s.id));
             
-            const wasPlaying = !audio.paused;
             const currentTime = audio.currentTime;
             const currentSongId = songs[index]?.id;
             
@@ -150,9 +179,7 @@ async function checkForUpdates() {
             
             listenData = {};
             songs.forEach(song => {
-                if (song.listenCount !== undefined) {
-                    listenData[song.id] = song.listenCount;
-                }
+                listenData[song.id] = song.listenCount || 0;
             });
             
             const newIndex = songs.findIndex(s => s.id === currentSongId);
@@ -188,10 +215,8 @@ async function checkForUpdates() {
                 });
             }
             
-            if (wasPlaying && currentSongId && newIndex !== -1 && !audio.paused) {
-                if (newIndex !== oldShuffleHistory[oldShuffleHistory.length - 1]) {
-                    audio.currentTime = currentTime;
-                }
+            if (currentSongId && newIndex !== -1 && !audio.paused) {
+                audio.currentTime = currentTime;
             }
         }
         
@@ -212,31 +237,27 @@ async function fetchListenDataSilent() {
     lastListenFetch = now;
     
     try {
-        const response = await fetch(`${GOOGLE_SHEET_API}?action=get&t=${Date.now()}`);
-        if (response.ok) {
-            const data = await response.json();
-            let hasChange = false;
-            
-            for (const song of songs) {
-                const newCount = data[song.id] || 0;
-                if (song.listenCount !== newCount) {
-                    song.listenCount = newCount;
-                    listenData[song.id] = newCount;
-                    hasChange = true;
-                }
+        const list = await fetchSongsFromFirebase();
+        let hasChange = false;
+        list.forEach(s => {
+            const newCount = s.listenCount || 0;
+            listenData[s.id] = newCount;
+            const local = songs.find(x => x.id === s.id);
+            if (local && local.listenCount !== newCount) {
+                local.listenCount = newCount;
+                hasChange = true;
             }
-            
-            if (hasChange) {
-                updateListenStatsModal();
-                localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
-            }
-            return listenData;
+        });
+        if (hasChange) {
+            updateListenStatsModal();
+            localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
         }
+        return listenData;
     } catch (error) {
-        console.log('API error, using local data');
+        console.log('Firebase listen error, using local data');
         const saved = localStorage.getItem('xuanken_listens');
         if (saved) {
-            listenData = JSON.parse(saved);
+            try { listenData = JSON.parse(saved); } catch (e) {}
             updateListenStatsModal();
         }
     }
@@ -266,26 +287,20 @@ if (!Array.prototype.findLast) {
     };
 }
 
-async function loadSongsFromSheet() {
+async function loadSongsFromFirebase() {
     try {
-        const response = await fetch(`${GOOGLE_SHEET_API}?action=getSongs&t=${Date.now()}`);
+        const list = await fetchSongsFromFirebase();
         
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (data && data.songs && data.songs.length > 0) {
-            songs = data.songs;
+        if (list && list.length > 0) {
+            songs = list;
             lastDataHash = generateDataHash(songs);
             
             listenData = {};
             songs.forEach(song => {
-                if (song.id && song.listenCount !== undefined) {
-                    listenData[song.id] = song.listenCount;
-                }
+                listenData[song.id] = song.listenCount || 0;
             });
             
-            console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ GOOGLE SHEET`);
+            console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
             initPlayerAfterLoad();
             updateListenStatsModal();
             
@@ -296,17 +311,24 @@ async function loadSongsFromSheet() {
                 startPlayback();
             }
         } else {
-            throw new Error("DỮ LIỆU KHÔNG ĐÚNG ĐỊNH DẠNG");
+            console.warn('Firebase chưa có bài hát — thêm bài trong Admin');
+            songs = [];
+            isLoadingSongs = false;
+            hidePlayerLoading();
+            showToastMsg('CHƯA CÓ BÀI HÁT — VÀO ADMIN THÊM BÀI', false);
         }
         
     } catch (error) {
-        console.error("LỖI TẢI DỮ LIỆU:", error);
+        console.error("LỖI TẢI DỮ LIỆU FIREBASE:", error);
         showToastMsg("KHÔNG THỂ TẢI DỮ LIỆU!", false);
         songs = [];
         isLoadingSongs = false;
         hidePlayerLoading();
     }
 }
+
+// Alias tương thích
+const loadSongsFromSheet = loadSongsFromFirebase;
 
 function updateArtImage() {
     if (!art || !songs[index]) return;
@@ -447,6 +469,29 @@ function forceScaleNotification() {
     setTimeout(() => autoScaleNotificationMessage(), 150);
 }
 
+let notificationHideAt = 0;
+
+function hideNotification() {
+    const noti = document.getElementById('custom-notification');
+    if (noti) noti.classList.remove('show');
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
+    }
+    notificationHideAt = 0;
+}
+
+function scheduleNotificationHide(ms) {
+    if (notificationTimeout) clearTimeout(notificationTimeout);
+    notificationHideAt = Date.now() + ms;
+    notificationTimeout = setTimeout(() => {
+        // Nếu tab bị ẩn, setTimeout có thể bị trì hoãn — kiểm tra lại thời điểm
+        if (notificationHideAt && Date.now() >= notificationHideAt) {
+            hideNotification();
+        }
+    }, ms);
+}
+
 function showNotification(title, message, color = "#4ade80", icon = "headphones") {
     const noti = document.getElementById('custom-notification');
     if (!noti) return;
@@ -482,10 +527,19 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         forceScaleNotification();
     });
     
-    notificationTimeout = setTimeout(() => {
-        noti.classList.remove('show');
-    }, 10000);
+    scheduleNotificationHide(10000);
 }
+
+// Khi quay lại tab: nếu đã hết hạn thì tắt toast ngay
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && notificationHideAt) {
+        if (Date.now() >= notificationHideAt) {
+            hideNotification();
+        } else {
+            scheduleNotificationHide(Math.max(0, notificationHideAt - Date.now()));
+        }
+    }
+});
 
 function showToastMsg(msg, isListen = false) {
     if (isListen) {
@@ -510,23 +564,23 @@ async function incrementListenCount(songId, songName, source = 'normal') {
     
     isUpdatingListen = true;
     try {
-        const response = await fetch(`${GOOGLE_SHEET_API}?action=increment&id=${encodeURIComponent(songId)}&name=${encodeURIComponent(songName)}&t=${Date.now()}`);
-        const result = await response.json();
+        const db = getDb();
+        if (!db) throw new Error('No DB');
         
-        if (result.success) {
-            listenData[songId] = result.count;
-            
-            const songIndex = songs.findIndex(s => s.id === songId);
-            if (songIndex !== -1) {
-                songs[songIndex].listenCount = result.count;
-            }
-            
-            updateListenStatsModal();
-            localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
-            console.log(`GHI NHẬN: ${songName} (${songId}) - ${result.count}`);
-            
-            showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
+        const ref = db.ref('songs/' + songId + '/listenCount');
+        const result = await ref.transaction(current => (Number(current) || 0) + 1);
+        const count = result.snapshot.val() || 0;
+        
+        listenData[songId] = count;
+        const songIndex = songs.findIndex(s => s.id === songId);
+        if (songIndex !== -1) {
+            songs[songIndex].listenCount = count;
         }
+        
+        updateListenStatsModal();
+        localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+        console.log(`GHI NHẬN: ${songName} (${songId}) - ${count}`);
+        showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
     } catch (error) {
         console.error('LỖI TĂNG LƯỢT NGHE:', error);
         if (!listenData[songId]) listenData[songId] = 0;
@@ -1189,7 +1243,7 @@ audio.ontimeupdate = () => {
     if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
         audio.pause();
         audio.currentTime = 0;
-        showNotification('DEMO:', 'HẾT 30 GIÂY — MUA BÀI ĐỂ NGHE FULL', '#ff9800', 'store');
+        showNotification('DEMO:', 'MUA ĐỂ NGHE FULL BÀI', '#ff9800', 'store');
         openShopModal();
     }
     
@@ -1566,7 +1620,7 @@ window.addEventListener('beforeunload', () => {
 window.adjustLyricFontSize = adjustLyricFontSize;
 window.selectSongFromList = selectSongFromList;
 
-// ========== USERNAME + CỬA HÀNG XK / ĐIỂM DANH / DEMO 30S ==========
+// ========== USERNAME + CỬA HÀNG XK (Firebase Realtime Database) ==========
 const DEMO_SECONDS = 30;
 const STORAGE_ACCOUNTS = 'xuanken_accounts';
 const STORAGE_CURRENT_USER = 'xuanken_current_user';
@@ -1579,6 +1633,8 @@ const DEFAULT_ADMIN_SETTINGS = {
     checkinReward: 15,
     starterCoins: 20
 };
+
+let sheetPricesCache = {};
 
 function getAdminSettings() {
     try {
@@ -1594,6 +1650,20 @@ function saveAdminSettings(settings) {
     localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
 }
 
+async function syncSettingsFromFirebase() {
+    try {
+        const db = getDb();
+        if (!db) return;
+        const snap = await db.ref('settings').once('value');
+        const val = snap.val();
+        if (val && typeof val === 'object') {
+            saveAdminSettings({ ...getAdminSettings(), ...val });
+        }
+    } catch (e) {
+        console.warn('Không đồng bộ Settings Firebase:', e);
+    }
+}
+
 function getSongPriceOverrides() {
     try {
         const raw = localStorage.getItem(STORAGE_SONG_PRICES);
@@ -1605,6 +1675,33 @@ function getSongPriceOverrides() {
 
 function saveSongPriceOverrides(map) {
     localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(map || {}));
+    sheetPricesCache = { ...(map || {}) };
+}
+
+async function syncPricesFromFirebase() {
+    try {
+        const db = getDb();
+        if (!db) return;
+        // Giá có thể nằm trong songs/{id}.price
+        const list = await fetchSongsFromFirebase();
+        const map = {};
+        list.forEach(s => {
+            if (s.price != null && !Number.isNaN(Number(s.price))) {
+                map[s.id] = Number(s.price);
+            }
+        });
+        // + node prices riêng (nếu có)
+        const snap = await db.ref('prices').once('value');
+        const prices = snap.val() || {};
+        Object.keys(prices).forEach(id => {
+            map[id] = Number(prices[id]) || 0;
+        });
+        sheetPricesCache = map;
+        localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(map));
+    } catch (e) {
+        console.warn('Không đồng bộ Prices Firebase:', e);
+        sheetPricesCache = getSongPriceOverrides();
+    }
 }
 
 function getAllAccounts() {
@@ -1645,6 +1742,75 @@ function ensureUserAccount(username) {
     return accounts[name];
 }
 
+function sanitizeUsernameKey(name) {
+    // Firebase key không được chứa . # $ [ ]
+    return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
+}
+
+async function fetchUserFromFirebase(username) {
+    const name = String(username || '').trim();
+    if (!name) return null;
+    const key = sanitizeUsernameKey(name);
+    try {
+        const db = getDb();
+        if (!db) throw new Error('No DB');
+        const snap = await db.ref('users/' + key).once('value');
+        const data = snap.val();
+        const accounts = getAllAccounts();
+        if (data) {
+            accounts[name] = {
+                coins: data.coins | 0,
+                owned: Array.isArray(data.owned) ? data.owned.map(String) : (data.owned ? String(data.owned).split(',').filter(Boolean) : []),
+                lastCheckin: data.lastCheckin || '',
+                createdAt: data.createdAt || Date.now()
+            };
+            saveAllAccounts(accounts);
+            return accounts[name];
+        }
+        // User mới — tạo trên Firebase
+        const settings = getAdminSettings();
+        const neu = {
+            username: name,
+            coins: settings.starterCoins,
+            owned: [],
+            lastCheckin: '',
+            createdAt: Date.now()
+        };
+        await db.ref('users/' + key).set(neu);
+        accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt };
+        saveAllAccounts(accounts);
+        return accounts[name];
+    } catch (e) {
+        console.warn('Lấy user Firebase thất bại, dùng local:', e);
+    }
+    return ensureUserAccount(name);
+}
+
+async function pushUserToFirebase(username, account) {
+    const name = String(username || '').trim();
+    if (!name || !account) return false;
+    const key = sanitizeUsernameKey(name);
+    try {
+        const db = getDb();
+        if (!db) return false;
+        await db.ref('users/' + key).set({
+            username: name,
+            coins: account.coins | 0,
+            owned: account.owned || [],
+            lastCheckin: account.lastCheckin || '',
+            createdAt: account.createdAt || Date.now()
+        });
+        return true;
+    } catch (e) {
+        console.warn('Lưu user Firebase thất bại:', e);
+        return false;
+    }
+}
+
+// Alias cũ
+const fetchUserFromSheet = fetchUserFromFirebase;
+const pushUserToSheet = pushUserToFirebase;
+
 function getCurrentAccount() {
     const name = getCurrentUsername();
     if (!name) return null;
@@ -1661,6 +1827,7 @@ function updateCurrentAccount(mutator) {
     }
     mutator(accounts[name]);
     saveAllAccounts(accounts);
+    pushUserToFirebase(name, accounts[name]);
     return accounts[name];
 }
 
@@ -1698,7 +1865,7 @@ function isSongOwned(songId) {
 
 function getSongPrice(song) {
     const settings = getAdminSettings();
-    const overrides = getSongPriceOverrides();
+    const overrides = { ...getSongPriceOverrides(), ...sheetPricesCache };
     if (song && song.id != null && overrides[String(song.id)] != null) {
         const p = Number(overrides[String(song.id)]);
         if (!Number.isNaN(p) && p >= 0) return p;
@@ -1763,7 +1930,7 @@ function buySong(songId) {
         acc.owned.push(String(songId));
         acc.owned = [...new Set(acc.owned)];
     });
-    showNotification('MUA THÀNH CÔNG:', song.name || String(songId), '#4ade80', 'shopping-bag');
+    showNotification('MUA THÀNH CÔNG:', String(songId), '#4ade80', 'shopping-bag');
     renderShopList();
     updateShopBalanceUI();
     updateUsernameBadge();
@@ -1856,7 +2023,7 @@ function closeShopModal() {
     if (modal) modal.classList.remove('show');
 }
 
-function loginWithUsername(rawName) {
+async function loginWithUsername(rawName) {
     const name = String(rawName || '').trim().replace(/\s+/g, ' ');
     if (!name || name.length < 2) {
         return { ok: false, message: 'Username tối thiểu 2 ký tự' };
@@ -1868,7 +2035,11 @@ function loginWithUsername(rawName) {
         return { ok: false, message: 'Username không hợp lệ' };
     }
     setCurrentUsername(name);
-    ensureUserAccount(name);
+    // Ưu tiên lấy từ Google Sheet, fallback local
+    await fetchUserFromSheet(name);
+    const acc = ensureUserAccount(name);
+    // Bảo đảm user tồn tại trên Sheet
+    await pushUserToSheet(name, acc);
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
@@ -1884,23 +2055,37 @@ function setupUsernameGate() {
     
     if (existing && input) {
         input.value = existing;
-        ensureUserAccount(existing);
+        fetchUserFromSheet(existing).then(() => {
+            updateUsernameBadge();
+            updateShopBalanceUI();
+            updateCheckinButtonUI();
+        });
         updateUsernameBadge();
     }
     
-    const submit = () => {
+    const submit = async () => {
         if (!input) return;
-        const result = loginWithUsername(input.value);
-        if (!result.ok) {
-            if (err) {
-                err.textContent = result.message;
-                err.style.display = 'block';
-            }
-            return;
+        if (startBtn) {
+            startBtn.disabled = true;
+            startBtn.style.opacity = '0.7';
         }
-        if (err) err.style.display = 'none';
-        // Sau khi có username → vào player như nút bắt đầu cũ
-        startPlayback();
+        try {
+            const result = await loginWithUsername(input.value);
+            if (!result.ok) {
+                if (err) {
+                    err.textContent = result.message;
+                    err.style.display = 'block';
+                }
+                return;
+            }
+            if (err) err.style.display = 'none';
+            startPlayback();
+        } finally {
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.style.opacity = '';
+            }
+        }
     };
     
     if (form) {
@@ -1917,11 +2102,9 @@ function setupUsernameGate() {
         };
     }
     
-    // Chặn chạm vùng hint nếu chưa nhập user (trừ form)
     const hintEl = document.getElementById('interaction-hint');
     if (hintEl) {
         hintEl.onclick = (e) => {
-            // Chỉ cho submit form / input, không auto start
             if (e.target.closest('#username-form') || e.target.closest('#username-start-btn')) return;
             if (!getCurrentUsername()) {
                 if (input) input.focus();
@@ -1931,7 +2114,6 @@ function setupUsernameGate() {
                 }
                 return;
             }
-            // Đã có username thì chạm ngoài form vẫn start
             if (!e.target.closest('input') && !e.target.closest('button')) {
                 startPlayback();
             }
@@ -1967,13 +2149,23 @@ updateUsernameBadge();
 updateShopBalanceUI();
 updateCheckinButtonUI();
 
+// Đồng bộ giá + settings từ Firebase (không chặn load nhạc)
+syncPricesFromFirebase();
+syncSettingsFromFirebase();
+
 window.buySong = buySong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
 window.getCurrentUsername = getCurrentUsername;
 window.getAllAccounts = getAllAccounts;
 window.getAdminSettings = getAdminSettings;
+window.pushUserToFirebase = pushUserToFirebase;
+window.fetchUserFromFirebase = fetchUserFromFirebase;
+window.syncPricesFromFirebase = syncPricesFromFirebase;
+window.getDb = getDb;
 
-loadSongsFromSheet();
+loadSongsFromFirebase();
+
+
 
 

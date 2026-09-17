@@ -263,41 +263,70 @@ body.dark .player-container {
     animation: gradientShift 1s ease infinite;
 }
 
-/* Lucide SVG: dùng stroke theo màu gradient (xấp xỉ music2) */
+/* Lucide SVG — màu rõ trên cả light/dark */
 .btn-icon svg {
-    stroke: #ff0040;
-    animation: lucideStrokeShift 3s ease infinite;
+    stroke: #444444;
+    color: #444444;
+    opacity: 1;
 }
 
 body.dark .btn-icon svg {
-    stroke: #ffd89b;
+    stroke: #e8e8f0;
+    color: #e8e8f0;
 }
 
 .btn-icon:hover svg {
-    stroke: #c2185b;
+    stroke: #111111;
+    color: #111111;
 }
 
 body.dark .btn-icon:hover svg {
-    stroke: #fbc2eb;
+    stroke: #ffffff;
+    color: #ffffff;
+}
+
+/* Icon đang BẬT: nền sáng + stroke đậm để phân biệt */
+.btn-icon.active {
+    background: #ffffff !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+    color: #111;
 }
 
 .btn-icon.active svg {
-    stroke: #ffd700;
+    stroke: #ff0040 !important;
+    color: #ff0040 !important;
+}
+
+body.dark .btn-icon.active {
+    background: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    color: #111;
 }
 
 body.dark .btn-icon.active svg {
-    stroke: #ff6b6b;
+    stroke: #ff0040 !important;
+    color: #ff0040 !important;
+}
+
+/* Play đang phát */
+.play-btn.playing {
+    background: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.play-btn.playing svg {
+    stroke: #8c00ff !important;
+    color: #8c00ff !important;
+}
+
+body.dark .play-btn.playing {
+    background: #ffffff !important;
 }
 
 @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
-}
-
-@keyframes lucideStrokeShift {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
 }
 
 .btn-icon::before {
@@ -321,27 +350,16 @@ body.dark .btn-icon.active svg {
 
 .btn-icon:hover {
     transform: scale(1.08);
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(0, 0, 0, 0.08);
     color: var(--text-primary);
 }
 
 body.dark .btn-icon:hover {
-    background: rgba(60, 60, 65, 0.95);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .btn-icon:active {
     transform: scale(0.92);
-}
-
-.btn-icon.active {
-    color: #000;
-    background: rgba(0, 0, 0, 0.08);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-body.dark .btn-icon.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.15);
 }
 
 .play-btn {
@@ -361,7 +379,7 @@ body.dark .btn-icon.active {
 
 .top-right-action .btn-icon,
 .top-left-action .btn-icon {
-    background: rgba(0, 0, 0, 0.03);
+    background: rgba(0, 0, 0, 0.07);
     backdrop-filter: blur(4px);
     transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55),
                 background 0.25s ease,
@@ -371,7 +389,7 @@ body.dark .btn-icon.active {
 
 body.dark .top-right-action .btn-icon,
 body.dark .top-left-action .btn-icon {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .top-right-action .btn-icon:hover,
@@ -1926,28 +1944,37 @@ body.dark .notification-message {
 
 .username-input {
     width: 100%;
-    padding: 12px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(0,0,0,0.08);
-    background: rgba(255,255,255,0.9);
+    padding: 12px 18px;
+    border-radius: 50px;
+    border: none;
+    background: rgba(255,255,255,0.92);
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     text-align: center;
     font-family: inherit;
     outline: none;
     color: #111;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 body.dark .username-input {
-    background: rgba(40,40,48,0.95);
-    border-color: #333;
+    background: rgba(255,255,255,0.12);
     color: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+.username-input::placeholder {
+    color: rgba(0,0,0,0.35);
+    font-weight: 600;
+}
+
+body.dark .username-input::placeholder {
+    color: rgba(255,255,255,0.4);
 }
 
 .username-input:focus {
-    border-color: #8c00ff;
-    box-shadow: 0 0 0 3px rgba(140,0,255,0.15);
+    box-shadow: 0 0 0 3px rgba(140,0,255,0.25), 0 8px 24px rgba(0,0,0,0.12);
 }
 
 .username-error {
@@ -1986,43 +2013,86 @@ body.dark .username-input {
 }
 
 .admin-link-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     margin-top: 14px;
-    font-size: 0.7rem;
-    color: rgba(0,0,0,0.35);
-    text-decoration: none;
-    letter-spacing: 1px;
+    padding: 10px 28px;
+    border-radius: 50px;
+    border: none;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
+    text-decoration: none;
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.admin-link-hint:hover {
+    transform: scale(1.03);
+    box-shadow: 0 10px 28px rgba(124, 58, 237, 0.45);
+    color: #fff;
 }
 
 body.dark .admin-link-hint {
-    color: rgba(255,255,255,0.35);
+    background: linear-gradient(135deg, #6d28d9, #c026d3);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
 }
 
+/* Badge user + xu — căn cao bằng hàng icon trên */
 .user-badge {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 110;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 5px;
-    margin-bottom: 6px;
-    padding: 5px 12px;
-    border-radius: 20px;
-    background: var(--btn-bg);
-    font-size: 0.7rem;
+    height: 42px;
+    margin: 0;
+    padding: 0 14px;
+    border-radius: 22px;
+    background: rgba(0, 0, 0, 0.07);
+    backdrop-filter: blur(6px);
+    font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-primary);
-    max-width: 90%;
+    max-width: min(46%, 200px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+body.dark .user-badge {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .user-badge svg {
-    width: 13px;
-    height: 13px;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    stroke: currentColor;
 }
 
 .user-badge .fa-coins {
     color: #f5b942;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .user-badge-sep {
     opacity: 0.4;
+}
+
+#user-badge-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
 }
