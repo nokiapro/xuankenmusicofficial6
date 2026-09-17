@@ -1071,6 +1071,9 @@ function startPlayback() {
         return;
     }
     
+    // Đánh dấu đã tương tác — lần đầu vào web nghe cũng được cộng lượt
+    hasUserInteracted = true;
+    
     const playerContainer = document.getElementById('player-container');
     const hintEl = document.getElementById('interaction-hint');
     
@@ -1095,15 +1098,22 @@ function startPlayback() {
     hidePlayerLoading();
     
     if (songs.length > 0 && songs[index]) {
-        if (!audio.src || audio.src !== getPlayableAudio(songs[index])) {
-            loadSong(index);
+        // Chờ loadSong xong rồi mới play — tránh race isChanging / audio.load
+        const needLoad = !audio.src || audio.src !== getPlayableAudio(songs[index]);
+        const playFn = () => {
+            audio.play().catch(e => console.log("LỖI PHÁT:", e));
             setTimeout(() => {
-                audio.play().catch(e => console.log("LỖI PHÁT:", e));
+                updateCurrentSongHighlightAndScroll();
+                updateListenStatsModal();
             }, 100);
+        };
+        if (needLoad) {
+            loadSong(index).then(playFn).catch(e => {
+                console.error("LỖI LOAD SONG:", e);
+                isChanging = false;
+            });
         } else {
-            setTimeout(() => {
-                audio.play().catch(e => console.log("LỖI PHÁT:", e));
-            }, 100);
+            playFn();
         }
     }
 }
