@@ -7,6 +7,7 @@
     <title>Admin | XuanKen Music</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <style>
@@ -119,8 +120,10 @@
     <div id="login-screen" class="wrap">
         <div class="login-box">
             <h1>ADMIN XUANKEN</h1>
-            <div class="error" id="login-error">Sai mật khẩu</div>
-            <label for="admin-pass">Mật khẩu admin</label>
+            <div class="error" id="login-error">Email hoặc mật khẩu không đúng</div>
+            <label for="admin-email">Email admin</label>
+            <input type="email" id="admin-email" placeholder="admin@xuanken.com" autocomplete="username">
+            <label for="admin-pass">Mật khẩu</label>
             <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
             <button class="btn btn-primary" id="admin-login-btn">Đăng nhập</button>
             <p style="margin-top:14px;text-align:center;"><a href="index.html" style="color:var(--muted);font-size:0.8rem;">← Về player</a></p>
@@ -246,15 +249,11 @@
                         <label>Xu tặng user mới</label>
                         <input type="number" id="set-starter" min="0">
                     </div>
-                    <div>
-                        <label>Đổi mật khẩu admin</label>
-                        <input type="password" id="set-password" placeholder="Để trống nếu không đổi" autocomplete="new-password">
-                    </div>
                 </div>
                 <div style="margin-top:14px;">
                     <button class="btn btn-primary" id="save-settings-btn">Lưu cài đặt</button>
                 </div>
-                <p class="muted" style="margin-top:12px;">Firebase Realtime Database · project <b>music6-dfd59</b></p>
+                <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
             </div>
         </div>
     </div>
@@ -262,10 +261,7 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const STORAGE_ADMIN_SESSION = 'xuanken_admin_session';
-        const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
         const DEFAULT_SETTINGS = {
-            adminPassword: 'xuanken2024',
             songPrice: 10,
             checkinReward: 15,
             starterCoins: 20
@@ -293,30 +289,18 @@
             return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
         }
 
-        function isLoggedIn() {
-            return localStorage.getItem(STORAGE_ADMIN_SESSION) === '1';
-        }
-        function setLoggedIn(v) {
-            localStorage.setItem(STORAGE_ADMIN_SESSION, v ? '1' : '0');
-        }
-
         async function loadSettings() {
             try {
                 const snap = await db().ref('settings').once('value');
                 const val = snap.val();
                 settingsCache = { ...DEFAULT_SETTINGS, ...(val || {}) };
-                localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify(settingsCache));
             } catch (e) {
-                try {
-                    settingsCache = { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(STORAGE_ADMIN_SETTINGS) || '{}') };
-                } catch (e2) {
-                    settingsCache = { ...DEFAULT_SETTINGS };
-                }
+                console.warn('loadSettings fallback', e);
+                settingsCache = { ...DEFAULT_SETTINGS };
             }
             document.getElementById('set-song-price').value = settingsCache.songPrice;
             document.getElementById('set-checkin').value = settingsCache.checkinReward;
             document.getElementById('set-starter').value = settingsCache.starterCoins;
-            document.getElementById('set-password').value = '';
         }
 
         async function loadSongs() {
@@ -544,17 +528,12 @@
             settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
             settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
             settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
-            const newPass = document.getElementById('set-password').value.trim();
-            if (newPass) settingsCache.adminPassword = newPass;
             await db().ref('settings').set({
                 songPrice: settingsCache.songPrice,
                 checkinReward: settingsCache.checkinReward,
-                starterCoins: settingsCache.starterCoins,
-                adminPassword: settingsCache.adminPassword
+                starterCoins: settingsCache.starterCoins
             });
-            localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify(settingsCache));
             toast('Đã lưu cài đặt Firebase');
-            document.getElementById('set-password').value = '';
         };
 
         document.querySelectorAll('.tab').forEach(tab => {
@@ -578,27 +557,65 @@
             }
         }
 
+        function showLogin() {
+            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('admin-app').style.display = 'none';
+            document.getElementById('login-error').style.display = 'none';
+        }
+
         document.getElementById('admin-login-btn').onclick = async () => {
-            await loadSettings();
+            const email = document.getElementById('admin-email').value.trim();
             const pass = document.getElementById('admin-pass').value;
-            if (pass === settingsCache.adminPassword) {
-                setLoggedIn(true);
-                document.getElementById('login-error').style.display = 'none';
-                showApp();
-            } else {
+            if (!email || !pass) {
+                document.getElementById('login-error').textContent = 'Vui lòng nhập email và mật khẩu';
                 document.getElementById('login-error').style.display = 'block';
+                return;
+            }
+            try {
+                document.getElementById('admin-login-btn').disabled = true;
+                document.getElementById('admin-login-btn').textContent = 'Đang đăng nhập...';
+                await firebase.auth().signInWithEmailAndPassword(email, pass);
+                document.getElementById('login-error').style.display = 'none';
+                // onAuthStateChanged sẽ gọi showApp
+            } catch (err) {
+                console.error(err);
+                let msg = 'Email hoặc mật khẩu không đúng';
+                if (err.code === 'auth/user-not-found') msg = 'Tài khoản không tồn tại';
+                if (err.code === 'auth/wrong-password') msg = 'Sai mật khẩu';
+                if (err.code === 'auth/invalid-email') msg = 'Email không hợp lệ';
+                if (err.code === 'auth/too-many-requests') msg = 'Thử lại sau (quá nhiều lần sai)';
+                document.getElementById('login-error').textContent = msg;
+                document.getElementById('login-error').style.display = 'block';
+            } finally {
+                document.getElementById('admin-login-btn').disabled = false;
+                document.getElementById('admin-login-btn').textContent = 'Đăng nhập';
             }
         };
+
         document.getElementById('admin-pass').addEventListener('keydown', e => {
             if (e.key === 'Enter') document.getElementById('admin-login-btn').click();
         });
-        document.getElementById('logout-btn').onclick = () => {
-            setLoggedIn(false);
-            document.getElementById('login-screen').style.display = 'block';
-            document.getElementById('admin-app').style.display = 'none';
+        document.getElementById('admin-email').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('admin-pass').focus();
+        });
+
+        document.getElementById('logout-btn').onclick = async () => {
+            try {
+                await firebase.auth().signOut();
+            } catch (e) {
+                console.error(e);
+            }
+            showLogin();
         };
 
-        if (isLoggedIn()) showApp();
+        // Theo dõi trạng thái đăng nhập
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                showApp();
+            } else {
+                showLogin();
+            }
+        });
     </script>
 </body>
 </html>
