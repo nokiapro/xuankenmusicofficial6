@@ -1,6 +1,6 @@
 // Firebase config — XuanKen Music
 const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyChU4i-6QN7ttYEPGnMNnFKbHXWdBR5NHo",
+    apiKey: "AIzaSyChU4i-6QN7ttYEPGnMNnfKbHXWdBR5NHo",
     authDomain: "music6-dfd59.firebaseapp.com",
     databaseURL: "https://music6-dfd59-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "music6-dfd59",
