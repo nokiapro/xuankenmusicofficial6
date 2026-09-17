@@ -117,8 +117,16 @@ function hidePlayerLoading() {
 }
 
 function generateDataHash(data) {
+    // Chỉ hash cấu trúc bài (id + link audio) — KHÔNG gồm listenCount
+    // để tránh checkForUpdates coi "có người nghe" là đổi data rồi seek audio → giật nhạc
     if (!data || !data.length) return null;
-    return JSON.stringify(data.map(s => ({ id: s.id, listenCount: s.listenCount })));
+    return JSON.stringify(data.map(s => ({
+        id: s.id,
+        audio: s.audio || '',
+        audioFull: s.audioFull || '',
+        name: s.name || '',
+        artist: s.artist || ''
+    })));
 }
 
 function songsObjectToArray(obj) {
@@ -226,9 +234,9 @@ async function checkForUpdates() {
                 });
             }
             
-            if (currentSongId && newIndex !== -1 && !audio.paused) {
-                audio.currentTime = currentTime;
-            }
+            // Không gán audio.currentTime khi đang phát — seek giữa chừng gây giật 1 phát
+            // Chỉ cần cập nhật index/UI; audio tiếp tục stream bình thường
+            void currentTime;
         }
         
         await fetchListenDataSilent();
@@ -441,52 +449,38 @@ function autoScaleNotificationMessage() {
     const content = noti.querySelector('.notification-content');
     if (!content) return;
 
-    // Reset trước khi đo
-    content.style.transform = 'none';
+    const inner = content.querySelector('.notification-content-inner') || content;
+    content.classList.remove('is-marquee');
     content.style.maxWidth = '';
-    content.style.whiteSpace = 'nowrap';
-
-    const titleEl = content.querySelector('.notification-title');
-    const msgEl = content.querySelector('.notification-message');
-    const msgSpan = msgEl ? (msgEl.querySelector('span') || msgEl) : null;
-
-    if (msgSpan) {
-        msgSpan.style.transform = 'none';
-        msgSpan.style.whiteSpace = 'nowrap';
-        msgSpan.style.display = 'inline-block';
-    }
-    if (titleEl) {
-        titleEl.style.transform = 'none';
-        titleEl.style.whiteSpace = 'nowrap';
+    content.style.transform = 'none';
+    if (inner && inner.style) {
+        inner.style.animationDuration = '';
     }
 
-    // Chiều rộng tối đa toast được phép chiếm (trừ icon + padding)
     const isMobile = window.innerWidth <= 768;
     const isSmallMobile = window.innerWidth <= 480;
     const maxToastW = Math.min(window.innerWidth * 0.92, isSmallMobile ? 340 : (isMobile ? 420 : 520));
-    const iconW = 40;
-    const maxContentW = Math.max(120, maxToastW - iconW - 24);
-
+    const iconW = 36;
+    const maxContentW = Math.max(140, maxToastW - iconW - 28);
     content.style.maxWidth = maxContentW + 'px';
 
-    // Đo tổng chiều rộng title + message → scale cả khối nếu dài
-    const totalW = content.scrollWidth;
-    if (totalW > maxContentW) {
-        let scale = (maxContentW / totalW) * 0.96;
-        const minScale = isSmallMobile ? 0.55 : (isMobile ? 0.5 : 0.45);
-        scale = Math.max(scale, minScale);
-        content.style.transform = `scale(${scale})`;
-        content.style.transformOrigin = 'center center';
-    } else {
-        content.style.transform = 'none';
+    // Chữ dài → chạy ngang (marquee) thay vì scale nhỏ
+    const totalW = inner.scrollWidth || content.scrollWidth;
+    if (totalW > maxContentW + 4) {
+        content.style.setProperty('--noti-view-w', maxContentW + 'px');
+        content.classList.add('is-marquee');
+        // Tốc độ ~40px/s, tối thiểu 6s
+        const duration = Math.max(6, (totalW - maxContentW) / 40 + 3);
+        if (inner && inner.style) {
+            inner.style.animationDuration = duration + 's';
+        }
     }
 }
 
 function forceScaleNotification() {
     autoScaleNotificationMessage();
-    setTimeout(() => autoScaleNotificationMessage(), 30);
-    setTimeout(() => autoScaleNotificationMessage(), 80);
-    setTimeout(() => autoScaleNotificationMessage(), 150);
+    setTimeout(() => autoScaleNotificationMessage(), 40);
+    setTimeout(() => autoScaleNotificationMessage(), 120);
 }
 
 let notificationHideAt = 0;
@@ -537,8 +531,16 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         formattedMessage = `<span style="font-weight: 700; background: ${gradient}; background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.5px; font-size: inherit; display: inline-block; white-space: nowrap; animation: titleGradientMove 3s ease infinite;">${message}</span>`;
     }
     
-    noti.querySelector('.notification-title').innerHTML = title;
-    noti.querySelector('.notification-message').innerHTML = formattedMessage;
+    const content = noti.querySelector('.notification-content');
+    if (content) {
+        content.classList.remove('is-marquee');
+        content.innerHTML = `<div class="notification-content-inner"><span class="notification-title">${title}</span><span class="notification-message">${formattedMessage}</span></div>`;
+    } else {
+        const titleEl = noti.querySelector('.notification-title');
+        const msgEl = noti.querySelector('.notification-message');
+        if (titleEl) titleEl.innerHTML = title;
+        if (msgEl) msgEl.innerHTML = formattedMessage;
+    }
     
     // Force reflow rồi bật lại để luôn có fade in
     void noti.offsetWidth;
@@ -1293,15 +1295,30 @@ if (progressThumb) {
     };
 }
 
+let lastProgressUiAt = 0;
+let lastTimeLabelAt = 0;
+
 audio.ontimeupdate = () => {
+    // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
+    if (demoLockedSongId) return;
+
     const cur = audio.currentTime;
     const dur = audio.duration;
-    if (dur) {
+    const now = performance.now();
+
+    // Cập nhật thời gian / progress thưa hơn để nhẹ main thread
+    if (dur && now - lastTimeLabelAt > 250) {
+        lastTimeLabelAt = now;
         const timeCurrent = document.getElementById('time-current');
         const timeTotal = document.getElementById('time-total');
         if (timeCurrent) timeCurrent.innerText = formatTime(cur);
         if (timeTotal) timeTotal.innerText = formatTime(dur);
     }
+    if (now - lastProgressUiAt > 80) {
+        lastProgressUiAt = now;
+        updateProgressUI();
+    }
+
     if (lyrics.length > 0) {
         const active = lyrics.findLast(l => cur >= l.time);
         if (active && lastLyric !== active.text) {
@@ -1313,37 +1330,38 @@ audio.ontimeupdate = () => {
     // Demo 60s nếu chưa sở hữu bài → dừng hẳn, mở cửa hàng đúng bài (không random tiếp)
     if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
         const demoSong = songs[index];
-        if (demoLockedSongId == null) {
-            demoLockedSongId = String(demoSong.id);
-            showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
-            openShopModal(demoSong.id);
-        }
+        demoLockedSongId = String(demoSong.id);
+        showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
+        openShopModal(demoSong.id);
         audio.pause();
-        // Giữ ở mốc 60s để sau khi mua tiếp tục từ đây
+        // Chỉ seek 1 lần khi khóa demo
         try { audio.currentTime = DEMO_SECONDS; } catch (e) {}
         updateProgressUI();
-        return; // không xử lý thêm (listen / loop) trong tick này
+        return;
     }
     
     if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && dur && dur > 5 && songs[index] && hasUserInteracted) {
         hasRecordedCurrentSong = true;
+        // Không await — fire-and-forget để không block ontimeupdate
         incrementListenCount(songs[index].id, songs[index].name, currentSource);
     }
     
-    if (isRepeatOne && dur && (dur - cur) <= 0.1 && !isLoopingHandled && dur > 0) {
-        // Không loop khi đang khóa demo
+    if (isRepeatOne && dur && (dur - cur) <= 0.15 && !isLoopingHandled && dur > 0) {
         if (demoLockedSongId) return;
         isLoopingHandled = true;
         if (hasRecordedCurrentSong) {
             hasRecordedCurrentSong = false;
             currentSource = 'loop';
         }
-        audio.currentTime = 0;
-        setTimeout(() => audio.play().catch(e => setTimeout(() => audio.play(), 20)), 10);
+        // Dùng ended/loop native nếu có thể — tránh seek cứng giữa ontimeupdate
+        try {
+            audio.currentTime = 0;
+            const p = audio.play();
+            if (p && p.catch) p.catch(() => setTimeout(() => audio.play().catch(() => {}), 30));
+        } catch (e) {}
     }
     
-    if (cur > 0 && dur && (dur - cur) > 0.2) isLoopingHandled = false;
-    updateProgressUI();
+    if (cur > 0.3 && dur && (dur - cur) > 0.3) isLoopingHandled = false;
 };
 
 audio.onended = () => {
@@ -1365,8 +1383,12 @@ audio.onended = () => {
                 hasRecordedCurrentSong = false;
                 currentSource = 'loop';
             }
-            audio.currentTime = 0;
-            setTimeout(() => audio.play().catch(e => { audio.load(); setTimeout(() => audio.play(), 50); }), 10);
+            // Không audio.load() lại — load lại gây giật/ngắt quãng rõ
+            try {
+                audio.currentTime = 0;
+                const p = audio.play();
+                if (p && p.catch) p.catch(() => setTimeout(() => audio.play().catch(() => {}), 40));
+            } catch (e) {}
         }
     } else {
         handleNextAction();
