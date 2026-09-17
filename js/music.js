@@ -580,36 +580,40 @@ async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     
     isUpdatingListen = true;
+    
+    // 1. Cộng local + hiện toast NGAY (không chờ Firebase) — tránh phải pause mới hiện
+    if (!listenData[songId]) listenData[songId] = 0;
+    listenData[songId]++;
+    
+    const songIndex = songs.findIndex(s => s.id === songId);
+    if (songIndex !== -1) {
+        songs[songIndex].listenCount = listenData[songId];
+    }
+    
+    localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+    updateListenStatsModal();
+    console.log(`GHI NHẬN: ${songName} (${songId}) - ${listenData[songId]}`);
+    showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
+    
+    // 2. Đồng bộ Firebase ở background (không block UI)
     try {
         const db = getDb();
-        if (!db) throw new Error('No DB');
-        
-        const ref = db.ref('songs/' + songId + '/listenCount');
-        const result = await ref.transaction(current => (Number(current) || 0) + 1);
-        const count = result.snapshot.val() || 0;
-        
-        listenData[songId] = count;
-        const songIndex = songs.findIndex(s => s.id === songId);
-        if (songIndex !== -1) {
-            songs[songIndex].listenCount = count;
+        if (db) {
+            const ref = db.ref('songs/' + songId + '/listenCount');
+            const result = await ref.transaction(current => (Number(current) || 0) + 1);
+            const serverCount = result.snapshot.val() || listenData[songId];
+            
+            // Cập nhật lại cho khớp server (nếu có người khác cũng đang nghe)
+            listenData[songId] = serverCount;
+            if (songIndex !== -1) {
+                songs[songIndex].listenCount = serverCount;
+            }
+            localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+            updateListenStatsModal();
         }
-        
-        updateListenStatsModal();
-        localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
-        console.log(`GHI NHẬN: ${songName} (${songId}) - ${count}`);
-        showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
     } catch (error) {
-        console.error('LỖI TĂNG LƯỢT NGHE:', error);
-        if (!listenData[songId]) listenData[songId] = 0;
-        listenData[songId]++;
-        
-        const songIndex = songs.findIndex(s => s.id === songId);
-        if (songIndex !== -1) {
-            songs[songIndex].listenCount = listenData[songId];
-        }
-        
-        localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
-        updateListenStatsModal();
+        console.error('LỖI TĂNG LƯỢT NGHE (Firebase):', error);
+        // Local đã cộng rồi, không cần làm gì thêm
     } finally {
         isUpdatingListen = false;
     }
