@@ -67,6 +67,9 @@ let hasUserInteracted = false;
 let isDataLoading = false;
 let pendingPlayAfterLoad = false;
 
+/** Bài đang bị khóa sau khi hết demo 60s — không auto next/random cho đến khi mua hoặc đổi bài */
+let demoLockedSongId = null;
+
 function showPlayerLoading() {
     let loadingDiv = document.getElementById('player-loading');
     if (loadingDiv) return;
@@ -1014,6 +1017,7 @@ async function loadSong(i) {
     if (playlistOverlay.classList.contains('active')) setTimeout(scrollToActiveTop, 100);
     
     hasRecordedCurrentSong = false;
+    demoLockedSongId = null; // đổi bài → bỏ khóa demo
     isChanging = false;
 }
 
@@ -1270,13 +1274,19 @@ audio.ontimeupdate = () => {
         }
     }
     
-    // Demo 60s nếu chưa sở hữu bài → mở cửa hàng và highlight đúng bài đang nghe
+    // Demo 60s nếu chưa sở hữu bài → dừng hẳn, mở cửa hàng đúng bài (không random tiếp)
     if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
         const demoSong = songs[index];
+        if (demoLockedSongId == null) {
+            demoLockedSongId = String(demoSong.id);
+            showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
+            openShopModal(demoSong.id);
+        }
         audio.pause();
-        audio.currentTime = 0;
-        showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
-        openShopModal(demoSong.id);
+        // Giữ ở mốc 60s để sau khi mua tiếp tục từ đây
+        try { audio.currentTime = DEMO_SECONDS; } catch (e) {}
+        updateProgressUI();
+        return; // không xử lý thêm (listen / loop) trong tick này
     }
     
     if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && dur && dur > 5 && songs[index] && hasUserInteracted) {
@@ -1285,6 +1295,8 @@ audio.ontimeupdate = () => {
     }
     
     if (isRepeatOne && dur && (dur - cur) <= 0.1 && !isLoopingHandled && dur > 0) {
+        // Không loop khi đang khóa demo
+        if (demoLockedSongId) return;
         isLoopingHandled = true;
         if (hasRecordedCurrentSong) {
             hasRecordedCurrentSong = false;
@@ -1299,6 +1311,17 @@ audio.ontimeupdate = () => {
 };
 
 audio.onended = () => {
+    // File demo ngắn kết thúc / hết 60s → dừng, không nhảy bài random
+    if (demoLockedSongId || (songs[index] && !isSongOwned(songs[index].id))) {
+        audio.pause();
+        if (songs[index] && !isSongOwned(songs[index].id) && demoLockedSongId == null) {
+            demoLockedSongId = String(songs[index].id);
+            try { audio.currentTime = Math.min(DEMO_SECONDS, audio.duration || DEMO_SECONDS); } catch (e) {}
+            showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (songs[index].name || songs[index].id), '#ff9800', 'store');
+            openShopModal(songs[index].id);
+        }
+        return;
+    }
     if (isRepeatOne) {
         if (!isLoopingHandled) {
             isLoopingHandled = true;
@@ -1966,19 +1989,38 @@ function buySong(songId) {
     renderShopList();
     updateShopBalanceUI();
     updateUsernameBadge();
-    // Nếu đang nghe đúng bài vừa mua → chuyển sang link full
-    if (songs[index] && String(songs[index].id) === String(songId)) {
+    
+    // Mua đúng bài vừa hết demo (hoặc đang nghe) → phát full từ mốc 1 phút
+    const isCurrentOrDemo = (songs[index] && String(songs[index].id) === String(songId))
+        || (demoLockedSongId != null && String(demoLockedSongId) === String(songId));
+    
+    if (isCurrentOrDemo) {
+        // Đảm bảo đang đứng đúng bài vừa mua
+        const songIdx = songs.findIndex(s => String(s.id) === String(songId));
+        if (songIdx !== -1) index = songIdx;
+        
+        demoLockedSongId = null;
         const fullUrl = getPlayableAudio(songs[index]);
-        if (fullUrl && audio.src !== fullUrl) {
-            const t = audio.currentTime;
-            const wasPlaying = !audio.paused;
+        if (fullUrl) {
             audio.src = fullUrl;
             audio.load();
             audio.addEventListener('loadedmetadata', function once() {
                 audio.removeEventListener('loadedmetadata', once);
-                try { audio.currentTime = Math.min(t, audio.duration || t); } catch (e) {}
-                if (wasPlaying) audio.play().catch(() => {});
+                try {
+                    const seekTo = Math.min(DEMO_SECONDS, (audio.duration || DEMO_SECONDS) - 0.5);
+                    audio.currentTime = Math.max(0, seekTo);
+                } catch (e) {}
+                audio.play().catch(() => {});
+                updateProgressUI();
             });
+            // Fallback nếu metadata đã có sẵn
+            if (audio.readyState >= 1) {
+                try {
+                    const seekTo = Math.min(DEMO_SECONDS, (audio.duration || DEMO_SECONDS) - 0.5);
+                    audio.currentTime = Math.max(0, seekTo);
+                } catch (e) {}
+                audio.play().catch(() => {});
+            }
         }
     }
     return true;
