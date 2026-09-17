@@ -44,6 +44,9 @@
             color: var(--muted); text-decoration: none; font-size: 0.85rem;
             padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
         }
+        .header .btn {
+            font-size: 0.72rem;
+        }
         .card {
             background: var(--card); border: 1px solid var(--border);
             border-radius: 16px; padding: 18px; margin-bottom: 16px;
@@ -92,8 +95,33 @@
         .btn-primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; }
         .btn-ok { background: rgba(74,222,128,0.15); color: var(--ok); }
         .btn-warn { background: rgba(255,152,0,0.15); color: var(--warn); }
+        .btn-info { background: rgba(59,130,246,0.18); color: #60a5fa; }
         .btn-danger { background: rgba(255,68,68,0.15); color: #ff6666; }
         .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        a.btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            text-decoration: none;
+        }
+        .pagination {
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-top: 14px; flex-wrap: wrap;
+        }
+        .pagination button {
+            min-width: 34px; height: 34px; padding: 0 10px;
+            border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer;
+            font-family: inherit; font-weight: 700; font-size: 0.78rem;
+        }
+        .pagination button.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff; border-color: transparent;
+        }
+        .pagination button:disabled {
+            opacity: 0.4; cursor: not-allowed;
+        }
+        .pagination .page-info {
+            color: var(--muted); font-size: 0.75rem; margin: 0 6px;
+        }
         .login-box {
             max-width: 380px; margin: 80px auto; padding: 28px;
             background: var(--card); border: 1px solid var(--border); border-radius: 18px;
@@ -135,7 +163,7 @@
             <h1>XUANKEN ADMIN</h1>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <button class="btn btn-warn" id="logout-btn">Đăng xuất</button>
-                <a href="index.html">Về player</a>
+                <a href="index.html" class="btn btn-info">Về player</a>
             </div>
         </div>
 
@@ -213,6 +241,7 @@
                         <tbody id="songs-tbody"></tbody>
                     </table>
                 </div>
+                <div class="pagination" id="songs-pagination"></div>
             </div>
         </div>
 
@@ -259,6 +288,25 @@
                 </div>
                 <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
             </div>
+            <div class="card">
+                <h2>Xuất / nhập danh sách bài hát</h2>
+                <p class="muted" style="margin-bottom:12px;">
+                    Xuất toàn bộ list bài (JSON) để backup hoặc thêm link mới. Nhập file JSON để ghi đè / bổ sung bài lên Firebase.
+                </p>
+                <div class="row-actions" style="margin-bottom:12px;">
+                    <button class="btn btn-ok" id="export-songs-btn">Xuất list nhạc (JSON)</button>
+                    <button class="btn btn-info" id="import-songs-btn">Nhập list nhạc (JSON)</button>
+                    <input type="file" id="import-songs-file" accept=".json,application/json" style="display:none;">
+                </div>
+                <label style="display:block;font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Hoặc dán JSON vào đây</label>
+                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","albumArt":"","lrc1":"","lrc2":"","price":10,"listenCount":0}]'></textarea>
+                <div class="row-actions" style="margin-top:12px;">
+                    <button class="btn btn-primary" id="import-songs-paste-btn">Nhập từ ô trên</button>
+                </div>
+                <p class="muted" style="margin-top:10px;">
+                    Khi nhập: bài trùng ID sẽ được cập nhật, bài mới sẽ được thêm. Không xóa bài không có trong file.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -274,6 +322,9 @@
         let songsCache = [];
         let usersCache = {};
         let settingsCache = { ...DEFAULT_SETTINGS };
+        let songsPage = 1;
+        const SONGS_PER_PAGE = 10;
+        let songsFilter = '';
 
         function db() {
             return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
@@ -387,20 +438,73 @@
             document.getElementById('s-price').value = settingsCache.songPrice;
         }
 
-        function renderSongs(filter = '') {
-            const tbody = document.getElementById('songs-tbody');
-            const q = filter.trim().toLowerCase();
-            const list = songsCache.filter(s => {
+        function getFilteredSongs(filter) {
+            const q = String(filter || '').trim().toLowerCase();
+            return songsCache.filter(s => {
                 if (!q) return true;
                 return String(s.id).toLowerCase().includes(q)
                     || String(s.name || '').toLowerCase().includes(q)
                     || String(s.artist || '').toLowerCase().includes(q);
             });
-            if (!list.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
+        }
+
+        function renderSongsPagination(totalPages) {
+            const el = document.getElementById('songs-pagination');
+            if (!el) return;
+            if (totalPages <= 1) {
+                el.innerHTML = totalPages === 1
+                    ? `<span class="page-info">Trang 1 / 1</span>`
+                    : '';
                 return;
             }
-            tbody.innerHTML = list.map(s => `<tr>
+            let html = `<button type="button" data-page="prev" ${songsPage <= 1 ? 'disabled' : ''}>‹</button>`;
+            const maxButtons = 7;
+            let start = Math.max(1, songsPage - Math.floor(maxButtons / 2));
+            let end = Math.min(totalPages, start + maxButtons - 1);
+            start = Math.max(1, end - maxButtons + 1);
+            if (start > 1) {
+                html += `<button type="button" data-page="1">1</button>`;
+                if (start > 2) html += `<span class="page-info">…</span>`;
+            }
+            for (let p = start; p <= end; p++) {
+                html += `<button type="button" data-page="${p}" class="${p === songsPage ? 'active' : ''}">${p}</button>`;
+            }
+            if (end < totalPages) {
+                if (end < totalPages - 1) html += `<span class="page-info">…</span>`;
+                html += `<button type="button" data-page="${totalPages}">${totalPages}</button>`;
+            }
+            html += `<button type="button" data-page="next" ${songsPage >= totalPages ? 'disabled' : ''}>›</button>`;
+            html += `<span class="page-info">Trang ${songsPage} / ${totalPages}</span>`;
+            el.innerHTML = html;
+            el.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.onclick = () => {
+                    const v = btn.getAttribute('data-page');
+                    if (v === 'prev') songsPage = Math.max(1, songsPage - 1);
+                    else if (v === 'next') songsPage = Math.min(totalPages, songsPage + 1);
+                    else songsPage = parseInt(v, 10) || 1;
+                    renderSongs(songsFilter, true);
+                };
+            });
+        }
+
+        function renderSongs(filter = '', keepPage = false) {
+            const tbody = document.getElementById('songs-tbody');
+            if (!keepPage) {
+                songsFilter = filter;
+                songsPage = 1;
+            }
+            const list = getFilteredSongs(songsFilter);
+            const totalPages = Math.max(1, Math.ceil(list.length / SONGS_PER_PAGE));
+            if (songsPage > totalPages) songsPage = totalPages;
+            const start = (songsPage - 1) * SONGS_PER_PAGE;
+            const pageList = list.slice(start, start + SONGS_PER_PAGE);
+
+            if (!list.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
+                renderSongsPagination(0);
+                return;
+            }
+            tbody.innerHTML = pageList.map(s => `<tr>
                 <td><code>${escapeHtml(s.id)}</code></td>
                 <td>${escapeHtml(s.name)}</td>
                 <td>${escapeHtml(s.artist)}</td>
@@ -432,6 +536,7 @@
                     await loadSongs();
                 };
             });
+            renderSongsPagination(totalPages);
         }
 
         function renderUsers(filter = '') {
@@ -542,6 +647,101 @@
                 starterCoins: settingsCache.starterCoins
             });
             toast('Đã lưu cài đặt Firebase');
+        };
+
+        function exportSongsJson() {
+            const data = songsCache.map(s => ({
+                id: s.id,
+                name: s.name,
+                artist: s.artist || '',
+                audio: s.audio || '',
+                audioFull: s.audioFull || '',
+                albumArt: s.albumArt || '',
+                lrc1: s.lrc1 || '',
+                lrc2: s.lrc2 || '',
+                price: s.price != null ? s.price : settingsCache.songPrice,
+                listenCount: s.listenCount || 0
+            }));
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'xuanken-songs-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            toast('Đã xuất ' + data.length + ' bài hát');
+        }
+
+        async function importSongsFromArray(arr) {
+            if (!Array.isArray(arr) || !arr.length) {
+                toast('JSON không hợp lệ hoặc rỗng');
+                return;
+            }
+            let ok = 0, skip = 0;
+            for (const item of arr) {
+                const id = String(item.id || '').trim();
+                const name = String(item.name || '').trim();
+                const audio = String(item.audio || '').trim();
+                if (!id || !name || !audio || /[.#$\[\]/]/.test(id)) {
+                    skip++;
+                    continue;
+                }
+                const existing = songsCache.find(s => s.id === id);
+                const payload = {
+                    id,
+                    name,
+                    artist: String(item.artist || '').trim(),
+                    audio,
+                    audioFull: item.audioFull ? String(item.audioFull).trim() : null,
+                    albumArt: String(item.albumArt || '').trim(),
+                    lrc1: item.lrc1 != null ? String(item.lrc1) : '',
+                    lrc2: item.lrc2 != null ? String(item.lrc2) : '',
+                    price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
+                    listenCount: existing ? (existing.listenCount || 0) : (Number(item.listenCount) || 0)
+                };
+                await db().ref('songs/' + id).set(payload);
+                ok++;
+            }
+            toast('Nhập xong: ' + ok + ' bài' + (skip ? ', bỏ qua ' + skip : ''));
+            await loadSongs();
+        }
+
+        document.getElementById('export-songs-btn').onclick = () => exportSongsJson();
+        document.getElementById('import-songs-btn').onclick = () => {
+            document.getElementById('import-songs-file').click();
+        };
+        document.getElementById('import-songs-file').onchange = async (e) => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
+                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ file? Bài trùng ID sẽ được cập nhật.')) return;
+                await importSongsFromArray(arr);
+            } catch (err) {
+                console.error(err);
+                toast('Không đọc được file JSON');
+            }
+        };
+        document.getElementById('import-songs-paste-btn').onclick = async () => {
+            const raw = document.getElementById('import-songs-textarea').value.trim();
+            if (!raw) {
+                toast('Dán JSON vào ô trước');
+                return;
+            }
+            try {
+                const data = JSON.parse(raw);
+                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
+                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ ô dán? Bài trùng ID sẽ được cập nhật.')) return;
+                await importSongsFromArray(arr);
+            } catch (err) {
+                console.error(err);
+                toast('JSON không hợp lệ');
+            }
         };
 
         document.querySelectorAll('.tab').forEach(tab => {
