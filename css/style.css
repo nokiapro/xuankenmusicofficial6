@@ -6,10 +6,11 @@
     --border-color: #f0f0f0;
     --card-bg: rgba(255, 255, 255, 0.95);
     --text-primary: #000000;
-    --text-secondary: #888888;
+    --text-secondary: #333333;
     --text-tertiary: #555555;
     --progress-bg: rgba(0, 0, 0, 0.08);
-    --btn-bg: rgba(255, 255, 255, 0.8);
+    --btn-bg: rgba(0, 0, 0, 0.05);
+    --btn-active-bg: rgba(0, 0, 0, 0.12);
     --btn-hover: rgba(0, 0, 0, 0.08);
     --playlist-bg: rgba(255, 255, 255, 1);
     --playlist-header-bg: rgba(255, 255, 255, 0.98);
@@ -20,6 +21,7 @@
     --icon-gradient: linear-gradient(135deg, #ff0040, #8c00ff, #ff0040);
     --icon-gradient-hover: linear-gradient(135deg, #ff6b6b, #c2185b, #ff6b6b);
     --icon-gradient-active: linear-gradient(135deg, #ff0040, #ffd700, #ff0040);
+    --icon-active-stroke: #ff0040;
 }
 
 body.dark {
@@ -28,11 +30,12 @@ body.dark {
     --border-color: #2a2a2a;
     --card-bg: rgba(30, 30, 35, 0.95);
     --text-primary: #ffffff;
-    --text-secondary: #aaaaaa;
+    --text-secondary: #cccccc;
     --text-tertiary: #999999;
     --progress-bg: rgba(255, 255, 255, 0.12);
-    --btn-bg: rgba(40, 40, 45, 0.8);
-    --btn-hover: rgba(255, 255, 255, 0.08);
+    --btn-bg: rgba(255, 255, 255, 0.08);
+    --btn-active-bg: rgba(255, 255, 255, 0.18);
+    --btn-hover: rgba(255, 255, 255, 0.05);
     --playlist-bg: rgba(25, 25, 30, 1);
     --playlist-header-bg: rgba(25, 25, 30, 0.98);
     --song-item-hover: rgba(255, 255, 255, 0.05);
@@ -41,6 +44,8 @@ body.dark {
     --icon-gradient: linear-gradient(135deg, #ffd89b, #c7e9fb, #ffd89b);
     --icon-gradient-hover: linear-gradient(135deg, #fbc2eb, #a6c1ee, #fbc2eb);
     --icon-gradient-active: linear-gradient(135deg, #ffd89b, #ff6b6b, #ffd89b);
+    /* Lucide active ~ màu cam hồng như music2 (gradient active) */
+    --icon-active-stroke: #ff6b6b;
 }
 
 * {
@@ -285,48 +290,58 @@ body.dark .btn-icon:hover svg {
     color: #ffffff;
 }
 
-/* Icon đang BẬT: nền sáng + stroke đậm để phân biệt */
+/* Icon đang BẬT — giống music2: nền btn-active + animation đổi màu (Lucide SVG) */
 .btn-icon.active {
-    background: #ffffff !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-    color: #111;
+    background: var(--btn-active-bg) !important;
+    box-shadow: none;
 }
 
 .btn-icon.active svg {
-    stroke: #ff0040 !important;
-    color: #ff0040 !important;
+    animation: iconActiveShiftLight 1s ease infinite !important;
 }
 
 body.dark .btn-icon.active {
-    background: #ffffff !important;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-    color: #111;
+    background: var(--btn-active-bg) !important;
+    box-shadow: none;
 }
 
 body.dark .btn-icon.active svg {
-    stroke: #ff0040 !important;
-    color: #ff0040 !important;
+    animation: iconActiveShiftDark 1s ease infinite !important;
 }
 
 /* Play đang phát */
 .play-btn.playing {
-    background: #ffffff !important;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    background: var(--btn-active-bg) !important;
+    box-shadow: none;
 }
 
 .play-btn.playing svg {
-    stroke: #8c00ff !important;
-    color: #8c00ff !important;
+    animation: iconActiveShiftLight 1s ease infinite !important;
 }
 
 body.dark .play-btn.playing {
-    background: #ffffff !important;
+    background: var(--btn-active-bg) !important;
 }
 
+body.dark .play-btn.playing svg {
+    animation: iconActiveShiftDark 1s ease infinite !important;
+}
+
+/* music2: gradientShift trên FA; Lucide dùng đổi stroke giữa 2 đầu gradient active */
 @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+}
+
+@keyframes iconActiveShiftLight {
+    0%, 100% { stroke: #ff0040; color: #ff0040; }
+    50% { stroke: #ffd700; color: #ffd700; }
+}
+
+@keyframes iconActiveShiftDark {
+    0%, 100% { stroke: #ffd89b; color: #ffd89b; }
+    50% { stroke: #ff6b6b; color: #ff6b6b; }
 }
 
 .btn-icon::before {
