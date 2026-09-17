@@ -862,12 +862,28 @@ function formatTime(sec) {
 function parseLRC(text) {
     try {
         if (!text || typeof text !== 'string') return [];
-        const lines = text.split('\n');
+        const lines = text.split(/\r?\n/);
         const result = [];
-        const timeReg = /\[(\d+):(\d+\.\d+)\]/;
+        // Hỗ trợ [mm:ss], [mm:ss.x], [mm:ss.xx], [mm:ss.xxx]
+        const timeReg = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
         lines.forEach(line => {
-            const match = timeReg.exec(line);
-            if (match) result.push({ time: parseInt(match[1]) * 60 + parseFloat(match[2]), text: line.replace(timeReg, '').trim() });
+            let match;
+            let lastIndex = 0;
+            let times = [];
+            timeReg.lastIndex = 0;
+            while ((match = timeReg.exec(line)) !== null) {
+                const mins = parseInt(match[1], 10);
+                const secs = parseInt(match[2], 10);
+                const frac = match[3] ? parseFloat('0.' + match[3]) : 0;
+                times.push(mins * 60 + secs + frac);
+                lastIndex = timeReg.lastIndex;
+            }
+            if (times.length) {
+                const lyricText = line.slice(lastIndex).trim();
+                if (lyricText) {
+                    times.forEach(t => result.push({ time: t, text: lyricText }));
+                }
+            }
         });
         return result.sort((a, b) => a.time - b.time);
     } catch (e) {
@@ -876,12 +892,32 @@ function parseLRC(text) {
     }
 }
 
+function looksLikeLrcText(s) {
+    if (!s || typeof s !== 'string') return false;
+    const t = s.trim();
+    // Raw LRC thường bắt đầu bằng [ti:], [ar:], hoặc [mm:ss...]
+    return /^\[(ti|ar|al|by|offset):/i.test(t) || /\[\d{1,2}:\d{1,2}(?:\.\d{1,3})?\]/.test(t);
+}
+
+function looksLikeUrl(s) {
+    if (!s || typeof s !== 'string') return false;
+    return /^https?:\/\//i.test(s.trim());
+}
+
 async function fetchLyricWithFallback(lrc1, lrc2) {
     try {
-        const urls = [lrc1, lrc2].filter(url => url && typeof url === 'string' && url.trim() !== "");
-        for (let i = 0; i < urls.length; i++) {
+        const sources = [lrc1, lrc2].filter(v => v && typeof v === 'string' && v.trim() !== "");
+        for (let i = 0; i < sources.length; i++) {
+            const src = sources[i].trim();
             try {
-                const res = await fetch(urls[i]);
+                // Nếu là text LRC thô (admin dán trực tiếp) → parse luôn, không fetch
+                if (looksLikeLrcText(src) && !looksLikeUrl(src)) {
+                    const parsed = parseLRC(src);
+                    if (parsed && parsed.length > 0) return parsed;
+                    continue;
+                }
+                // Còn lại coi như URL
+                const res = await fetch(src);
                 if (res.ok) {
                     const text = await res.text();
                     const parsed = parseLRC(text);
@@ -2034,11 +2070,9 @@ function updateShopBalanceUI() {
 function updateUsernameBadge() {
     const badge = document.getElementById('user-badge');
     const nameEl = document.getElementById('user-badge-name');
-    const coinEl = document.getElementById('user-badge-coins');
     const name = getCurrentUsername();
     if (badge) badge.style.display = name ? 'flex' : 'none';
     if (nameEl) nameEl.textContent = name || '';
-    if (coinEl) coinEl.textContent = String(loadCoins());
 }
 
 function updateCheckinButtonUI() {
