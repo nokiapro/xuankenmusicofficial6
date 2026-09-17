@@ -515,7 +515,7 @@
                 toast('Cần ID, tên bài và link audio');
                 return;
             }
-            if (/[.#$\\[\\]\\/]/.test(id)) {
+            if (/[.#$\[\]/]/.test(id)) {
                 toast('ID không được chứa . # $ [ ] /');
                 return;
             }
