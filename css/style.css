@@ -822,9 +822,9 @@ body.dark .song-item.active {
 }
 
 .song-item-info {
-    flex: 1 1 50%;
+    flex: 1 1 70%;
     min-width: 0;
-    max-width: 52%;
+    max-width: 78%;
     overflow: hidden;
 }
 
