@@ -484,6 +484,14 @@ function forceScaleNotification() {
 }
 
 let notificationHideAt = 0;
+let notificationWatchdog = null;
+
+function stopNotificationWatchdog() {
+    if (notificationWatchdog) {
+        clearInterval(notificationWatchdog);
+        notificationWatchdog = null;
+    }
+}
 
 function hideNotification() {
     const noti = document.getElementById('custom-notification');
@@ -492,18 +500,53 @@ function hideNotification() {
         clearTimeout(notificationTimeout);
         notificationTimeout = null;
     }
+    stopNotificationWatchdog();
     notificationHideAt = 0;
+}
+
+/** Kiểm tra hết hạn toast — dùng khi bật màn hình / quay lại tab (setTimeout bị trình duyệt tạm dừng) */
+function checkNotificationExpiry() {
+    if (!notificationHideAt) return;
+    const noti = document.getElementById('custom-notification');
+    const isShowing = noti && noti.classList.contains('show');
+    if (!isShowing) {
+        notificationHideAt = 0;
+        stopNotificationWatchdog();
+        return;
+    }
+    if (Date.now() >= notificationHideAt) {
+        hideNotification();
+        return;
+    }
+    // Còn thời gian — đặt lại timeout theo phần còn lại
+    const remain = Math.max(0, notificationHideAt - Date.now());
+    if (notificationTimeout) clearTimeout(notificationTimeout);
+    notificationTimeout = setTimeout(() => {
+        if (notificationHideAt && Date.now() >= notificationHideAt) {
+            hideNotification();
+        }
+    }, remain);
 }
 
 function scheduleNotificationHide(ms) {
     if (notificationTimeout) clearTimeout(notificationTimeout);
+    stopNotificationWatchdog();
     notificationHideAt = Date.now() + ms;
     notificationTimeout = setTimeout(() => {
-        // Nếu tab bị ẩn, setTimeout có thể bị trì hoãn — kiểm tra lại thời điểm
         if (notificationHideAt && Date.now() >= notificationHideAt) {
             hideNotification();
         }
     }, ms);
+    // Watchdog: mỗi 1s kiểm tra (khi bật màn hình interval chạy lại → toast không kẹt)
+    notificationWatchdog = setInterval(() => {
+        if (!notificationHideAt) {
+            stopNotificationWatchdog();
+            return;
+        }
+        if (Date.now() >= notificationHideAt) {
+            hideNotification();
+        }
+    }, 1000);
 }
 
 function showNotification(title, message, color = "#4ade80", icon = "headphones") {
@@ -511,6 +554,7 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     if (!noti) return;
     
     if (notificationTimeout) clearTimeout(notificationTimeout);
+    stopNotificationWatchdog();
     
     // Luôn tắt show trước để reset animation
     noti.classList.remove('show');
@@ -552,16 +596,15 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     scheduleNotificationHide(10000);
 }
 
-// Khi quay lại tab: nếu đã hết hạn thì tắt toast ngay
+// Bật màn hình / quay lại tab / focus cửa sổ → kiểm tra ẩn toast ngay
+function onAppResume() {
+    checkNotificationExpiry();
+}
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && notificationHideAt) {
-        if (Date.now() >= notificationHideAt) {
-            hideNotification();
-        } else {
-            scheduleNotificationHide(Math.max(0, notificationHideAt - Date.now()));
-        }
-    }
+    if (document.visibilityState === 'visible') onAppResume();
 });
+window.addEventListener('pageshow', onAppResume);
+window.addEventListener('focus', onAppResume);
 
 function showToastMsg(msg, isListen = false) {
     if (isListen) {
