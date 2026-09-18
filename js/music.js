@@ -124,8 +124,10 @@ function generateDataHash(data) {
         id: s.id,
         audio: s.audio || '',
         audioFull: s.audioFull || '',
+        audioFull2: s.audioFull2 || '',
         name: s.name || '',
-        artist: s.artist || ''
+        artist: s.artist || '',
+        publishAt: s.publishAt || null
     })));
 }
 
@@ -139,13 +141,22 @@ function songsObjectToArray(obj) {
             artist: s.artist || '',
             audio: s.audio || '',
             audioFull: s.audioFull || '',
+            audioFull2: s.audioFull2 || '',
             albumArt: s.albumArt || '',
             listenCount: Number(s.listenCount) || 0,
             lrc1: s.lrc1 || '',
             lrc2: s.lrc2 || '',
-            price: s.price != null ? Number(s.price) : null
+            price: s.price != null ? Number(s.price) : null,
+            rentPrice: s.rentPrice != null ? Number(s.rentPrice) : null,
+            publishAt: s.publishAt || null
         };
-    }).filter(s => s.audio);
+    }).filter(s => s.audio)
+      .filter(s => {
+        if (!s.publishAt) return true;
+        const t = Date.parse(s.publishAt);
+        if (Number.isNaN(t)) return true;
+        return Date.now() >= t;
+      });
     // Sắp xếp theo bảng chữ cái (tên bài)
     list.sort((a, b) => {
         const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
@@ -155,12 +166,37 @@ function songsObjectToArray(obj) {
     return list;
 }
 
-/** Link phát: đã mua → audioFull (nếu có), chưa mua → audio (demo) */
+/** Danh sách link full (đã mua/thuê) — random + fallback */
+function getFullAudioCandidates(song) {
+    if (!song) return [];
+    const list = [];
+    if (song.audioFull) list.push(song.audioFull);
+    if (song.audioFull2) list.push(song.audioFull2);
+    return list.filter(Boolean);
+}
+
+function pickFullAudioUrl(song, preferOtherThan) {
+    const cands = getFullAudioCandidates(song);
+    if (!cands.length) return song.audio || '';
+    if (preferOtherThan) {
+        const alt = cands.find(u => u !== preferOtherThan);
+        if (alt) return alt;
+    }
+    if (cands.length === 1) return cands[0];
+    return cands[Math.floor(Math.random() * cands.length)];
+}
+
+/** Link phát: đã mua/thuê → full (random), chưa → demo */
 function getPlayableAudio(song) {
     if (!song) return '';
-    if (isSongOwned(song.id) && song.audioFull) return song.audioFull;
+    if (isSongOwned(song.id)) {
+        return pickFullAudioUrl(song) || song.audio || '';
+    }
     return song.audio || '';
 }
+
+let lastTriedFullUrl = {};
+let preloadAudioEl = null;
 
 async function fetchSongsFromFirebase() {
     const db = getDb();
@@ -324,6 +360,12 @@ async function loadSongsFromFirebase() {
             updateListenStatsModal();
             
             startAutoRefresh(60);
+            
+            // Có username → tiếp tục đúng bài + phút đã lưu
+            if (getCurrentUsername()) {
+                playbackRestored = false;
+                restorePlaybackState();
+            }
             
             if (pendingPlayAfterLoad) {
                 pendingPlayAfterLoad = false;
@@ -1021,8 +1063,11 @@ async function loadSong(i) {
     document.documentElement.style.setProperty('--accent-color', colors.accent);
     
     audio.pause();
-    audio.src = getPlayableAudio(song);
+    const playUrl = getPlayableAudio(song);
+    if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[song.id] = playUrl;
+    audio.src = playUrl;
     audio.load();
+    preloadNextSong();
     
     lyrics = [];
     lastLyric = "";
@@ -1090,7 +1135,7 @@ function prevSong() {
     changeSong(prev, source);
 }
 
-function startPlayback() {
+async function startPlayback() {
     // Bắt buộc có username
     if (typeof getCurrentUsername === 'function' && !getCurrentUsername()) {
         const input = document.getElementById('username-input');
@@ -1103,7 +1148,7 @@ function startPlayback() {
         return;
     }
     
-    // Đánh dấu đã tương tác — lần đầu vào web nghe cũng được cộng lượt
+    // Click "Bắt đầu" = user gesture → được autoplay + cộng lượt nghe
     hasUserInteracted = true;
     
     const playerContainer = document.getElementById('player-container');
@@ -1129,8 +1174,28 @@ function startPlayback() {
     
     hidePlayerLoading();
     
-    if (songs.length > 0 && songs[index]) {
-        // Chờ loadSong xong rồi mới play — tránh race isChanging / audio.load
+    // Chờ danh sách bài nếu chưa có
+    if (!songs.length) {
+        pendingPlayAfterLoad = true;
+        return;
+    }
+
+    // Ưu tiên: tiếp tục đúng bài + đúng phút đã lưu, rồi phát luôn
+    try {
+        const resumed = await restorePlaybackState({ autoplay: true, force: true });
+        if (resumed) {
+            setTimeout(() => {
+                updateCurrentSongHighlightAndScroll();
+                updateListenStatsModal();
+            }, 100);
+            return;
+        }
+    } catch (e) {
+        console.warn('restore on start:', e);
+    }
+
+    // Không có lịch sử → phát bài hiện tại từ đầu
+    if (songs[index]) {
         const needLoad = !audio.src || audio.src !== getPlayableAudio(songs[index]);
         const playFn = () => {
             audio.play().catch(e => console.log("LỖI PHÁT:", e));
@@ -1224,9 +1289,29 @@ function togglePlay() {
 
 audio.onerror = () => {
     if (!songs[index]) return;
+    const song = songs[index];
+    // Thử link full thứ 2 nếu đang nghe full
+    if (isSongOwned(song.id)) {
+        const failed = lastTriedFullUrl[song.id] || audio.src;
+        const alt = pickFullAudioUrl(song, failed);
+        if (alt && alt !== failed && !audio.dataset.retried) {
+            audio.dataset.retried = '1';
+            lastTriedFullUrl[song.id] = alt;
+            audio.src = alt;
+            audio.load();
+            audio.play().catch(() => {});
+            showNotification('DỰ PHÒNG:', 'ĐANG THỬ LINK FULL 2...', '#ff9800', 'refresh-cw');
+            return;
+        }
+    }
+    delete audio.dataset.retried;
     showNotification('LỖI:', 'KHÔNG THỂ PHÁT BÀI HÁT!', '#ff4444', 'alert-circle');
     hidePlayerLoading();
 };
+
+audio.addEventListener('playing', () => {
+    delete audio.dataset.retried;
+});
 
 const progressArea = document.getElementById('progress-area');
 const progressFill = document.getElementById('progress-fill');
@@ -1421,15 +1506,84 @@ function renderPlaylist() {
     }
     list.innerHTML = songs.map((s, i) => {
         const artistName = s.artist && s.artist.trim() !== "" ? s.artist : "ĐANG CẬP NHẬT";
-        return `<div class="song-item ${i === index ? 'active' : ''}" onclick="window.selectSongFromList(${i})">
-            <div class="flex-1">
-                <div class="item-title text-sm uppercase font-bold break-words pr-2">${escapeHtml(s.name)}</div>
+        const id = String(s.id);
+        const fav = isFavorite(id);
+        const liked = isLiked(id);
+        const disliked = isDisliked(id);
+        const inPl = isInMyPlaylist(id);
+        return `<div class="song-item ${i === index ? 'active' : ''}" data-idx="${i}">
+            <div class="song-item-info" data-play-idx="${i}">
+                <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
                 <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
-            ${i === index ? '<i data-lucide="smile"></i>' : ''}
+            <div class="song-item-actions">
+                <button type="button" class="song-act-btn ${liked ? 'on-like' : ''}" data-act="like" data-id="${escapeHtml(id)}" title="Like"><i data-lucide="thumbs-up"></i></button>
+                <button type="button" class="song-act-btn ${disliked ? 'on-dislike' : ''}" data-act="dislike" data-id="${escapeHtml(id)}" title="Dislike"><i data-lucide="thumbs-down"></i></button>
+                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i data-lucide="${fav ? 'heart' : 'heart'}" style="${fav ? 'fill:currentColor' : ''}"></i></button>
+                <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i data-lucide="list-plus"></i></button>
+            </div>
         </div>`;
     }).join('');
     if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(list.querySelectorAll('[data-lucide]')) });
+    list.querySelectorAll('[data-play-idx]').forEach(el => {
+        el.onclick = (e) => {
+            e.stopPropagation();
+            window.selectSongFromList(parseInt(el.getAttribute('data-play-idx'), 10));
+        };
+    });
+    list.querySelectorAll('.song-act-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const act = btn.getAttribute('data-act');
+            const id = btn.getAttribute('data-id');
+            if (act === 'fav') toggleFavorite(id);
+            else if (act === 'like') toggleLike(id);
+            else if (act === 'dislike') toggleDislike(id);
+            else if (act === 'pl') toggleMyPlaylistSong(id);
+        };
+    });
+}
+
+function renderMyPlaylist() {
+    const list = document.getElementById('my-playlist-content');
+    if (!list) return;
+    const ids = loadMyPlaylist();
+    if (!ids.length) {
+        list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:0.85rem;">Chưa có bài — bấm icon playlist bên cạnh bài hát để thêm</div>';
+        return;
+    }
+    list.innerHTML = ids.map(id => {
+        const s = songs.find(x => String(x.id) === String(id));
+        if (!s) return '';
+        const i = songs.findIndex(x => String(x.id) === String(id));
+        const artistName = s.artist && s.artist.trim() !== "" ? s.artist : "ĐANG CẬP NHẬT";
+        return `<div class="song-item ${i === index ? 'active' : ''}">
+            <div class="song-item-info" data-play-idx="${i}">
+                <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
+                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
+            </div>
+            <div class="song-item-actions">
+                <button type="button" class="song-act-btn on-pl" data-act="pl-remove" data-id="${escapeHtml(String(id))}" title="Xóa khỏi playlist"><i data-lucide="trash-2"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(list.querySelectorAll('[data-lucide]')) });
+    list.querySelectorAll('[data-play-idx]').forEach(el => {
+        el.onclick = () => {
+            const i = parseInt(el.getAttribute('data-play-idx'), 10);
+            if (!Number.isNaN(i) && i >= 0) {
+                document.getElementById('my-playlist-overlay')?.classList.remove('active');
+                window.selectSongFromList(i);
+            }
+        };
+    });
+    list.querySelectorAll('[data-act="pl-remove"]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            toggleMyPlaylistSong(btn.getAttribute('data-id'));
+            renderMyPlaylist();
+        };
+    });
 }
 
 const playerContainer = document.getElementById('player-container');
@@ -1837,9 +1991,22 @@ function ensureUserAccount(username) {
         accounts[name] = {
             coins: settings.starterCoins,
             owned: [],
+            favorites: [],
+            likes: [],
+            dislikes: [],
+            myPlaylist: [],
+            rentals: {},
             lastCheckin: '',
             createdAt: Date.now()
         };
+        saveAllAccounts(accounts);
+    } else {
+        const a = accounts[name];
+        if (!Array.isArray(a.favorites)) a.favorites = [];
+        if (!Array.isArray(a.likes)) a.likes = [];
+        if (!Array.isArray(a.dislikes)) a.dislikes = [];
+        if (!Array.isArray(a.myPlaylist)) a.myPlaylist = [];
+        if (!a.rentals || typeof a.rentals !== 'object') a.rentals = {};
         saveAllAccounts(accounts);
     }
     return accounts[name];
@@ -1864,6 +2031,11 @@ async function fetchUserFromFirebase(username) {
             accounts[name] = {
                 coins: data.coins | 0,
                 owned: Array.isArray(data.owned) ? data.owned.map(String) : (data.owned ? String(data.owned).split(',').filter(Boolean) : []),
+                favorites: Array.isArray(data.favorites) ? data.favorites.map(String) : [],
+                likes: Array.isArray(data.likes) ? data.likes.map(String) : [],
+                dislikes: Array.isArray(data.dislikes) ? data.dislikes.map(String) : [],
+                myPlaylist: Array.isArray(data.myPlaylist) ? data.myPlaylist.map(String) : [],
+                rentals: (data.rentals && typeof data.rentals === 'object') ? data.rentals : {},
                 lastCheckin: data.lastCheckin || '',
                 createdAt: data.createdAt || Date.now()
             };
@@ -1876,6 +2048,11 @@ async function fetchUserFromFirebase(username) {
             username: name,
             coins: settings.starterCoins,
             owned: [],
+            favorites: [],
+            likes: [],
+            dislikes: [],
+            myPlaylist: [],
+            rentals: {},
             lastCheckin: '',
             createdAt: Date.now()
         };
@@ -1900,6 +2077,11 @@ async function pushUserToFirebase(username, account) {
             username: name,
             coins: account.coins | 0,
             owned: account.owned || [],
+            favorites: account.favorites || [],
+            likes: account.likes || [],
+            dislikes: account.dislikes || [],
+            myPlaylist: account.myPlaylist || [],
+            rentals: account.rentals || {},
             lastCheckin: account.lastCheckin || '',
             createdAt: account.createdAt || Date.now()
         });
@@ -1963,7 +2145,176 @@ function saveOwnedSongs(ids) {
 
 function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
-    return loadOwnedSongs().includes(String(songId));
+    const id = String(songId);
+    if (loadOwnedSongs().includes(id)) return true;
+    // Thuê 24h còn hạn?
+    const acc = getCurrentAccount();
+    if (acc && acc.rentals && acc.rentals[id]) {
+        const exp = Number(acc.rentals[id]) || 0;
+        if (exp > Date.now()) return true;
+    }
+    return false;
+}
+
+function isSongRented(songId) {
+    const id = String(songId);
+    const acc = getCurrentAccount();
+    if (!acc || !acc.rentals || !acc.rentals[id]) return false;
+    return Number(acc.rentals[id]) > Date.now();
+}
+
+function getRentExpiry(songId) {
+    const acc = getCurrentAccount();
+    if (!acc || !acc.rentals) return 0;
+    return Number(acc.rentals[String(songId)]) || 0;
+}
+
+function getRentPrice(song) {
+    if (song && song.rentPrice != null && !Number.isNaN(Number(song.rentPrice))) {
+        return Math.max(0, Number(song.rentPrice));
+    }
+    // Mặc định: khoảng 40% giá mua, tối thiểu 1
+    const buy = getSongPrice(song);
+    return Math.max(1, Math.ceil(buy * 0.4));
+}
+
+function rentSong(songId) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
+    const song = songs.find(s => String(s.id) === String(songId));
+    if (!song) {
+        showNotification('LỖI:', 'KHÔNG TÌM THẤY BÀI HÁT', '#ff4444', 'alert-circle');
+        return false;
+    }
+    if (loadOwnedSongs().includes(String(songId))) {
+        showNotification('CỬA HÀNG:', 'BẠN ĐÃ MUA BÀI NÀY', '#4ade80', 'check');
+        return false;
+    }
+    if (isSongRented(songId)) {
+        showNotification('THUÊ:', 'VẪN CÒN HẠN THUÊ', '#4ade80', 'clock');
+        return false;
+    }
+    const price = getRentPrice(song);
+    const coins = loadCoins();
+    if (coins < price) {
+        showNotification('THIẾU XU:', `THUÊ CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        return false;
+    }
+    const expiry = Date.now() + 24 * 60 * 60 * 1000;
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) - price;
+        if (!acc.rentals) acc.rentals = {};
+        acc.rentals[String(songId)] = expiry;
+    });
+    showNotification('THUÊ 24H:', String(songId), '#4ade80', 'clock');
+    renderShopList();
+    updateShopBalanceUI();
+    // Nếu đang demo bài này → mở full
+    if (songs[index] && String(songs[index].id) === String(songId)) {
+        demoLockedSongId = null;
+        const fullUrl = getPlayableAudio(songs[index]);
+        if (fullUrl) {
+            audio.src = fullUrl;
+            audio.load();
+            audio.play().catch(() => {});
+        }
+    }
+    return true;
+}
+
+function loadFavorites() {
+    const acc = getCurrentAccount();
+    return acc && Array.isArray(acc.favorites) ? acc.favorites.map(String) : [];
+}
+function isFavorite(id) { return loadFavorites().includes(String(id)); }
+function toggleFavorite(id) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return;
+    }
+    const sid = String(id);
+    updateCurrentAccount(acc => {
+        if (!Array.isArray(acc.favorites)) acc.favorites = [];
+        const i = acc.favorites.indexOf(sid);
+        if (i >= 0) acc.favorites.splice(i, 1);
+        else acc.favorites.push(sid);
+    });
+    renderPlaylist();
+}
+
+function loadLikes() {
+    const acc = getCurrentAccount();
+    return acc && Array.isArray(acc.likes) ? acc.likes.map(String) : [];
+}
+function isLiked(id) { return loadLikes().includes(String(id)); }
+function toggleLike(id) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return;
+    }
+    const sid = String(id);
+    updateCurrentAccount(acc => {
+        if (!Array.isArray(acc.likes)) acc.likes = [];
+        if (!Array.isArray(acc.dislikes)) acc.dislikes = [];
+        const i = acc.likes.indexOf(sid);
+        if (i >= 0) acc.likes.splice(i, 1);
+        else {
+            acc.likes.push(sid);
+            const d = acc.dislikes.indexOf(sid);
+            if (d >= 0) acc.dislikes.splice(d, 1);
+        }
+    });
+    renderPlaylist();
+}
+
+function loadDislikes() {
+    const acc = getCurrentAccount();
+    return acc && Array.isArray(acc.dislikes) ? acc.dislikes.map(String) : [];
+}
+function isDisliked(id) { return loadDislikes().includes(String(id)); }
+function toggleDislike(id) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return;
+    }
+    const sid = String(id);
+    updateCurrentAccount(acc => {
+        if (!Array.isArray(acc.dislikes)) acc.dislikes = [];
+        if (!Array.isArray(acc.likes)) acc.likes = [];
+        const i = acc.dislikes.indexOf(sid);
+        if (i >= 0) acc.dislikes.splice(i, 1);
+        else {
+            acc.dislikes.push(sid);
+            const l = acc.likes.indexOf(sid);
+            if (l >= 0) acc.likes.splice(l, 1);
+        }
+    });
+    renderPlaylist();
+}
+
+function loadMyPlaylist() {
+    const acc = getCurrentAccount();
+    return acc && Array.isArray(acc.myPlaylist) ? acc.myPlaylist.map(String) : [];
+}
+function isInMyPlaylist(id) { return loadMyPlaylist().includes(String(id)); }
+function toggleMyPlaylistSong(id) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return;
+    }
+    const sid = String(id);
+    let added = false;
+    updateCurrentAccount(acc => {
+        if (!Array.isArray(acc.myPlaylist)) acc.myPlaylist = [];
+        const i = acc.myPlaylist.indexOf(sid);
+        if (i >= 0) acc.myPlaylist.splice(i, 1);
+        else { acc.myPlaylist.push(sid); added = true; }
+    });
+    showNotification('PLAYLIST:', added ? 'ĐÃ THÊM' : 'ĐÃ XÓA', added ? '#4ade80' : '#ff9800', 'list-plus');
+    renderPlaylist();
+    if (document.getElementById('my-playlist-overlay')?.classList.contains('active')) renderMyPlaylist();
 }
 
 function getSongPrice(song) {
@@ -2121,24 +2472,40 @@ function renderShopList(highlightSongId) {
         const name = escapeHtml(s.name || id);
         const artist = escapeHtml(s.artist || 'ĐANG CẬP NHẬT');
         const isFocus = focusId && id === focusId;
-        const action = owned
-            ? `<span class="shop-owned-badge">ĐÃ MUA</span>`
-            : `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
-        const priceLabel = owned ? '' : `<div class="shop-item-price">${price} XK</div>`;
+        const rented = isSongRented(id);
+        const rentP = getRentPrice(s);
+        let action = '';
+        if (owned && loadOwnedSongs().includes(id)) {
+            action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
+        } else if (rented) {
+            const leftH = Math.max(1, Math.ceil((getRentExpiry(id) - Date.now()) / 3600000));
+            action = `<span class="shop-owned-badge">THUÊ CÒN ~${leftH}H</span>
+                <button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
+        } else {
+            action = `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
+                <button type="button" class="shop-buy-btn shop-rent-btn" data-rent-id="${id}">THUÊ 24H ${rentP} XK</button>`;
+        }
+        const priceLabel = (owned && loadOwnedSongs().includes(id)) ? '' : `<div class="shop-item-price">Mua ${price} XK · Thuê ${rentP} XK/24h</div>`;
         return `<div class="shop-item ${owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
             <div class="shop-item-info">
                 <div class="shop-item-name">${name}${owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
                 <div class="shop-item-artist">${artist}</div>
                 ${priceLabel}
             </div>
-            ${action}
+            <div class="shop-item-actions-col">${action}</div>
         </div>`;
     }).join('');
     
-    list.querySelectorAll('.shop-buy-btn').forEach(btn => {
+    list.querySelectorAll('.shop-buy-btn[data-buy-id]').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
             buySong(btn.getAttribute('data-buy-id'));
+        };
+    });
+    list.querySelectorAll('[data-rent-id]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            rentSong(btn.getAttribute('data-rent-id'));
         };
     });
 
@@ -2193,6 +2560,7 @@ async function loginWithUsername(rawName) {
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
+    startPlaybackSyncListener();
     return { ok: true, username: name };
 }
 
@@ -2209,6 +2577,7 @@ function setupUsernameGate() {
             updateUsernameBadge();
             updateShopBalanceUI();
             updateCheckinButtonUI();
+            startPlaybackSyncListener();
         });
         updateUsernameBadge();
     }
@@ -2303,10 +2672,231 @@ updateCheckinButtonUI();
 syncPricesFromFirebase();
 syncSettingsFromFirebase();
 
+
+// ===== PRELOAD bài kế tiếp (shuffle / tuần tự) =====
+function getNextSongIndexForPreload() {
+    if (!songs.length) return -1;
+    if (isShuffle) {
+        if (remainingQueue && remainingQueue.length) return remainingQueue[0];
+        return -1;
+    }
+    return (index + 1) % songs.length;
+}
+
+function preloadNextSong() {
+    try {
+        const nextIdx = getNextSongIndexForPreload();
+        if (nextIdx < 0 || !songs[nextIdx]) return;
+        const url = getPlayableAudio(songs[nextIdx]);
+        if (!url) return;
+        if (!preloadAudioEl) {
+            preloadAudioEl = new Audio();
+            preloadAudioEl.preload = 'auto';
+        }
+        if (preloadAudioEl.dataset.url === url) return;
+        preloadAudioEl.dataset.url = url;
+        preloadAudioEl.src = url;
+        preloadAudioEl.load();
+    } catch (e) {}
+}
+
+// ===== LƯU / TIẾP TỤC vị trí nghe theo username (mọi thiết bị) =====
+// Máy A nghe đến phút X → dừng/thoát → lưu.
+// Máy A/B/C vào lại (cùng username) → mở đúng bài + đúng phút đó.
+const DEVICE_ID = (() => {
+    let id = localStorage.getItem('xuanken_device_id');
+    if (!id) {
+        id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('xuanken_device_id', id);
+    }
+    return id;
+})();
+let syncApplying = false;
+let lastSyncPush = 0;
+let playbackRestored = false;
+
+function getLocalPlaybackKey() {
+    const name = getCurrentUsername();
+    return name ? ('xuanken_playback_' + sanitizeUsernameKey(name)) : null;
+}
+
+function savePlaybackLocal(data) {
+    const k = getLocalPlaybackKey();
+    if (!k || !data) return;
+    try { localStorage.setItem(k, JSON.stringify(data)); } catch (e) {}
+}
+
+function loadPlaybackLocal() {
+    const k = getLocalPlaybackKey();
+    if (!k) return null;
+    try {
+        const raw = localStorage.getItem(k);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+/** Lưu vị trí đang nghe (local + Firebase) — gọi khi pause / thoát / định kỳ */
+function pushPlaybackSync(force) {
+    const name = getCurrentUsername();
+    if (!name || !songs[index] || syncApplying) return;
+    const now = Date.now();
+    if (!force && now - lastSyncPush < 2000) return;
+    lastSyncPush = now;
+    const data = {
+        songId: String(songs[index].id),
+        position: Math.floor(audio.currentTime || 0),
+        isPlaying: !audio.paused,
+        deviceId: DEVICE_ID,
+        updatedAt: now
+    };
+    savePlaybackLocal(data);
+    const db = getDb();
+    if (!db) return;
+    const key = sanitizeUsernameKey(name);
+    try {
+        db.ref('users/' + key + '/playback').set(data);
+    } catch (e) {}
+}
+
+async function fetchPlaybackFromFirebase() {
+    const name = getCurrentUsername();
+    const db = getDb();
+    if (!name || !db) return loadPlaybackLocal();
+    try {
+        const snap = await db.ref('users/' + sanitizeUsernameKey(name) + '/playback').once('value');
+        const data = snap.val();
+        if (data && data.songId) {
+            savePlaybackLocal(data);
+            return data;
+        }
+    } catch (e) {}
+    return loadPlaybackLocal();
+}
+
+/**
+ * Khôi phục bài + phút đã lưu.
+ * opts.autoplay = true: phát luôn (gọi khi user bấm "Bắt đầu" — đã có gesture).
+ * opts.force = true: cho phép restore lại dù đã restore trước đó.
+ * Trả về true nếu đã restore được bài đã lưu.
+ */
+async function restorePlaybackState(opts = {}) {
+    const autoplay = !!opts.autoplay;
+    const force = !!opts.force;
+    if (playbackRestored && !force && !autoplay) return false;
+    if (!songs.length || !getCurrentUsername()) return false;
+
+    const data = await fetchPlaybackFromFirebase();
+    if (!data || !data.songId) {
+        playbackRestored = true;
+        return false;
+    }
+    const songIdx = songs.findIndex(s => String(s.id) === String(data.songId));
+    if (songIdx < 0) {
+        playbackRestored = true;
+        return false;
+    }
+    const pos = Math.max(0, Number(data.position) || 0);
+    syncApplying = true;
+    playbackRestored = true;
+    try {
+        if (songIdx !== index || !audio.src) {
+            await loadSong(songIdx);
+        }
+        const applySeek = () => {
+            try {
+                if (audio.duration && pos >= audio.duration - 1) {
+                    audio.currentTime = 0;
+                } else {
+                    audio.currentTime = Math.min(pos, Math.max(0, (audio.duration || pos) - 0.25));
+                }
+            } catch (e) {}
+        };
+        if (audio.readyState >= 1) applySeek();
+        else {
+            await new Promise(resolve => {
+                const onMeta = () => { applySeek(); resolve(); };
+                audio.addEventListener('loadedmetadata', onMeta, { once: true });
+                // fallback nếu metadata chậm
+                setTimeout(() => { applySeek(); resolve(); }, 1500);
+            });
+        }
+
+        console.log('RESUME:', data.songId, 'tại', pos, 's', autoplay ? '(autoplay)' : '');
+        if (autoplay) {
+            // User vừa bấm "Bắt đầu" → đây là user gesture, được phép play
+            try {
+                await audio.play();
+            } catch (e) {
+                console.log('RESUME play:', e);
+                // Thử lại sau seek
+                setTimeout(() => audio.play().catch(() => {}), 200);
+            }
+        } else {
+            audio.pause();
+        }
+        return true;
+    } finally {
+        setTimeout(() => { syncApplying = false; }, 600);
+    }
+}
+
+function startPlaybackSyncListener() {
+    // Chỉ preload vị trí (không auto-play) khi đã có username + danh sách bài
+    playbackRestored = false;
+    const tryRestore = () => {
+        if (songs.length) restorePlaybackState({ autoplay: false });
+        else setTimeout(tryRestore, 800);
+    };
+    tryRestore();
+}
+
+// Lưu định kỳ khi đang phát
+setInterval(() => {
+    if (!audio.paused && hasUserInteracted && !syncApplying) pushPlaybackSync(false);
+}, 5000);
+
+// Lưu ngay khi pause / đổi bài xong
+audio.addEventListener('pause', () => { if (!syncApplying) pushPlaybackSync(true); });
+audio.addEventListener('play', () => {
+    if (!syncApplying) pushPlaybackSync(true);
+    preloadNextSong();
+});
+audio.addEventListener('ended', () => { if (!syncApplying) pushPlaybackSync(true); });
+
+// Thoát tab / tắt màn hình / đóng app → lưu vị trí
+function savePlaybackOnLeave() {
+    if (!syncApplying && songs[index] && hasUserInteracted) pushPlaybackSync(true);
+}
+window.addEventListener('pagehide', savePlaybackOnLeave);
+window.addEventListener('beforeunload', savePlaybackOnLeave);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') savePlaybackOnLeave();
+});
+
+// My playlist button
+const myPlaylistBtn = document.getElementById('my-playlist-btn');
+const myPlaylistOverlay = document.getElementById('my-playlist-overlay');
+const closeMyPlaylistBtn = document.getElementById('close-my-playlist-btn');
+if (myPlaylistBtn) {
+    myPlaylistBtn.onclick = (e) => {
+        e.stopPropagation();
+        renderMyPlaylist();
+        if (myPlaylistOverlay) myPlaylistOverlay.classList.add('active');
+    };
+}
+if (closeMyPlaylistBtn && myPlaylistOverlay) {
+    closeMyPlaylistBtn.onclick = () => myPlaylistOverlay.classList.remove('active');
+}
+
 window.buySong = buySong;
+window.rentSong = rentSong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
 window.getCurrentUsername = getCurrentUsername;
+window.toggleFavorite = toggleFavorite;
+window.toggleLike = toggleLike;
+window.toggleDislike = toggleDislike;
+window.toggleMyPlaylistSong = toggleMyPlaylistSong;
 window.getAllAccounts = getAllAccounts;
 window.getAdminSettings = getAdminSettings;
 window.pushUserToFirebase = pushUserToFirebase;
