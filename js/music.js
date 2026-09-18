@@ -195,7 +195,8 @@ function generateDataHash(data) {
         audioFull2: s.audioFull2 || '',
         name: s.name || '',
         artist: s.artist || '',
-        publishAt: s.publishAt || null
+        publishAt: s.publishAt || null,
+        hidden: !!s.hidden
     })));
 }
 
@@ -216,9 +217,11 @@ function songsObjectToArray(obj) {
             lrc2: s.lrc2 || '',
             price: s.price != null ? Number(s.price) : null,
             rentPrice: s.rentPrice != null ? Number(s.rentPrice) : null,
-            publishAt: s.publishAt || null
+            publishAt: s.publishAt || null,
+            hidden: !!s.hidden
         };
     }).filter(s => s.audio)
+      .filter(s => !s.hidden)
       .filter(s => {
         if (!s.publishAt) return true;
         const t = Date.parse(s.publishAt);
@@ -1731,8 +1734,6 @@ function renderPlaylist() {
         const artistName = s.artist && s.artist.trim() !== "" ? s.artist : "ĐANG CẬP NHẬT";
         const id = String(s.id);
         const fav = isFavorite(id);
-        const liked = isLiked(id);
-        const disliked = isDisliked(id);
         const inPl = isInMyPlaylist(id);
         return `<div class="song-item ${i === index ? 'active' : ''}" data-idx="${i}">
             <div class="song-item-info" data-play-idx="${i}">
@@ -1740,9 +1741,7 @@ function renderPlaylist() {
                 <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
             <div class="song-item-actions">
-                <button type="button" class="song-act-btn ${liked ? 'on-like' : ''}" data-act="like" data-id="${escapeHtml(id)}" title="Like"><i data-lucide="thumbs-up"></i></button>
-                <button type="button" class="song-act-btn ${disliked ? 'on-dislike' : ''}" data-act="dislike" data-id="${escapeHtml(id)}" title="Dislike"><i data-lucide="thumbs-down"></i></button>
-                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i data-lucide="${fav ? 'heart' : 'heart'}" style="${fav ? 'fill:currentColor' : ''}"></i></button>
+                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i data-lucide="heart" style="${fav ? 'fill:currentColor' : ''}"></i></button>
                 <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i data-lucide="list-plus"></i></button>
             </div>
         </div>`;
@@ -1760,8 +1759,6 @@ function renderPlaylist() {
             const act = btn.getAttribute('data-act');
             const id = btn.getAttribute('data-id');
             if (act === 'fav') toggleFavorite(id);
-            else if (act === 'like') toggleLike(id);
-            else if (act === 'dislike') toggleDislike(id);
             else if (act === 'pl') toggleMyPlaylistSong(id);
         };
     });
