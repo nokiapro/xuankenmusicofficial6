@@ -2250,7 +2250,8 @@ async function fetchUserFromFirebase(username) {
                 myPlaylist: Array.isArray(data.myPlaylist) ? data.myPlaylist.map(String) : [],
                 rentals: (data.rentals && typeof data.rentals === 'object') ? data.rentals : {},
                 lastCheckin: data.lastCheckin || '',
-                createdAt: data.createdAt || Date.now()
+                createdAt: data.createdAt || Date.now(),
+                rank: data.rank || 'member'
             };
             saveAllAccounts(accounts);
             return accounts[name];
@@ -2267,10 +2268,11 @@ async function fetchUserFromFirebase(username) {
             myPlaylist: [],
             rentals: {},
             lastCheckin: '',
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            rank: 'member'
         };
         await db.ref(dataPath('users') + '/' + key).set(neu);
-        accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt };
+        accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt, rank: 'member' };
         saveAllAccounts(accounts);
         return accounts[name];
     } catch (e) {
@@ -2296,7 +2298,8 @@ async function pushUserToFirebase(username, account) {
             myPlaylist: account.myPlaylist || [],
             rentals: account.rentals || {},
             lastCheckin: account.lastCheckin || '',
-            createdAt: account.createdAt || Date.now()
+            createdAt: account.createdAt || Date.now(),
+            rank: account.rank || 'member'
         });
         return true;
     } catch (e) {
@@ -2641,14 +2644,49 @@ function buySong(songId) {
 function updateShopBalanceUI() {
     const el = document.getElementById('shop-coin-count');
     if (el) el.textContent = String(loadCoins());
+    updateShopUserProfile();
+}
+
+/** Rank: member | vip | super_vip | admin */
+function getUserRank(account) {
+    const r = String((account && account.rank) || 'member').toLowerCase().trim();
+    if (r === 'admin' || r === 'super_vip' || r === 'vip') return r;
+    return 'member';
+}
+
+function rankLabel(rank) {
+    if (rank === 'admin') return 'ADMIN';
+    if (rank === 'super_vip') return 'SUPER VIP';
+    if (rank === 'vip') return 'VIP';
+    return 'Thành viên';
+}
+
+function updateShopUserProfile() {
+    const name = getCurrentUsername();
+    const nameEl = document.getElementById('shop-user-name');
+    const badgeEl = document.getElementById('shop-rank-badge');
+    const subEl = document.querySelector('.shop-user-sub');
+    const acc = getCurrentAccount();
+    const rank = getUserRank(acc);
+
+    if (nameEl) nameEl.textContent = name || '—';
+    if (badgeEl) {
+        if (rank === 'member') {
+            badgeEl.style.display = 'none';
+            badgeEl.textContent = '';
+            badgeEl.className = 'rank-badge';
+        } else {
+            badgeEl.style.display = 'inline-flex';
+            badgeEl.textContent = rankLabel(rank);
+            badgeEl.className = 'rank-badge rank-' + rank;
+        }
+    }
+    if (subEl) subEl.textContent = rank === 'member' ? 'Thành viên' : rankLabel(rank);
 }
 
 function updateUsernameBadge() {
-    const badge = document.getElementById('user-badge');
-    const nameEl = document.getElementById('user-badge-name');
-    const name = getCurrentUsername();
-    if (badge) badge.style.display = name ? 'flex' : 'none';
-    if (nameEl) nameEl.textContent = name || '';
+    // Username đã chuyển vào cửa hàng
+    updateShopUserProfile();
 }
 
 function updateCheckinButtonUI() {

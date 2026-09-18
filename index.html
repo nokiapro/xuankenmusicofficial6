@@ -77,10 +77,6 @@
                 </div>
             </div>
             
-            <div class="user-badge" id="user-badge" style="display:none;">
-                <i data-lucide="user"></i>
-                <span id="user-badge-name"></span>
-            </div>
             <div class="album-art">
                 <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
             </div>
@@ -196,12 +192,24 @@
                 <div class="shop-title"><i data-lucide="store"></i> CỬA HÀNG XK</div>
                 <div style="width:40px;"></div>
             </div>
-            <div class="shop-balance-bar">
+            <div class="shop-user-bar" id="shop-user-bar">
+                <div class="shop-user-info">
+                    <div class="shop-user-avatar"><i data-lucide="user"></i></div>
+                    <div class="shop-user-meta">
+                        <div class="shop-user-name-row">
+                            <span class="rank-badge" id="shop-rank-badge" style="display:none;"></span>
+                            <span class="shop-user-name" id="shop-user-name">—</span>
+                        </div>
+                        <div class="shop-user-sub">Thành viên</div>
+                    </div>
+                </div>
                 <div class="shop-coins">
                     <i class="fa-solid fa-coins"></i>
                     <span id="shop-coin-count">0</span> XK
                 </div>
-                <button type="button" id="checkin-btn" class="checkin-btn">
+            </div>
+            <div class="shop-balance-bar">
+                <button type="button" id="checkin-btn" class="checkin-btn" style="width:100%;justify-content:center;">
                     <i data-lucide="calendar-check"></i>
                     <span id="checkin-btn-text">ĐIỂM DANH</span>
                 </button>

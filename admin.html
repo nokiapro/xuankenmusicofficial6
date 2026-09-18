@@ -266,6 +266,7 @@
                         <thead>
                             <tr>
                                 <th>Username</th>
+                                <th>Hạng</th>
                                 <th>Xu XK</th>
                                 <th>Bài sở hữu</th>
                                 <th>Điểm danh</th>
@@ -487,7 +488,8 @@
                     coins: u.coins | 0,
                     owned: Array.isArray(u.owned) ? u.owned : [],
                     lastCheckin: u.lastCheckin || '',
-                    createdAt: u.createdAt || 0
+                    createdAt: u.createdAt || 0,
+                    rank: u.rank || 'member'
                 };
             });
             renderUsers(document.getElementById('user-search').value);
@@ -648,19 +650,34 @@
             const q = filter.trim().toLowerCase();
             const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
             if (!names.length) {
-                tbody.innerHTML = `<tr><td colspan="5" class="muted">Chưa có user</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có user</td></tr>`;
                 return;
             }
+            const rankOpts = (cur) => {
+                const opts = [
+                    { v: 'member', l: 'Thành viên' },
+                    { v: 'vip', l: 'VIP' },
+                    { v: 'super_vip', l: 'SUPER VIP' },
+                    { v: 'admin', l: 'ADMIN' }
+                ];
+                return opts.map(o => `<option value="${o.v}" ${cur === o.v ? 'selected' : ''}>${o.l}</option>`).join('');
+            };
             tbody.innerHTML = names.map(name => {
                 const a = usersCache[name];
+                const rank = a.rank || 'member';
                 return `<tr>
                     <td><b>${escapeHtml(name)}</b></td>
+                    <td>
+                        <select data-rank-user="${escapeHtml(name)}" class="rank-select" style="width:120px;font-size:0.78rem;">
+                            ${rankOpts(rank)}
+                        </select>
+                    </td>
                     <td><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input" style="width:90px"></td>
                     <td>${(a.owned || []).length}</td>
                     <td>${escapeHtml(a.lastCheckin || '—')}</td>
                     <td>
                         <div class="row-actions">
-                            <button class="btn btn-ok" data-save-user="${escapeHtml(name)}">Lưu xu</button>
+                            <button class="btn btn-ok" data-save-user="${escapeHtml(name)}">Lưu</button>
                             <button class="btn btn-warn" data-gift="${escapeHtml(name)}">+50</button>
                             <button class="btn btn-danger" data-del-user="${escapeHtml(name)}">Xóa</button>
                         </div>
@@ -672,11 +689,14 @@
                 btn.onclick = async () => {
                     const name = btn.getAttribute('data-save-user');
                     const input = tbody.querySelector('.coin-input[data-user="' + name.replace(/"/g, '') + '"]');
+                    const rankSel = tbody.querySelector('.rank-select[data-rank-user="' + name.replace(/"/g, '') + '"]');
                     const coins = Math.max(0, parseInt(input.value, 10) || 0);
+                    const rank = (rankSel && rankSel.value) || 'member';
                     const key = usersCache[name].key || sanitizeKey(name);
-                    await db().ref(dataPath('users') + '/' + key + '/coins').set(coins);
+                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank });
                     usersCache[name].coins = coins;
-                    toast('Đã lưu xu ' + name);
+                    usersCache[name].rank = rank;
+                    toast('Đã lưu ' + name + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
                     refreshStats();
                 };
             });
