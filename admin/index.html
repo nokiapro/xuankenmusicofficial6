@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link id="site-favicon" href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
     <title>Admin | XuanKen Music</title>
     <link rel="stylesheet" href="https://kit-pro.fontawesome.com/releases/v7.2.0/css/pro.min.css">
@@ -14,143 +14,622 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700;800&display=swap');
         :root {
-            --bg: #0f0f12;
-            --card: #1a1a22;
-            --border: #2a2a35;
-            --text: #f2f2f2;
-            --muted: #9a9aaa;
+            --bg: #0c0c10;
+            --card: #16161e;
+            --card2: #1c1c26;
+            --border: #2a2a38;
+            --text: #f2f2f5;
+            --muted: #8b8b9a;
             --accent: #8c00ff;
             --accent2: #ff0040;
             --ok: #4ade80;
             --warn: #ff9800;
+            --info: #60a5fa;
+            --danger: #ff6666;
+            --radius: 14px;
+            --touch: 44px;
+            --safe-b: env(safe-area-inset-bottom, 0px);
+            --safe-t: env(safe-area-inset-top, 0px);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-text-size-adjust: 100%; }
         body {
-            font-family: "Roboto Condensed", system-ui, sans-serif;
-            background: linear-gradient(160deg, #12121a, #1a1025 50%, #0f0f12);
+            font-family: "Roboto Condensed", system-ui, -apple-system, sans-serif;
+            background: linear-gradient(165deg, #0e0e14 0%, #16102a 45%, #0c0c10 100%);
+            background-attachment: fixed;
             color: var(--text);
             min-height: 100vh;
+            min-height: 100dvh;
+            line-height: 1.45;
+            padding-bottom: var(--safe-b);
         }
-        .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+        a { color: var(--info); }
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.82em;
+            background: rgba(255,255,255,0.06);
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 16px 14px calc(28px + var(--safe-b));
+        }
+        @media (min-width: 768px) {
+            .wrap { padding: 24px 20px 48px; }
+        }
+
+        /* ===== Header ===== */
         .header {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(12,12,16,0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 0;
+            margin-left: -14px;
+            margin-right: -14px;
+            padding-left: 14px;
+            padding-right: 14px;
+            border-bottom: 1px solid transparent;
         }
+        .header.scrolled { border-bottom-color: var(--border); }
         .header h1 {
-            font-size: 1.4rem; letter-spacing: 1px;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
             background: linear-gradient(135deg, #ff0040, #8c00ff, #17adca);
-            -webkit-background-clip: text; background-clip: text; color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
         }
-        .header a {
-            color: var(--muted); text-decoration: none; font-size: 0.85rem;
-            padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
         }
-        .header .btn i { margin-right: 6px; }
-        .tab i { margin-right: 6px; }
-        .btn {
-            font-size: 0.72rem;
+        @media (min-width: 768px) {
+            .header {
+                margin-left: 0; margin-right: 0;
+                padding-left: 0; padding-right: 0;
+                position: relative;
+                background: transparent;
+                backdrop-filter: none;
+            }
+            .header h1 { font-size: 1.45rem; }
         }
+
+        /* ===== Cards ===== */
         .card {
-            background: var(--card); border: 1px solid var(--border);
-            border-radius: 16px; padding: 18px; margin-bottom: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        @media (min-width: 768px) {
+            .card { padding: 20px; margin-bottom: 16px; }
         }
         .card h2 {
-            font-size: 0.95rem; letter-spacing: 1px; text-transform: uppercase;
-            margin-bottom: 14px; color: var(--muted);
+            font-size: 0.8rem;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        .card h2::before {
+            content: '';
+            width: 3px;
+            height: 14px;
+            border-radius: 2px;
+            background: linear-gradient(180deg, var(--accent2), var(--accent));
+            flex-shrink: 0;
+        }
+        .card h3 {
+            margin: 18px 0 10px;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        /* ===== Stats ===== */
         .grid-stats {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        @media (min-width: 480px) {
+            .grid-stats { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (min-width: 768px) {
+            .grid-stats { grid-template-columns: repeat(5, 1fr); gap: 12px; }
         }
         .stat {
-            background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px;
+            background: var(--card2);
+            border-radius: 12px;
+            padding: 12px 14px;
             border: 1px solid var(--border);
+            text-align: center;
         }
-        .stat .n { font-size: 1.4rem; font-weight: 800; word-break: break-all; }
-        .stat .l { font-size: 0.7rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
-        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .stat .n {
+            font-size: 1.25rem;
+            font-weight: 800;
+            word-break: break-all;
+            background: linear-gradient(135deg, #fff, #c4b5fd);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .stat .l {
+            font-size: 0.65rem;
+            color: var(--muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        @media (min-width: 768px) {
+            .stat { text-align: left; padding: 14px; }
+            .stat .n { font-size: 1.45rem; }
+        }
+
+        /* ===== Tabs ===== */
+        .tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 2px;
+        }
+        .tabs::-webkit-scrollbar { display: none; }
         .tab {
-            padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
-            background: transparent; color: var(--muted); cursor: pointer;
-            font-family: inherit; font-weight: 700; font-size: 0.78rem;
+            flex: 1 0 auto;
+            min-height: var(--touch);
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--muted);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.82rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: 0.2s;
+            -webkit-tap-highlight-color: transparent;
         }
+        .tab i { margin-right: 0; font-size: 0.9em; }
         .tab.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
-            color: #fff; border-color: transparent;
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(140,0,255,0.25);
         }
+        @media (min-width: 768px) {
+            .tabs { gap: 8px; }
+            .tab { flex: 0 0 auto; padding: 10px 20px; }
+        }
+
         .panel { display: none; }
         .panel.active { display: block; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
-        input, select, textarea {
-            background: #121218; border: 1px solid var(--border); color: var(--text);
-            border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem;
+
+        /* ===== Form ===== */
+        input, textarea, select {
             width: 100%;
+            background: #121218;
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-family: inherit;
+            font-size: 16px; /* tránh zoom iOS */
+            min-height: var(--touch);
+            transition: border-color 0.2s;
         }
-        textarea { min-height: 64px; resize: vertical; }
-        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
-        .btn i { margin-right: 6px; }
-        .tab i { margin-right: 6px; }
-        .btn {
-            border: none; border-radius: 10px; padding: 8px 12px; cursor: pointer;
-            font-family: inherit; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.4px;
-            text-transform: uppercase; white-space: nowrap;
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(140,0,255,0.15);
         }
-        .btn-primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; }
-        .btn-ok { background: rgba(74,222,128,0.15); color: var(--ok); }
-        .btn-warn { background: rgba(255,152,0,0.15); color: var(--warn); }
-        .btn-info { background: rgba(59,130,246,0.18); color: #60a5fa; }
-        .btn-danger { background: rgba(255,68,68,0.15); color: #ff6666; }
-        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-        a.btn i { margin-right: 6px; }
-        .tab i { margin-right: 6px; }
+        textarea {
+            min-height: 90px;
+            resize: vertical;
+            line-height: 1.4;
+        }
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            min-height: 0;
+            accent-color: var(--warn);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        input[type="number"] { -moz-appearance: textfield; }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        @media (min-width: 560px) {
+            .form-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 900px) {
+            .form-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        }
+        .form-grid label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-weight: 600;
+        }
+        .full { grid-column: 1 / -1; }
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            background: rgba(255,152,0,0.08);
+            border: 1px solid rgba(255,152,0,0.25);
+            border-radius: 10px;
+        }
+        .check-row label {
+            margin: 0 !important;
+            text-transform: none !important;
+            font-size: 0.85rem !important;
+            color: var(--warn) !important;
+            cursor: pointer;
+            line-height: 1.35;
+        }
+
+        /* ===== Buttons ===== */
         .btn {
-            display: inline-flex; align-items: center; justify-content: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 40px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
             text-decoration: none;
+            white-space: nowrap;
+            transition: transform 0.15s, opacity 0.15s, filter 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .btn i { margin-right: 0; font-size: 0.9em; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(140,0,255,0.3);
+        }
+        .btn-ok { background: rgba(74,222,128,0.14); color: var(--ok); border: 1px solid rgba(74,222,128,0.25); }
+        .btn-warn { background: rgba(255,152,0,0.14); color: var(--warn); border: 1px solid rgba(255,152,0,0.25); }
+        .btn-info { background: rgba(59,130,246,0.16); color: var(--info); border: 1px solid rgba(59,130,246,0.25); }
+        .btn-danger { background: rgba(255,68,68,0.14); color: var(--danger); border: 1px solid rgba(255,68,68,0.25); }
+        .btn-ghost {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+        .row-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .row-actions.form-actions {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .row-actions.form-actions .btn {
+            flex: 1 1 auto;
+            min-width: 120px;
+            min-height: var(--touch);
+        }
+        @media (min-width: 560px) {
+            .row-actions.form-actions .btn { flex: 0 0 auto; }
+        }
+
+        /* ===== Tables → cards on mobile ===== */
+        .table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
+            padding: 0 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        th {
+            text-align: left;
+            padding: 10px 8px;
+            color: var(--muted);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid rgba(42,42,56,0.6);
+            vertical-align: middle;
+        }
+        tr:last-child td { border-bottom: none; }
+
+        /* Mobile card layout for tables */
+        @media (max-width: 719px) {
+            .table-wrap { overflow: visible; margin: 0; padding: 0; }
+            table thead { display: none; }
+            table, tbody { display: block; width: 100%; }
+            table tr {
+                display: block;
+                background: var(--card2);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 12px 14px;
+                margin-bottom: 10px;
+            }
+            table td {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 6px 0;
+                border-bottom: 1px dashed rgba(42,42,56,0.5);
+                text-align: right;
+            }
+            table td:last-child {
+                border-bottom: none;
+                padding-top: 10px;
+                margin-top: 4px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            table td::before {
+                content: attr(data-label);
+                color: var(--muted);
+                font-size: 0.68rem;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                font-weight: 700;
+                text-align: left;
+                flex-shrink: 0;
+                padding-top: 2px;
+            }
+            table td:last-child::before { display: none; }
+            table td .row-actions {
+                width: 100%;
+            }
+            table td .row-actions .btn {
+                flex: 1 1 calc(50% - 4px);
+                min-height: 40px;
+                font-size: 0.75rem;
+            }
+            /* hide empty muted colspan cells look */
+            table td[colspan] {
+                display: block;
+                text-align: center;
+            }
+            table td[colspan]::before { display: none; }
+        }
+
+        /* ===== Pagination ===== */
         .pagination {
-            display: flex; align-items: center; justify-content: center;
-            gap: 6px; margin-top: 14px; flex-wrap: wrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 14px;
+            flex-wrap: wrap;
         }
         .pagination button {
-            min-width: 34px; height: 34px; padding: 0 10px;
-            border-radius: 8px; border: 1px solid var(--border);
-            background: transparent; color: var(--muted); cursor: pointer;
-            font-family: inherit; font-weight: 700; font-size: 0.78rem;
+            min-width: 40px;
+            height: 40px;
+            padding: 0 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card2);
+            color: var(--muted);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.8rem;
+            -webkit-tap-highlight-color: transparent;
         }
         .pagination button.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
-            color: #fff; border-color: transparent;
+            color: #fff;
+            border-color: transparent;
         }
-        .pagination button:disabled {
-            opacity: 0.4; cursor: not-allowed;
-        }
+        .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
         .pagination .page-info {
-            color: var(--muted); font-size: 0.75rem; margin: 0 6px;
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin: 0 4px;
+        }
+
+        /* ===== Search ===== */
+        .search {
+            width: 100%;
+            margin-bottom: 14px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%238b8b9a' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 14px center;
+            padding-left: 42px;
+        }
+
+        /* ===== Login ===== */
+        #login-screen.wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 24px 16px;
         }
         .login-box {
-            max-width: 380px; margin: 80px auto; padding: 28px;
-            background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+            width: 100%;
+            max-width: 400px;
+            padding: 28px 22px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
         }
-        .login-box h1 { text-align: center; margin-bottom: 18px; font-size: 1.2rem; }
-        .login-box label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
-        .login-box input { width: 100%; margin-bottom: 12px; }
-        .login-box .btn i { margin-right: 6px; }
-        .tab i { margin-right: 6px; }
-        .btn { width: 100%; padding: 12px; }
-        .error { color: #ff6666; font-size: 0.8rem; margin-bottom: 10px; display: none; }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-        .form-grid label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+        .login-box h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.25rem;
+            background: linear-gradient(135deg, #ff0040, #8c00ff, #17adca);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
+        }
+        .login-box label {
+            display: block;
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .login-box input { margin-bottom: 14px; }
+        .login-box .btn {
+            width: 100%;
+            min-height: var(--touch);
+            margin-top: 4px;
+        }
+        .login-box .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+        }
+        .login-box .back-link:hover { color: var(--text); }
+        .error {
+            color: var(--danger);
+            font-size: 0.8rem;
+            margin-bottom: 12px;
+            display: none;
+            padding: 10px 12px;
+            background: rgba(255,68,68,0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(255,68,68,0.2);
+        }
+
+        /* ===== Misc ===== */
         .muted { color: var(--muted); font-size: 0.8rem; }
         .toast {
-            position: fixed; top: 16px; right: 16px; background: #222; border: 1px solid var(--border);
-            padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; z-index: 99;
-            opacity: 0; transform: translateY(-10px); transition: 0.25s; pointer-events: none;
+            position: fixed;
+            top: calc(12px + var(--safe-t));
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%) translateY(-12px);
+            max-width: min(420px, calc(100vw - 24px));
+            background: var(--card2);
+            border: 1px solid var(--border);
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            z-index: 999;
+            opacity: 0;
+            transition: 0.25s;
+            pointer-events: none;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
         }
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .search { width: 100%; margin-bottom: 12px; }
-        .full { grid-column: 1 / -1; }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        details summary {
+            cursor: pointer;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 0.8rem;
+            list-style: none;
+            padding: 8px 0;
+        }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::before {
+            content: '▸ ';
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        details[open] summary::before { transform: rotate(90deg); }
+        details pre {
+            margin-top: 8px;
+            padding: 12px;
+            background: #0e0e14;
+            border-radius: 10px;
+            font-size: 0.68rem;
+            overflow: auto;
+            color: var(--muted);
+            white-space: pre-wrap;
+            border: 1px solid var(--border);
+            max-height: 240px;
+        }
+        .badge-hidden {
+            color: var(--warn);
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .badge-visible {
+            color: var(--ok);
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .coin-input, .rank-select {
+            min-width: 0;
+            width: 100%;
+            max-width: 110px;
+            min-height: 36px;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+        }
+        @media (max-width: 719px) {
+            .coin-input, .rank-select { max-width: 140px; }
+        }
     </style>
 
     <script>
@@ -179,16 +658,16 @@
             <label for="admin-pass">Mật khẩu</label>
             <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
             <button class="btn btn-primary" id="admin-login-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
-            <p style="margin-top:14px;text-align:center;"><a href="/" style="color:var(--muted);font-size:0.8rem;">← Về player</a></p>
+            <a href="/" class="back-link">← Về player</a>
         </div>
     </div>
 
     <div id="admin-app" class="wrap" style="display:none;">
-        <div class="header">
+        <div class="header" id="admin-header">
             <h1>XUANKEN ADMIN</h1>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button class="btn btn-warn" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
-                <a href="/" class="btn btn-info"><i class="fa-solid fa-music"></i> Về player</a>
+            <div class="header-actions">
+                <button class="btn btn-warn" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> <span class="btn-label">Đăng xuất</span></button>
+                <a href="/" class="btn btn-info"><i class="fa-solid fa-music"></i> <span class="btn-label">Player</span></a>
             </div>
         </div>
 
@@ -242,9 +721,9 @@
                         <label>Lịch đăng bài (để trống = hiện ngay)</label>
                         <input id="s-publish-at" type="datetime-local">
                     </div>
-                    <div class="full" style="display:flex;align-items:center;gap:10px;padding-top:4px;">
-                        <input type="checkbox" id="s-hidden" style="width:18px;height:18px;accent-color:var(--warn);">
-                        <label for="s-hidden" style="margin:0;text-transform:none;font-size:0.85rem;color:var(--warn);cursor:pointer;">
+                    <div class="full check-row">
+                        <input type="checkbox" id="s-hidden">
+                        <label for="s-hidden">
                             <i class="fa-solid fa-eye-slash"></i> Ẩn bài tạm thời (link lỗi / đang sửa — player không hiện)
                         </label>
                     </div>
@@ -261,7 +740,7 @@
                         <textarea id="s-lrc2"></textarea>
                     </div>
                 </div>
-                <div class="row-actions" style="margin-top:14px;">
+                <div class="row-actions form-actions">
                     <button class="btn btn-primary" id="save-song-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu bài hát</button>
                     <button class="btn btn-warn" id="clear-song-form-btn"><i class="fa-solid fa-eraser"></i> Xoá form</button>
                 </div>
@@ -269,7 +748,7 @@
             <div class="card">
                 <h2>Danh sách bài trên Firebase</h2>
                 <input class="search" id="song-search" placeholder="Tìm bài / ID...">
-                <div style="overflow-x:auto;">
+                <div class="table-wrap">
                     <table>
                         <thead>
                             <tr>
@@ -293,13 +772,14 @@
             <div class="card">
                 <h2>Người dùng (Firebase)</h2>
                 <input class="search" id="user-search" placeholder="Tìm username...">
-                <div style="overflow-x:auto;">
+                <div class="table-wrap">
                     <table>
                         <thead>
                             <tr>
                                 <th>Username</th>
                                 <th>Hạng</th>
                                 <th>Xu XK</th>
+                                <th>PIN</th>
                                 <th>Bài sở hữu</th>
                                 <th>Điểm danh</th>
                                 <th>Thao tác</th>
@@ -328,6 +808,21 @@
                         <input type="number" id="set-starter" min="0">
                     </div>
                 </div>
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Bảo mật đăng nhập</h3>
+                <div class="form-grid">
+                    <div class="full check-row">
+                        <input type="checkbox" id="set-require-pin" checked>
+                        <label for="set-require-pin">Bắt buộc PIN 6 số khi vào player (chống vào nhờ username)</label>
+                    </div>
+                    <div class="full check-row" style="background:rgba(96,165,250,0.08);border-color:rgba(96,165,250,0.25);">
+                        <input type="checkbox" id="set-allow-register" checked>
+                        <label for="set-allow-register" style="color:var(--info)!important;">Cho phép đăng ký username mới từ màn hình đầu</label>
+                    </div>
+                </div>
+                <p class="muted" style="margin:8px 0 0;font-size:0.72rem;">
+                    Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase (admin tạo / đã từng vào) mới đăng nhập được.
+                    Admin có thể đặt / xoá PIN từng user ở tab Người dùng.
+                </p>
                 <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thương hiệu &amp; đa web</h3>
                 <div class="form-grid">
                     <div style="grid-column:1/-1;">
@@ -347,7 +842,7 @@
                         </p>
                     </div>
                 </div>
-                <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                <div class="row-actions form-actions">
                     <button class="btn btn-primary" id="save-settings-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
                     <button class="btn btn-warn" id="migrate-prefix-btn" title="Copy songs + users từ root sang prefix đang nhập"><i class="fa-solid fa-right-left"></i> Migrate root → prefix</button>
                 </div>
@@ -356,8 +851,8 @@
                     Cần Firebase Rules cho phép đọc/ghi path prefix trước. Xem hướng dẫn bên dưới.
                 </p>
                 <details style="margin-top:12px;">
-                    <summary style="cursor:pointer;color:var(--accent);font-weight:700;font-size:0.8rem;">Hướng dẫn Firebase Rules cho prefix</summary>
-                    <pre style="margin-top:8px;padding:12px;background:#121218;border-radius:8px;font-size:0.7rem;overflow:auto;color:var(--muted);white-space:pre-wrap;">{
+                    <summary>Hướng dẫn Firebase Rules cho prefix</summary>
+                    <pre>{
   "rules": {
     "settings": {
       ".read": true,
@@ -394,14 +889,14 @@
                 <p class="muted" style="margin-bottom:12px;">
                     Xuất toàn bộ list bài (JSON) để backup hoặc thêm link mới. Nhập file JSON để ghi đè / bổ sung bài lên Firebase.
                 </p>
-                <div class="row-actions" style="margin-bottom:12px;">
+                <div class="row-actions form-actions" style="margin-bottom:12px;border:none;padding-top:0;">
                     <button class="btn btn-ok" id="export-songs-btn"><i class="fa-solid fa-file-export"></i> Xuất list nhạc (JSON)</button>
                     <button class="btn btn-info" id="import-songs-btn"><i class="fa-solid fa-file-import"></i> Nhập list nhạc (JSON)</button>
                     <input type="file" id="import-songs-file" accept=".json,application/json" style="display:none;">
                 </div>
                 <label style="display:block;font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Hoặc dán JSON vào đây</label>
                 <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","audioFull2":"","albumArt":"","lrc1":"","lrc2":"","price":10}]'></textarea>
-                <div class="row-actions" style="margin-top:12px;">
+                <div class="row-actions form-actions" style="margin-top:12px;">
                     <button class="btn btn-primary" id="import-songs-paste-btn"><i class="fa-solid fa-paste"></i> Nhập từ ô trên</button>
                 </div>
                 <p class="muted" style="margin-top:10px;">
@@ -420,7 +915,9 @@
             starterCoins: 20,
             siteName: 'XuanKen Music Official',
             siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
-            sitePrefix: ''
+            sitePrefix: '',
+            requirePin: true,
+            allowRegister: true
         };
 
         let songsCache = [];
@@ -476,6 +973,8 @@
             document.getElementById('set-song-price').value = settingsCache.songPrice;
             document.getElementById('set-checkin').value = settingsCache.checkinReward;
             document.getElementById('set-starter').value = settingsCache.starterCoins;
+            document.getElementById('set-require-pin').checked = settingsCache.requirePin !== false;
+            document.getElementById('set-allow-register').checked = settingsCache.allowRegister !== false;
             document.getElementById('set-site-name').value = settingsCache.siteName || '';
             document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
             document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
@@ -524,7 +1023,8 @@
                     owned: Array.isArray(u.owned) ? u.owned : [],
                     lastCheckin: u.lastCheckin || '',
                     createdAt: u.createdAt || 0,
-                    rank: u.rank || 'member'
+                    rank: u.rank || 'member',
+                    pin: u.pin != null ? String(u.pin) : ''
                 };
             });
             renderUsers(document.getElementById('user-search').value);
@@ -649,16 +1149,16 @@
                 renderSongsPagination(0);
                 return;
             }
-            tbody.innerHTML = pageList.map(s => `<tr style="${s.hidden ? 'opacity:0.55;' : ''}">
-                <td><code>${escapeHtml(s.id)}</code></td>
-                <td>${escapeHtml(s.name)}</td>
-                <td>${escapeHtml(s.artist)}</td>
-                <td>${s.listenCount || 0}</td>
-                <td>${s.price != null ? s.price : settingsCache.songPrice}</td>
-                <td>${s.hidden
-                    ? '<span style="color:var(--warn);font-size:0.75rem;"><i class="fa-solid fa-eye-slash"></i> Ẩn</span>'
-                    : '<span style="color:var(--ok);font-size:0.75rem;"><i class="fa-solid fa-eye"></i> Hiện</span>'}</td>
-                <td>
+            tbody.innerHTML = pageList.map(s => `<tr style="${s.hidden ? 'opacity:0.6;' : ''}">
+                <td data-label="ID"><code>${escapeHtml(s.id)}</code></td>
+                <td data-label="Tên">${escapeHtml(s.name)}</td>
+                <td data-label="Ca sĩ">${escapeHtml(s.artist || '—')}</td>
+                <td data-label="Lượt nghe">${s.listenCount || 0}</td>
+                <td data-label="Giá">${s.price != null ? s.price : settingsCache.songPrice}</td>
+                <td data-label="Trạng thái">${s.hidden
+                    ? '<span class="badge-hidden"><i class="fa-solid fa-eye-slash"></i> Ẩn</span>'
+                    : '<span class="badge-visible"><i class="fa-solid fa-eye"></i> Hiện</span>'}</td>
+                <td data-label="Thao tác">
                     <div class="row-actions">
                         <button class="btn ${s.hidden ? 'btn-ok' : 'btn-warn'}" data-toggle-hide="${escapeHtml(s.id)}" title="${s.hidden ? 'Hiện lại bài' : 'Ẩn tạm thời'}">
                             <i class="fa-solid ${s.hidden ? 'fa-eye' : 'fa-eye-slash'}"></i> ${s.hidden ? 'Hiện' : 'Ẩn'}
@@ -706,7 +1206,7 @@
             const q = filter.trim().toLowerCase();
             const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
             if (!names.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có user</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="muted">Chưa có user</td></tr>`;
                 return;
             }
             const rankOpts = (cur) => {
@@ -722,16 +1222,17 @@
                 const a = usersCache[name];
                 const rank = a.rank || 'member';
                 return `<tr>
-                    <td><b>${escapeHtml(name)}</b></td>
-                    <td>
-                        <select data-rank-user="${escapeHtml(name)}" class="rank-select" style="width:120px;font-size:0.78rem;">
+                    <td data-label="Username"><b>${escapeHtml(name)}</b></td>
+                    <td data-label="Hạng">
+                        <select data-rank-user="${escapeHtml(name)}" class="rank-select">
                             ${rankOpts(rank)}
                         </select>
                     </td>
-                    <td><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input" style="width:90px"></td>
-                    <td>${(a.owned || []).length}</td>
-                    <td>${escapeHtml(a.lastCheckin || '—')}</td>
-                    <td>
+                    <td data-label="Xu XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
+                    <td data-label="PIN"><input type="text" value="${escapeHtml(a.pin || '')}" data-pin-user="${escapeHtml(name)}" class="coin-input" placeholder="6 số..." maxlength="6" inputmode="numeric" pattern="[0-9]*" style="max-width:100px;font-family:monospace;letter-spacing:2px;"></td>
+                    <td data-label="Sở hữu">${(a.owned || []).length}</td>
+                    <td data-label="Điểm danh">${escapeHtml(a.lastCheckin || '—')}</td>
+                    <td data-label="Thao tác">
                         <div class="row-actions">
                             <button class="btn btn-ok" data-save-user="${escapeHtml(name)}"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
                             <button class="btn btn-warn" data-gift="${escapeHtml(name)}"><i class="fa-solid fa-gift"></i> +50</button>
@@ -748,11 +1249,18 @@
                     const rankSel = tbody.querySelector('.rank-select[data-rank-user="' + name.replace(/"/g, '') + '"]');
                     const coins = Math.max(0, parseInt(input.value, 10) || 0);
                     const rank = (rankSel && rankSel.value) || 'member';
+                    const pinInput = tbody.querySelector('[data-pin-user="' + name.replace(/"/g, '') + '"]');
+                    const pin = pinInput ? String(pinInput.value || '').trim() : (usersCache[name].pin || '');
+                    if (pin && !/^[0-9]{6}$/.test(pin)) {
+                        toast('PIN phải đúng 6 chữ số (hoặc để trống để xoá PIN)');
+                        return;
+                    }
                     const key = usersCache[name].key || sanitizeKey(name);
-                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank });
+                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank, pin: pin || '' });
                     usersCache[name].coins = coins;
                     usersCache[name].rank = rank;
-                    toast('Đã lưu ' + name + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
+                    usersCache[name].pin = pin || '';
+                    toast('Đã lưu ' + name + (pin ? ' · có PIN' : ' · không PIN') + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
                     refreshStats();
                 };
             });
@@ -865,6 +1373,8 @@
             settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
             settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
             settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
+            settingsCache.requirePin = !!document.getElementById('set-require-pin').checked;
+            settingsCache.allowRegister = !!document.getElementById('set-allow-register').checked;
             settingsCache.siteName = (document.getElementById('set-site-name').value || '').trim() || DEFAULT_SETTINGS.siteName;
             settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
             settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
