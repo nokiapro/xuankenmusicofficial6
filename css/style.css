@@ -1088,17 +1088,21 @@ body.dark .song-item.active {
     border-radius: 50px;
 }
 
+/* Active hẹn giờ = cùng nền với nút xáo trộn / repeat */
 #open-timer-btn.active {
-    background: var(--accent-color) !important;
-    color: var(--bg-color) !important;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    animation: pulse 1.5s infinite;
+    background: var(--btn-active-bg) !important;
+    color: var(--text-primary) !important;
+    box-shadow: none;
+    transform: none;
+    animation: none;
 }
 
-@keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
-    50% { box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.1); }
+#open-timer-btn.active svg {
+    animation: iconActiveShiftLight 1s ease infinite !important;
+}
+
+body.dark #open-timer-btn.active svg {
+    animation: iconActiveShiftDark 1s ease infinite !important;
 }
 
 .listen-badge {
