@@ -50,8 +50,13 @@
     <div class="player-container" id="player-container" style="display: none;">
         <div class="header-section">
             <div class="top-left-action">
-                <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
-                    <i data-lucide="timer"></i>
+                <div class="top-left-stack">
+                    <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
+                        <i data-lucide="timer"></i>
+                    </div>
+                    <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
+                        <i data-lucide="list-plus"></i>
+                    </div>
                 </div>
                 <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
                     <i data-lucide="headphones"></i>
@@ -128,6 +133,17 @@
                 <div style="width: 40px;"></div> 
             </div>
             <div id="playlist-content"></div>
+        </div>
+
+        <div class="playlist" id="my-playlist-overlay">
+            <div class="playlist-header">
+                <div class="close-playlist" id="close-my-playlist-btn">
+                    <i data-lucide="x"></i>
+                </div>
+                <div class="playlist-title"><i data-lucide="list-plus"></i> PLAYLIST CỦA TÔI</div>
+                <div style="width: 40px;"></div>
+            </div>
+            <div id="my-playlist-content"></div>
         </div>
 
         <div id="timer-overlay" class="timer-overlay"></div>

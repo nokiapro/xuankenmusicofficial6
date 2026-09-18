@@ -194,16 +194,28 @@
                         <input id="s-artist" placeholder="XuanKen">
                     </div>
                     <div>
-                        <label>Giá XK</label>
+                        <label>Giá mua XK</label>
                         <input id="s-price" type="number" min="0" value="10">
+                    </div>
+                    <div>
+                        <label>Giá thuê 24h XK</label>
+                        <input id="s-rent-price" type="number" min="0" placeholder="Trống = 40% giá mua">
                     </div>
                     <div class="full">
                         <label>Link audio DEMO 1 phút *</label>
                         <input id="s-audio" placeholder="https://.../demo-1p.mp3">
                     </div>
                     <div class="full">
-                        <label>Link audio FULL (sau khi mua)</label>
+                        <label>Link audio FULL 1 (sau khi mua/thuê)</label>
                         <input id="s-audio-full" placeholder="https://.../full.mp3 — để trống = dùng link demo">
+                    </div>
+                    <div class="full">
+                        <label>Link audio FULL 2 (dự phòng / random)</label>
+                        <input id="s-audio-full-2" placeholder="https://.../full-backup.mp3 — random + fallback nếu link 1 lỗi">
+                    </div>
+                    <div class="full">
+                        <label>Lịch đăng bài (để trống = hiện ngay)</label>
+                        <input id="s-publish-at" type="datetime-local">
                     </div>
                     <div class="full">
                         <label>Link ảnh bìa</label>
@@ -367,11 +379,14 @@
                 artist: obj[id].artist || '',
                 audio: obj[id].audio || '',
                 audioFull: obj[id].audioFull || '',
+                audioFull2: obj[id].audioFull2 || '',
                 albumArt: obj[id].albumArt || '',
                 listenCount: Number(obj[id].listenCount) || 0,
                 lrc1: obj[id].lrc1 || '',
                 lrc2: obj[id].lrc2 || '',
-                price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice
+                price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice,
+                rentPrice: obj[id].rentPrice != null ? Number(obj[id].rentPrice) : null,
+                publishAt: obj[id].publishAt || null
             }));
             // Sắp xếp theo bảng chữ cái (tên bài, rồi ID)
             songsCache.sort((a, b) => {
@@ -424,15 +439,27 @@
             document.getElementById('s-name').value = song.name || '';
             document.getElementById('s-artist').value = song.artist || '';
             document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
+            document.getElementById('s-rent-price').value = song.rentPrice != null ? song.rentPrice : '';
             document.getElementById('s-audio').value = song.audio || '';
             document.getElementById('s-audio-full').value = song.audioFull || '';
+            document.getElementById('s-audio-full-2').value = song.audioFull2 || '';
             document.getElementById('s-art').value = song.albumArt || '';
             document.getElementById('s-lrc1').value = song.lrc1 || '';
             document.getElementById('s-lrc2').value = song.lrc2 || '';
+            // publishAt ISO → datetime-local
+            const pub = song.publishAt ? new Date(song.publishAt) : null;
+            if (pub && !Number.isNaN(pub.getTime())) {
+                const pad = n => String(n).padStart(2, '0');
+                document.getElementById('s-publish-at').value =
+                    pub.getFullYear() + '-' + pad(pub.getMonth()+1) + '-' + pad(pub.getDate()) +
+                    'T' + pad(pub.getHours()) + ':' + pad(pub.getMinutes());
+            } else {
+                document.getElementById('s-publish-at').value = '';
+            }
         }
 
         function clearSongForm() {
-            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-art','s-lrc1','s-lrc2'].forEach(id => {
+            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
                 document.getElementById(id).value = '';
             });
             document.getElementById('s-price').value = settingsCache.songPrice;
@@ -616,16 +643,27 @@
             }
             const existing = songsCache.find(s => s.id === id);
             const audioFull = document.getElementById('s-audio-full').value.trim();
+            const audioFull2 = document.getElementById('s-audio-full-2').value.trim();
+            const rentRaw = document.getElementById('s-rent-price').value.trim();
+            const pubLocal = document.getElementById('s-publish-at').value.trim();
+            let publishAt = null;
+            if (pubLocal) {
+                const d = new Date(pubLocal);
+                if (!Number.isNaN(d.getTime())) publishAt = d.toISOString();
+            }
             const payload = {
                 id,
                 name,
                 artist: document.getElementById('s-artist').value.trim(),
                 audio,
                 audioFull: audioFull || null,
+                audioFull2: audioFull2 || null,
                 albumArt: document.getElementById('s-art').value.trim(),
                 lrc1: document.getElementById('s-lrc1').value,
                 lrc2: document.getElementById('s-lrc2').value,
                 price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
+                rentPrice: rentRaw === '' ? null : Math.max(0, parseInt(rentRaw, 10) || 0),
+                publishAt,
                 listenCount: existing ? (existing.listenCount || 0) : 0
             };
             await db().ref('songs/' + id).set(payload);
@@ -656,10 +694,13 @@
                 artist: s.artist || '',
                 audio: s.audio || '',
                 audioFull: s.audioFull || '',
+                audioFull2: s.audioFull2 || '',
                 albumArt: s.albumArt || '',
                 lrc1: s.lrc1 || '',
                 lrc2: s.lrc2 || '',
                 price: s.price != null ? s.price : settingsCache.songPrice,
+                rentPrice: s.rentPrice != null ? s.rentPrice : null,
+                publishAt: s.publishAt || null,
                 listenCount: s.listenCount || 0
             }));
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -695,10 +736,13 @@
                     artist: String(item.artist || '').trim(),
                     audio,
                     audioFull: item.audioFull ? String(item.audioFull).trim() : null,
+                    audioFull2: item.audioFull2 ? String(item.audioFull2).trim() : null,
                     albumArt: String(item.albumArt || '').trim(),
                     lrc1: item.lrc1 != null ? String(item.lrc1) : '',
                     lrc2: item.lrc2 != null ? String(item.lrc2) : '',
                     price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
+                    rentPrice: item.rentPrice != null ? Math.max(0, Number(item.rentPrice) || 0) : null,
+                    publishAt: item.publishAt || null,
                     listenCount: existing ? (existing.listenCount || 0) : (Number(item.listenCount) || 0)
                 };
                 await db().ref('songs/' + id).set(payload);
