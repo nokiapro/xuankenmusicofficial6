@@ -50,7 +50,11 @@
         <div class="hint-subtitle">OFFICIAL</div>
         <form id="username-form" class="username-form" autocomplete="username">
             <label class="username-label" for="username-input">NHẬP USERNAME</label>
-            <input type="text" id="username-input" class="username-input" placeholder="Tên của bạn..." maxlength="20" required>
+            <input type="text" id="username-input" class="username-input" placeholder="Tên của bạn..." maxlength="20" required autocomplete="username">
+            <label class="username-label" style="margin-top:12px;">MÃ PIN (6 SỐ)</label>
+            <div class="pin-boxes" id="pin-boxes" role="group" aria-label="Mã PIN 6 số"></div>
+            <input type="tel" id="pin-hidden" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" />
+            <p class="username-pin-hint" id="pin-hint">Nhập đúng 6 chữ số · User mới = đặt PIN mới</p>
             <div id="username-error" class="username-error" style="display:none;"></div>
             <button type="submit" id="username-start-btn" class="username-start-btn">
                 <i data-lucide="play"></i>
