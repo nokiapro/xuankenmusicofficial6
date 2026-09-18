@@ -12,6 +12,22 @@
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
     <script src="js/firebase-config.js"></script>
+
+    <script>
+    // Ẩn đuôi .html trên URL (GitHub Pages / static hosting)
+    (function () {
+        try {
+            var path = location.pathname;
+            if (path.endsWith('/index.html')) {
+                history.replaceState(null, '', path.slice(0, -10) || '/');
+            } else if (path.endsWith('index.html')) {
+                history.replaceState(null, '', path.slice(0, -10) || '/');
+            } else if (path.endsWith('.html')) {
+                history.replaceState(null, '', path.slice(0, -5) + (path.slice(0, -5).endsWith('/') ? '' : '/'));
+            }
+        } catch (e) {}
+    })();
+    </script>
 </head>
 <body>
 
@@ -44,7 +60,7 @@
         <div class="hint-decoration">
             <i data-lucide="heart"></i> DESIGNER BY XUANKEN OFFICIAL <i data-lucide="heart"></i>
         </div>
-        <a href="admin.html" class="admin-link-hint" onclick="event.stopPropagation()">Admin</a>
+        <a href="/admin/" class="admin-link-hint" onclick="event.stopPropagation()">Admin</a>
     </div>
 
     <div class="player-container" id="player-container" style="display: none;">

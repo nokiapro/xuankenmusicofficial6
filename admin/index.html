@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link id="site-favicon" href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
+    <title>Admin | XuanKen Music</title>
+    <link rel="stylesheet" href="https://kit-pro.fontawesome.com/releases/v7.2.0/css/pro.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+    <script src="../js/firebase-config.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700;800&display=swap');
+        :root {
+            --bg: #0f0f12;
+            --card: #1a1a22;
+            --border: #2a2a35;
+            --text: #f2f2f2;
+            --muted: #9a9aaa;
+            --accent: #8c00ff;
+            --accent2: #ff0040;
+            --ok: #4ade80;
+            --warn: #ff9800;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "Roboto Condensed", system-ui, sans-serif;
+            background: linear-gradient(160deg, #12121a, #1a1025 50%, #0f0f12);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .header h1 {
+            font-size: 1.4rem; letter-spacing: 1px;
+            background: linear-gradient(135deg, #ff0040, #8c00ff, #17adca);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .header a {
+            color: var(--muted); text-decoration: none; font-size: 0.85rem;
+            padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+        }
+        .header .btn i { margin-right: 6px; }
+        .tab i { margin-right: 6px; }
+        .btn {
+            font-size: 0.72rem;
+        }
+        .card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 18px; margin-bottom: 16px;
+        }
+        .card h2 {
+            font-size: 0.95rem; letter-spacing: 1px; text-transform: uppercase;
+            margin-bottom: 14px; color: var(--muted);
+        }
+        .grid-stats {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+        }
+        .stat {
+            background: rgba(255,255,255,0.03); border-radius: 12px; padding: 14px;
+            border: 1px solid var(--border);
+        }
+        .stat .n { font-size: 1.4rem; font-weight: 800; word-break: break-all; }
+        .stat .l { font-size: 0.7rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab {
+            padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer;
+            font-family: inherit; font-weight: 700; font-size: 0.78rem;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff; border-color: transparent;
+        }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
+        input, select, textarea {
+            background: #121218; border: 1px solid var(--border); color: var(--text);
+            border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 0.85rem;
+            width: 100%;
+        }
+        textarea { min-height: 64px; resize: vertical; }
+        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+        .btn i { margin-right: 6px; }
+        .tab i { margin-right: 6px; }
+        .btn {
+            border: none; border-radius: 10px; padding: 8px 12px; cursor: pointer;
+            font-family: inherit; font-weight: 700; font-size: 0.72rem; letter-spacing: 0.4px;
+            text-transform: uppercase; white-space: nowrap;
+        }
+        .btn-primary { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; }
+        .btn-ok { background: rgba(74,222,128,0.15); color: var(--ok); }
+        .btn-warn { background: rgba(255,152,0,0.15); color: var(--warn); }
+        .btn-info { background: rgba(59,130,246,0.18); color: #60a5fa; }
+        .btn-danger { background: rgba(255,68,68,0.15); color: #ff6666; }
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        a.btn i { margin-right: 6px; }
+        .tab i { margin-right: 6px; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            text-decoration: none;
+        }
+        .pagination {
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-top: 14px; flex-wrap: wrap;
+        }
+        .pagination button {
+            min-width: 34px; height: 34px; padding: 0 10px;
+            border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer;
+            font-family: inherit; font-weight: 700; font-size: 0.78rem;
+        }
+        .pagination button.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff; border-color: transparent;
+        }
+        .pagination button:disabled {
+            opacity: 0.4; cursor: not-allowed;
+        }
+        .pagination .page-info {
+            color: var(--muted); font-size: 0.75rem; margin: 0 6px;
+        }
+        .login-box {
+            max-width: 380px; margin: 80px auto; padding: 28px;
+            background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        }
+        .login-box h1 { text-align: center; margin-bottom: 18px; font-size: 1.2rem; }
+        .login-box label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+        .login-box input { width: 100%; margin-bottom: 12px; }
+        .login-box .btn i { margin-right: 6px; }
+        .tab i { margin-right: 6px; }
+        .btn { width: 100%; padding: 12px; }
+        .error { color: #ff6666; font-size: 0.8rem; margin-bottom: 10px; display: none; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+        .form-grid label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+        .muted { color: var(--muted); font-size: 0.8rem; }
+        .toast {
+            position: fixed; top: 16px; right: 16px; background: #222; border: 1px solid var(--border);
+            padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; z-index: 99;
+            opacity: 0; transform: translateY(-10px); transition: 0.25s; pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .search { width: 100%; margin-bottom: 12px; }
+        .full { grid-column: 1 / -1; }
+    </style>
+
+    <script>
+    // Ẩn đuôi .html trên URL (GitHub Pages / static hosting)
+    (function () {
+        try {
+            var path = location.pathname;
+            if (path.endsWith('/index.html')) {
+                history.replaceState(null, '', path.slice(0, -10) || '/');
+            } else if (path.endsWith('index.html')) {
+                history.replaceState(null, '', path.slice(0, -10) || '/');
+            } else if (path.endsWith('.html')) {
+                history.replaceState(null, '', path.slice(0, -5) + (path.slice(0, -5).endsWith('/') ? '' : '/'));
+            }
+        } catch (e) {}
+    })();
+    </script>
+</head>
+<body>
+    <div id="login-screen" class="wrap">
+        <div class="login-box">
+            <h1>ADMIN XUANKEN</h1>
+            <div class="error" id="login-error">Email hoặc mật khẩu không đúng</div>
+            <label for="admin-email">Email admin</label>
+            <input type="email" id="admin-email" placeholder="admin@xuanken.com" autocomplete="username">
+            <label for="admin-pass">Mật khẩu</label>
+            <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
+            <button class="btn btn-primary" id="admin-login-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
+            <p style="margin-top:14px;text-align:center;"><a href="/" style="color:var(--muted);font-size:0.8rem;">← Về player</a></p>
+        </div>
+    </div>
+
+    <div id="admin-app" class="wrap" style="display:none;">
+        <div class="header">
+            <h1>XUANKEN ADMIN</h1>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-warn" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+                <a href="/" class="btn btn-info"><i class="fa-solid fa-music"></i> Về player</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="grid-stats" id="stats-grid"></div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="songs"><i class="fa-solid fa-music"></i> Bài hát</button>
+            <button class="tab" data-tab="users"><i class="fa-solid fa-users"></i> Người dùng</button>
+            <button class="tab" data-tab="settings"><i class="fa-solid fa-gear"></i> Cài đặt</button>
+        </div>
+
+        <div class="panel active" id="panel-songs">
+            <div class="card">
+                <h2>Thêm / sửa bài hát (Firebase)</h2>
+                <div class="form-grid">
+                    <div>
+                        <label>ID bài *</label>
+                        <input id="s-id" placeholder="VD: ABR">
+                    </div>
+                    <div>
+                        <label>Tên bài *</label>
+                        <input id="s-name" placeholder="Tên bài hát">
+                    </div>
+                    <div>
+                        <label>Ca sĩ</label>
+                        <input id="s-artist" placeholder="XuanKen">
+                    </div>
+                    <div>
+                        <label>Giá mua XK</label>
+                        <input id="s-price" type="number" min="0" value="10">
+                    </div>
+                    <div>
+                        <label>Giá thuê 24h XK</label>
+                        <input id="s-rent-price" type="number" min="0" placeholder="Trống = 40% giá mua">
+                    </div>
+                    <div class="full">
+                        <label>Link audio DEMO 1 phút *</label>
+                        <input id="s-audio" placeholder="https://.../demo-1p.mp3">
+                    </div>
+                    <div class="full">
+                        <label>Link audio FULL 1 (sau khi mua/thuê)</label>
+                        <input id="s-audio-full" placeholder="https://.../full.mp3 — để trống = dùng link demo">
+                    </div>
+                    <div class="full">
+                        <label>Link audio FULL 2 (dự phòng / random)</label>
+                        <input id="s-audio-full-2" placeholder="https://.../full-backup.mp3 — random + fallback nếu link 1 lỗi">
+                    </div>
+                    <div class="full">
+                        <label>Lịch đăng bài (để trống = hiện ngay)</label>
+                        <input id="s-publish-at" type="datetime-local">
+                    </div>
+                    <div class="full">
+                        <label>Link ảnh bìa</label>
+                        <input id="s-art" placeholder="https://.../anh.jpg">
+                    </div>
+                    <div class="full">
+                        <label>Lyric LRC 1 (text hoặc URL)</label>
+                        <textarea id="s-lrc1" placeholder="[00:12.00] Lời..."></textarea>
+                    </div>
+                    <div class="full">
+                        <label>Lyric LRC 2 (tuỳ chọn)</label>
+                        <textarea id="s-lrc2"></textarea>
+                    </div>
+                </div>
+                <div class="row-actions" style="margin-top:14px;">
+                    <button class="btn btn-primary" id="save-song-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu bài hát</button>
+                    <button class="btn btn-warn" id="clear-song-form-btn"><i class="fa-solid fa-eraser"></i> Xoá form</button>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Danh sách bài trên Firebase</h2>
+                <input class="search" id="song-search" placeholder="Tìm bài / ID...">
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên</th>
+                                <th>Ca sĩ</th>
+                                <th>Nghe</th>
+                                <th>Giá</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="songs-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="songs-pagination"></div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-users">
+            <div class="card">
+                <h2>Người dùng (Firebase)</h2>
+                <input class="search" id="user-search" placeholder="Tìm username...">
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Hạng</th>
+                                <th>Xu XK</th>
+                                <th>Bài sở hữu</th>
+                                <th>Điểm danh</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-settings">
+            <div class="card">
+                <h2>Cài đặt hệ thống</h2>
+                <div class="form-grid">
+                    <div>
+                        <label>Giá bài mặc định (XK)</label>
+                        <input type="number" id="set-song-price" min="0">
+                    </div>
+                    <div>
+                        <label>Xu điểm danh / ngày</label>
+                        <input type="number" id="set-checkin" min="0">
+                    </div>
+                    <div>
+                        <label>Xu tặng user mới</label>
+                        <input type="number" id="set-starter" min="0">
+                    </div>
+                </div>
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thương hiệu &amp; đa web</h3>
+                <div class="form-grid">
+                    <div style="grid-column:1/-1;">
+                        <label>Tên web (hiển thị trên tab / title)</label>
+                        <input type="text" id="set-site-name" placeholder="XuanKen Music Official">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label>Icon web / Favicon (URL ảnh .png / .ico)</label>
+                        <input type="url" id="set-site-icon" placeholder="https://.../icon.png">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label>Prefix dữ liệu (để tách nhiều web trên cùng Firebase)</label>
+                        <input type="text" id="set-site-prefix" placeholder="vd: music6, site1... (để trống = root)">
+                        <p class="muted" style="margin-top:6px;font-size:0.72rem;">
+                            Khi có prefix, bài hát &amp; user lưu dưới <code>prefix/songs</code>, <code>prefix/users</code>...
+                            Settings luôn ở root <code>settings</code>.
+                        </p>
+                    </div>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="save-settings-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
+                    <button class="btn btn-warn" id="migrate-prefix-btn" title="Copy songs + users từ root sang prefix đang nhập"><i class="fa-solid fa-right-left"></i> Migrate root → prefix</button>
+                </div>
+                <p class="muted" style="margin-top:10px;font-size:0.72rem;">
+                    <b>Migrate:</b> copy <code>songs</code> + <code>users</code> từ root sang prefix (không xóa root).
+                    Cần Firebase Rules cho phép đọc/ghi path prefix trước. Xem hướng dẫn bên dưới.
+                </p>
+                <details style="margin-top:12px;">
+                    <summary style="cursor:pointer;color:var(--accent);font-weight:700;font-size:0.8rem;">Hướng dẫn Firebase Rules cho prefix</summary>
+                    <pre style="margin-top:8px;padding:12px;background:#121218;border-radius:8px;font-size:0.7rem;overflow:auto;color:var(--muted);white-space:pre-wrap;">{
+  "rules": {
+    "settings": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "songs": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "prices": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "music6": {
+      "songs": { ".read": true, ".write": "auth != null" },
+      "users": { ".read": true, ".write": true },
+      "prices": { ".read": true, ".write": "auth != null" }
+    }
+  }
+}</pre>
+                    <p class="muted" style="font-size:0.72rem;margin-top:6px;">
+                        Vào <b>Firebase Console</b> → project <b>music6-dfd59</b> → Realtime Database → tab <b>Rules</b> → dán → Publish.
+                        Sau đó bấm <b>Migrate root → prefix</b> (đã đăng nhập Admin).
+                    </p>
+                </details>
+                <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
+            </div>
+            <div class="card">
+                <h2>Xuất / nhập danh sách bài hát</h2>
+                <p class="muted" style="margin-bottom:12px;">
+                    Xuất toàn bộ list bài (JSON) để backup hoặc thêm link mới. Nhập file JSON để ghi đè / bổ sung bài lên Firebase.
+                </p>
+                <div class="row-actions" style="margin-bottom:12px;">
+                    <button class="btn btn-ok" id="export-songs-btn"><i class="fa-solid fa-file-export"></i> Xuất list nhạc (JSON)</button>
+                    <button class="btn btn-info" id="import-songs-btn"><i class="fa-solid fa-file-import"></i> Nhập list nhạc (JSON)</button>
+                    <input type="file" id="import-songs-file" accept=".json,application/json" style="display:none;">
+                </div>
+                <label style="display:block;font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Hoặc dán JSON vào đây</label>
+                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","audioFull2":"","albumArt":"","lrc1":"","lrc2":"","price":10}]'></textarea>
+                <div class="row-actions" style="margin-top:12px;">
+                    <button class="btn btn-primary" id="import-songs-paste-btn"><i class="fa-solid fa-paste"></i> Nhập từ ô trên</button>
+                </div>
+                <p class="muted" style="margin-top:10px;">
+                    Khi nhập: bài trùng ID sẽ được cập nhật, bài mới sẽ được thêm. Không xóa bài không có trong file.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const DEFAULT_SETTINGS = {
+            songPrice: 10,
+            checkinReward: 15,
+            starterCoins: 20,
+            siteName: 'XuanKen Music Official',
+            siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
+            sitePrefix: ''
+        };
+
+        let songsCache = [];
+        let usersCache = {};
+        let settingsCache = { ...DEFAULT_SETTINGS };
+        let songsPage = 1;
+        const SONGS_PER_PAGE = 10;
+        let songsFilter = '';
+
+        function db() {
+            return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
+        }
+
+        /** Đường dẫn Firebase theo prefix (settings luôn ở root) */
+        function dataPath(key) {
+            const p = String(settingsCache.sitePrefix || '').trim().replace(/^\/+|\/+$/g, '');
+            return p ? `${p}/${key}` : key;
+        }
+
+        function applyBranding() {
+            const name = (settingsCache.siteName || DEFAULT_SETTINGS.siteName).trim() || DEFAULT_SETTINGS.siteName;
+            const icon = (settingsCache.siteIcon || DEFAULT_SETTINGS.siteIcon).trim() || DEFAULT_SETTINGS.siteIcon;
+            document.title = 'Admin | ' + name;
+            const fav = document.getElementById('site-favicon');
+            if (fav && icon) fav.href = icon;
+        }
+
+        function toast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2200);
+        }
+
+        function escapeHtml(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function sanitizeKey(name) {
+            return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
+        }
+
+        async function loadSettings() {
+            try {
+                const snap = await db().ref('settings').once('value');
+                const val = snap.val();
+                settingsCache = { ...DEFAULT_SETTINGS, ...(val || {}) };
+            } catch (e) {
+                console.warn('loadSettings fallback', e);
+                settingsCache = { ...DEFAULT_SETTINGS };
+            }
+            document.getElementById('set-song-price').value = settingsCache.songPrice;
+            document.getElementById('set-checkin').value = settingsCache.checkinReward;
+            document.getElementById('set-starter').value = settingsCache.starterCoins;
+            document.getElementById('set-site-name').value = settingsCache.siteName || '';
+            document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
+            document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
+            applyBranding();
+        }
+
+        async function loadSongs() {
+            const snap = await db().ref(dataPath('songs')).once('value');
+            const obj = snap.val() || {};
+            songsCache = Object.keys(obj).map(id => ({
+                id: String(obj[id].id || id),
+                name: obj[id].name || id,
+                artist: obj[id].artist || '',
+                audio: obj[id].audio || '',
+                audioFull: obj[id].audioFull || '',
+                audioFull2: obj[id].audioFull2 || '',
+                albumArt: obj[id].albumArt || '',
+                listenCount: Number(obj[id].listenCount) || 0,
+                lrc1: obj[id].lrc1 || '',
+                lrc2: obj[id].lrc2 || '',
+                price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice,
+                rentPrice: obj[id].rentPrice != null ? Number(obj[id].rentPrice) : null,
+                publishAt: obj[id].publishAt || null
+            }));
+            // Sắp xếp theo bảng chữ cái (tên bài, rồi ID)
+            songsCache.sort((a, b) => {
+                const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
+                if (na !== 0) return na;
+                return String(a.id || '').localeCompare(String(b.id || ''), 'vi', { sensitivity: 'base' });
+            });
+            renderSongs(document.getElementById('song-search').value);
+            refreshStats();
+        }
+
+        async function loadUsers() {
+            const snap = await db().ref(dataPath('users')).once('value');
+            const obj = snap.val() || {};
+            usersCache = {};
+            Object.keys(obj).forEach(k => {
+                const u = obj[k];
+                const name = u.username || k;
+                usersCache[name] = {
+                    key: k,
+                    coins: u.coins | 0,
+                    owned: Array.isArray(u.owned) ? u.owned : [],
+                    lastCheckin: u.lastCheckin || '',
+                    createdAt: u.createdAt || 0,
+                    rank: u.rank || 'member'
+                };
+            });
+            renderUsers(document.getElementById('user-search').value);
+            refreshStats();
+        }
+
+        function refreshStats() {
+            const users = Object.keys(usersCache);
+            let totalCoins = 0, totalOwned = 0;
+            users.forEach(n => {
+                totalCoins += usersCache[n].coins | 0;
+                totalOwned += (usersCache[n].owned || []).length;
+            });
+            const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
+            document.getElementById('stats-grid').innerHTML = `
+                <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
+                <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
+                <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng xu XK</div></div>
+                <div class="stat"><div class="n">${totalOwned}</div><div class="l">Lượt mua</div></div>
+                <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
+            `;
+        }
+
+        function fillSongForm(song) {
+            document.getElementById('s-id').value = song.id || '';
+            document.getElementById('s-name').value = song.name || '';
+            document.getElementById('s-artist').value = song.artist || '';
+            document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
+            document.getElementById('s-rent-price').value = song.rentPrice != null ? song.rentPrice : '';
+            document.getElementById('s-audio').value = song.audio || '';
+            document.getElementById('s-audio-full').value = song.audioFull || '';
+            document.getElementById('s-audio-full-2').value = song.audioFull2 || '';
+            document.getElementById('s-art').value = song.albumArt || '';
+            document.getElementById('s-lrc1').value = song.lrc1 || '';
+            document.getElementById('s-lrc2').value = song.lrc2 || '';
+            // publishAt ISO → datetime-local
+            const pub = song.publishAt ? new Date(song.publishAt) : null;
+            if (pub && !Number.isNaN(pub.getTime())) {
+                const pad = n => String(n).padStart(2, '0');
+                document.getElementById('s-publish-at').value =
+                    pub.getFullYear() + '-' + pad(pub.getMonth()+1) + '-' + pad(pub.getDate()) +
+                    'T' + pad(pub.getHours()) + ':' + pad(pub.getMinutes());
+            } else {
+                document.getElementById('s-publish-at').value = '';
+            }
+        }
+
+        function clearSongForm() {
+            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('s-price').value = settingsCache.songPrice;
+        }
+
+        function getFilteredSongs(filter) {
+            const q = String(filter || '').trim().toLowerCase();
+            return songsCache.filter(s => {
+                if (!q) return true;
+                return String(s.id).toLowerCase().includes(q)
+                    || String(s.name || '').toLowerCase().includes(q)
+                    || String(s.artist || '').toLowerCase().includes(q);
+            });
+        }
+
+        function renderSongsPagination(totalPages) {
+            const el = document.getElementById('songs-pagination');
+            if (!el) return;
+            if (totalPages <= 1) {
+                el.innerHTML = totalPages === 1
+                    ? `<span class="page-info">Trang 1 / 1</span>`
+                    : '';
+                return;
+            }
+            let html = `<button type="button" data-page="prev" ${songsPage <= 1 ? 'disabled' : ''}>‹</button>`;
+            const maxButtons = 7;
+            let start = Math.max(1, songsPage - Math.floor(maxButtons / 2));
+            let end = Math.min(totalPages, start + maxButtons - 1);
+            start = Math.max(1, end - maxButtons + 1);
+            if (start > 1) {
+                html += `<button type="button" data-page="1">1</button>`;
+                if (start > 2) html += `<span class="page-info">…</span>`;
+            }
+            for (let p = start; p <= end; p++) {
+                html += `<button type="button" data-page="${p}" class="${p === songsPage ? 'active' : ''}">${p}</button>`;
+            }
+            if (end < totalPages) {
+                if (end < totalPages - 1) html += `<span class="page-info">…</span>`;
+                html += `<button type="button" data-page="${totalPages}">${totalPages}</button>`;
+            }
+            html += `<button type="button" data-page="next" ${songsPage >= totalPages ? 'disabled' : ''}>›</button>`;
+            html += `<span class="page-info">Trang ${songsPage} / ${totalPages}</span>`;
+            el.innerHTML = html;
+            el.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.onclick = () => {
+                    const v = btn.getAttribute('data-page');
+                    if (v === 'prev') songsPage = Math.max(1, songsPage - 1);
+                    else if (v === 'next') songsPage = Math.min(totalPages, songsPage + 1);
+                    else songsPage = parseInt(v, 10) || 1;
+                    renderSongs(songsFilter, true);
+                };
+            });
+        }
+
+        function renderSongs(filter = '', keepPage = false) {
+            const tbody = document.getElementById('songs-tbody');
+            if (!keepPage) {
+                songsFilter = filter;
+                songsPage = 1;
+            }
+            const list = getFilteredSongs(songsFilter);
+            const totalPages = Math.max(1, Math.ceil(list.length / SONGS_PER_PAGE));
+            if (songsPage > totalPages) songsPage = totalPages;
+            const start = (songsPage - 1) * SONGS_PER_PAGE;
+            const pageList = list.slice(start, start + SONGS_PER_PAGE);
+
+            if (!list.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
+                renderSongsPagination(0);
+                return;
+            }
+            tbody.innerHTML = pageList.map(s => `<tr>
+                <td><code>${escapeHtml(s.id)}</code></td>
+                <td>${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.artist)}</td>
+                <td>${s.listenCount || 0}</td>
+                <td>${s.price != null ? s.price : settingsCache.songPrice}</td>
+                <td>
+                    <div class="row-actions">
+                        <button class="btn btn-ok" data-edit="${escapeHtml(s.id)}"><i class="fa-solid fa-pen"></i> Sửa</button>
+                        <button class="btn btn-danger" data-del="${escapeHtml(s.id)}"><i class="fa-solid fa-trash"></i> Xóa</button>
+                    </div>
+                </td>
+            </tr>`).join('');
+
+            tbody.querySelectorAll('[data-edit]').forEach(btn => {
+                btn.onclick = () => {
+                    const song = songsCache.find(x => x.id === btn.getAttribute('data-edit'));
+                    if (song) {
+                        fillSongForm(song);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                };
+            });
+            tbody.querySelectorAll('[data-del]').forEach(btn => {
+                btn.onclick = async () => {
+                    const id = btn.getAttribute('data-del');
+                    if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
+                    await db().ref(dataPath('songs') + '/' + id).remove();
+                    toast('Đã xóa ' + id);
+                    await loadSongs();
+                };
+            });
+            renderSongsPagination(totalPages);
+        }
+
+        function renderUsers(filter = '') {
+            const tbody = document.getElementById('users-tbody');
+            const q = filter.trim().toLowerCase();
+            const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
+            if (!names.length) {
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có user</td></tr>`;
+                return;
+            }
+            const rankOpts = (cur) => {
+                const opts = [
+                    { v: 'member', l: 'Thành viên' },
+                    { v: 'vip', l: 'VIP' },
+                    { v: 'super_vip', l: 'SUPER VIP' },
+                    { v: 'admin', l: 'ADMIN' }
+                ];
+                return opts.map(o => `<option value="${o.v}" ${cur === o.v ? 'selected' : ''}>${o.l}</option>`).join('');
+            };
+            tbody.innerHTML = names.map(name => {
+                const a = usersCache[name];
+                const rank = a.rank || 'member';
+                return `<tr>
+                    <td><b>${escapeHtml(name)}</b></td>
+                    <td>
+                        <select data-rank-user="${escapeHtml(name)}" class="rank-select" style="width:120px;font-size:0.78rem;">
+                            ${rankOpts(rank)}
+                        </select>
+                    </td>
+                    <td><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input" style="width:90px"></td>
+                    <td>${(a.owned || []).length}</td>
+                    <td>${escapeHtml(a.lastCheckin || '—')}</td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="btn btn-ok" data-save-user="${escapeHtml(name)}"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+                            <button class="btn btn-warn" data-gift="${escapeHtml(name)}"><i class="fa-solid fa-gift"></i> +50</button>
+                            <button class="btn btn-danger" data-del-user="${escapeHtml(name)}"><i class="fa-solid fa-trash"></i> Xóa</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.querySelectorAll('[data-save-user]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-save-user');
+                    const input = tbody.querySelector('.coin-input[data-user="' + name.replace(/"/g, '') + '"]');
+                    const rankSel = tbody.querySelector('.rank-select[data-rank-user="' + name.replace(/"/g, '') + '"]');
+                    const coins = Math.max(0, parseInt(input.value, 10) || 0);
+                    const rank = (rankSel && rankSel.value) || 'member';
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank });
+                    usersCache[name].coins = coins;
+                    usersCache[name].rank = rank;
+                    toast('Đã lưu ' + name + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
+                    refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-gift]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-gift');
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    const coins = (usersCache[name].coins | 0) + 50;
+                    await db().ref(dataPath('users') + '/' + key + '/coins').set(coins);
+                    usersCache[name].coins = coins;
+                    toast('+50 xu ' + name);
+                    renderUsers(document.getElementById('user-search').value);
+                    refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-del-user]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-del-user');
+                    if (!confirm('Xóa user "' + name + '"?')) return;
+                    const key = usersCache[name].key || sanitizeKey(name);
+                    await db().ref(dataPath('users') + '/' + key).remove();
+                    delete usersCache[name];
+                    toast('Đã xóa ' + name);
+                    renderUsers(document.getElementById('user-search').value);
+                    refreshStats();
+                };
+            });
+        }
+
+        document.getElementById('save-song-btn').onclick = async () => {
+            const id = document.getElementById('s-id').value.trim();
+            const name = document.getElementById('s-name').value.trim();
+            const audio = document.getElementById('s-audio').value.trim();
+            if (!id || !name || !audio) {
+                toast('Cần ID, tên bài và link audio');
+                return;
+            }
+            if (/[.#$\[\]/]/.test(id)) {
+                toast('ID không được chứa . # $ [ ] /');
+                return;
+            }
+            const audioFull = document.getElementById('s-audio-full').value.trim();
+            const audioFull2 = document.getElementById('s-audio-full-2').value.trim();
+            const rentRaw = document.getElementById('s-rent-price').value.trim();
+            const pubLocal = document.getElementById('s-publish-at').value.trim();
+            let publishAt = null;
+            if (pubLocal) {
+                const d = new Date(pubLocal);
+                if (!Number.isNaN(d.getTime())) publishAt = d.toISOString();
+            }
+            // Đọc listenCount thật từ Firebase — không bao giờ giảm khi sửa bài
+            let liveCount = 0;
+            try {
+                const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
+                liveCount = Number(snap.val()) || 0;
+            } catch (e) {}
+            const cacheCount = (songsCache.find(s => s.id === id) || {}).listenCount || 0;
+            const payload = {
+                id,
+                name,
+                artist: document.getElementById('s-artist').value.trim(),
+                audio,
+                audioFull: audioFull || null,
+                audioFull2: audioFull2 || null,
+                albumArt: document.getElementById('s-art').value.trim(),
+                lrc1: document.getElementById('s-lrc1').value,
+                lrc2: document.getElementById('s-lrc2').value,
+                price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
+                rentPrice: rentRaw === '' ? null : Math.max(0, parseInt(rentRaw, 10) || 0),
+                publishAt,
+                listenCount: Math.max(liveCount, cacheCount, 0)
+            };
+            await db().ref(dataPath('songs') + '/' + id).set(payload);
+            toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
+            await loadSongs();
+        };
+
+        document.getElementById('clear-song-form-btn').onclick = () => clearSongForm();
+        document.getElementById('song-search').oninput = e => renderSongs(e.target.value);
+        document.getElementById('user-search').oninput = e => renderUsers(e.target.value);
+
+        document.getElementById('save-settings-btn').onclick = async () => {
+            settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
+            settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
+            settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
+            settingsCache.siteName = (document.getElementById('set-site-name').value || '').trim() || DEFAULT_SETTINGS.siteName;
+            settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
+            settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
+            await db().ref('settings').set({
+                songPrice: settingsCache.songPrice,
+                checkinReward: settingsCache.checkinReward,
+                starterCoins: settingsCache.starterCoins,
+                siteName: settingsCache.siteName,
+                siteIcon: settingsCache.siteIcon,
+                sitePrefix: settingsCache.sitePrefix
+            });
+            applyBranding();
+            toast('Đã lưu cài đặt Firebase');
+            // Reload data theo prefix mới
+            try {
+                await loadSongs();
+                await loadUsers();
+            } catch (e) {
+                console.warn('Reload after prefix change', e);
+            }
+        };
+
+        document.getElementById('migrate-prefix-btn').onclick = async () => {
+            const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
+            if (!prefix) {
+                toast('Nhập prefix trước (vd: music6)');
+                return;
+            }
+            if (!confirm(`Migrate songs + users từ ROOT → "${prefix}/..." ?\n\n• Không xóa data root\n• Ghi đè data dưới ${prefix}/ nếu đã có\n• Cần Firebase Rules cho phép path này`)) return;
+
+            const btn = document.getElementById('migrate-prefix-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang migrate...';
+            try {
+                // 1) Đọc root
+                const [songsSnap, usersSnap, pricesSnap] = await Promise.all([
+                    db().ref('songs').once('value'),
+                    db().ref('users').once('value'),
+                    db().ref('prices').once('value')
+                ]);
+                const songsVal = songsSnap.val() || {};
+                const usersVal = usersSnap.val() || {};
+                const pricesVal = pricesSnap.val();
+
+                const songCount = Object.keys(songsVal).length;
+                const userCount = Object.keys(usersVal).length;
+                if (songCount === 0 && userCount === 0) {
+                    toast('Root không có songs/users để migrate');
+                    return;
+                }
+
+                // 2) Ghi sang prefix
+                await db().ref(prefix + '/songs').set(songsVal);
+                await db().ref(prefix + '/users').set(usersVal);
+                if (pricesVal && typeof pricesVal === 'object') {
+                    await db().ref(prefix + '/prices').set(pricesVal);
+                }
+
+                // 3) Bật prefix trong settings
+                settingsCache.sitePrefix = prefix;
+                document.getElementById('set-site-prefix').value = prefix;
+                await db().ref('settings').update({ sitePrefix: prefix });
+
+                applyBranding();
+                await loadSongs();
+                await loadUsers();
+                toast(`Đã migrate ${songCount} bài + ${userCount} user → ${prefix}/`);
+            } catch (e) {
+                console.error('Migrate failed', e);
+                const msg = (e && (e.code || e.message)) || String(e);
+                if (/permission|PERMISSION_DENIED/i.test(msg)) {
+                    toast('PERMISSION_DENIED — cập nhật Firebase Rules cho path ' + prefix + ' trước');
+                } else {
+                    toast('Migrate lỗi: ' + msg);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate root → prefix';
+            }
+        };
+
+        function exportSongsJson() {
+            // Không xuất listenCount — import sau không đụng lượt nghe
+            const data = songsCache.map(s => ({
+                id: s.id,
+                name: s.name,
+                artist: s.artist || '',
+                audio: s.audio || '',
+                audioFull: s.audioFull || '',
+                audioFull2: s.audioFull2 || '',
+                albumArt: s.albumArt || '',
+                lrc1: s.lrc1 || '',
+                lrc2: s.lrc2 || '',
+                price: s.price != null ? s.price : settingsCache.songPrice,
+                rentPrice: s.rentPrice != null ? s.rentPrice : null,
+                publishAt: s.publishAt || null
+            }));
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'xuanken-songs-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            toast('Đã xuất ' + data.length + ' bài (không gồm lượt nghe)');
+        }
+
+        async function importSongsFromArray(arr) {
+            if (!Array.isArray(arr) || !arr.length) {
+                toast('JSON không hợp lệ hoặc rỗng');
+                return;
+            }
+            let ok = 0, skip = 0;
+            for (const item of arr) {
+                const id = String(item.id || '').trim();
+                const name = String(item.name || '').trim();
+                const audio = String(item.audio || '').trim();
+                if (!id || !name || !audio || /[.#$\[\]/]/.test(id)) {
+                    skip++;
+                    continue;
+                }
+                // Bài đã có: giữ listenCount trên Firebase (bỏ qua field trong JSON nếu có)
+                // Bài mới: listenCount = 0
+                let liveCount = 0;
+                try {
+                    const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
+                    if (snap.exists()) liveCount = Number(snap.val()) || 0;
+                } catch (e) {}
+
+                const payload = {
+                    id,
+                    name,
+                    artist: String(item.artist || '').trim(),
+                    audio,
+                    audioFull: item.audioFull ? String(item.audioFull).trim() : null,
+                    audioFull2: item.audioFull2 ? String(item.audioFull2).trim() : null,
+                    albumArt: String(item.albumArt || '').trim(),
+                    lrc1: item.lrc1 != null ? String(item.lrc1) : '',
+                    lrc2: item.lrc2 != null ? String(item.lrc2) : '',
+                    price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
+                    rentPrice: item.rentPrice != null ? Math.max(0, Number(item.rentPrice) || 0) : null,
+                    publishAt: item.publishAt || null,
+                    listenCount: liveCount
+                };
+                await db().ref(dataPath('songs') + '/' + id).set(payload);
+                ok++;
+            }
+            toast('Nhập xong: ' + ok + ' bài (không đụng lượt nghe)' + (skip ? ', bỏ qua ' + skip : ''));
+            await loadSongs();
+        }
+
+        document.getElementById('export-songs-btn').onclick = () => exportSongsJson();
+        document.getElementById('import-songs-btn').onclick = () => {
+            document.getElementById('import-songs-file').click();
+        };
+        document.getElementById('import-songs-file').onchange = async (e) => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
+                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ file? Bài trùng ID sẽ được cập nhật.')) return;
+                await importSongsFromArray(arr);
+            } catch (err) {
+                console.error(err);
+                toast('Không đọc được file JSON');
+            }
+        };
+        document.getElementById('import-songs-paste-btn').onclick = async () => {
+            const raw = document.getElementById('import-songs-textarea').value.trim();
+            if (!raw) {
+                toast('Dán JSON vào ô trước');
+                return;
+            }
+            try {
+                const data = JSON.parse(raw);
+                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
+                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ ô dán? Bài trùng ID sẽ được cập nhật.')) return;
+                await importSongsFromArray(arr);
+            } catch (err) {
+                console.error(err);
+                toast('JSON không hợp lệ');
+            }
+        };
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.onclick = () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+            };
+        });
+
+        async function showApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-app').style.display = 'block';
+            try {
+                await loadSettings();
+                await Promise.all([loadSongs(), loadUsers()]);
+            } catch (e) {
+                console.error(e);
+                toast('Lỗi Firebase — kiểm tra Rules / kết nối');
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('admin-app').style.display = 'none';
+            document.getElementById('login-error').style.display = 'none';
+        }
+
+        document.getElementById('admin-login-btn').onclick = async () => {
+            const email = document.getElementById('admin-email').value.trim();
+            const pass = document.getElementById('admin-pass').value;
+            if (!email || !pass) {
+                document.getElementById('login-error').textContent = 'Vui lòng nhập email và mật khẩu';
+                document.getElementById('login-error').style.display = 'block';
+                return;
+            }
+            try {
+                document.getElementById('admin-login-btn').disabled = true;
+                document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
+                await firebase.auth().signInWithEmailAndPassword(email, pass);
+                document.getElementById('login-error').style.display = 'none';
+                // onAuthStateChanged sẽ gọi showApp
+            } catch (err) {
+                console.error(err);
+                let msg = 'Email hoặc mật khẩu không đúng';
+                if (err.code === 'auth/user-not-found') msg = 'Tài khoản không tồn tại';
+                if (err.code === 'auth/wrong-password') msg = 'Sai mật khẩu';
+                if (err.code === 'auth/invalid-email') msg = 'Email không hợp lệ';
+                if (err.code === 'auth/too-many-requests') msg = 'Thử lại sau (quá nhiều lần sai)';
+                document.getElementById('login-error').textContent = msg;
+                document.getElementById('login-error').style.display = 'block';
+            } finally {
+                document.getElementById('admin-login-btn').disabled = false;
+                document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Đăng nhập';
+            }
+        };
+
+        document.getElementById('admin-pass').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('admin-login-btn').click();
+        });
+        document.getElementById('admin-email').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('admin-pass').focus();
+        });
+
+        document.getElementById('logout-btn').onclick = async () => {
+            try {
+                await firebase.auth().signOut();
+            } catch (e) {
+                console.error(e);
+            }
+            showLogin();
+        };
+
+        // Theo dõi trạng thái đăng nhập
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                showApp();
+            } else {
+                showLogin();
+            }
+        });
+    </script>
+</body>
+</html>
