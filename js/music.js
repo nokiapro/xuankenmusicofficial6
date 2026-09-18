@@ -1,5 +1,7 @@
 let shuffleHistory = [];
 let remainingQueue = [];
+let myPlaylistMode = false;
+let myPlaylistQueue = [];
 let currentShuffleCycle = [];
 let index = 0;
 let isPlaying = false;
@@ -1110,12 +1112,92 @@ function changeSong(i, source = 'normal') {
 
 function selectSongFromList(i) {
     if (playlistOverlay) playlistOverlay.classList.remove('active');
+    // Chọn từ danh sách tổng → thoát chế độ playlist cá nhân
+    myPlaylistMode = false;
+    myPlaylistQueue = [];
     changeSong(i, 'select');
+}
+
+function getMyPlaylistIndices() {
+    const ids = loadMyPlaylist();
+    return ids
+        .map(id => songs.findIndex(s => String(s.id) === String(id)))
+        .filter(i => i >= 0);
+}
+
+function getNextMyPlaylistIndex(currentIdx) {
+    const indices = getMyPlaylistIndices();
+    if (!indices.length) {
+        myPlaylistMode = false;
+        myPlaylistQueue = [];
+        return isShuffle ? getNextShuffleIndex(currentIdx) : ((currentIdx + 1) % songs.length);
+    }
+    if (isShuffle) {
+        if (!myPlaylistQueue.length) {
+            myPlaylistQueue = [...indices].sort(() => Math.random() - 0.5);
+            if (myPlaylistQueue.length > 1 && myPlaylistQueue[0] === currentIdx) {
+                myPlaylistQueue.push(myPlaylistQueue.shift());
+            }
+        }
+        let next = myPlaylistQueue.shift();
+        if (next === currentIdx && myPlaylistQueue.length) {
+            myPlaylistQueue.push(next);
+            next = myPlaylistQueue.shift();
+        }
+        return typeof next === 'number' ? next : indices[0];
+    }
+    const pos = indices.indexOf(currentIdx);
+    if (pos < 0) return indices[0];
+    return indices[(pos + 1) % indices.length];
+}
+
+function getPrevMyPlaylistIndex(currentIdx) {
+    const indices = getMyPlaylistIndices();
+    if (!indices.length) {
+        myPlaylistMode = false;
+        return isShuffle ? getPrevShuffleIndex(currentIdx) : ((currentIdx - 1 + songs.length) % songs.length);
+    }
+    if (isShuffle) {
+        // Lịch sử đơn giản: bài trước trong indices
+        const pos = indices.indexOf(currentIdx);
+        if (pos < 0) return indices[indices.length - 1];
+        return indices[(pos - 1 + indices.length) % indices.length];
+    }
+    const pos = indices.indexOf(currentIdx);
+    if (pos < 0) return indices[indices.length - 1];
+    return indices[(pos - 1 + indices.length) % indices.length];
+}
+
+/** Phát tất cả bài trong playlist của tôi (chỉ vòng trong playlist đó) */
+function playAllMyPlaylist() {
+    const indices = getMyPlaylistIndices();
+    if (!indices.length) {
+        showNotification('PLAYLIST:', 'CHƯA CÓ BÀI NÀO', '#ff9800', 'list-plus');
+        return;
+    }
+    myPlaylistMode = true;
+    if (isShuffle) {
+        myPlaylistQueue = [...indices].sort(() => Math.random() - 0.5);
+    } else {
+        myPlaylistQueue = [...indices];
+    }
+    const start = myPlaylistQueue.shift();
+    // Đưa các bài còn lại vào queue để next dùng
+    document.getElementById('my-playlist-overlay')?.classList.remove('active');
+    hasUserInteracted = true;
+    changeSong(start, 'my-playlist');
+    setTimeout(() => {
+        audio.play().catch(e => console.log('PLAY ALL:', e));
+    }, 120);
+    showNotification('PLAYLIST:', `PHÁT ${indices.length} BÀI`, '#4ade80', 'list-plus');
 }
 
 function handleNextAction() {
     let next, source = 'next';
-    if (isShuffle) {
+    if (myPlaylistMode) {
+        next = getNextMyPlaylistIndex(index);
+        source = 'my-playlist';
+    } else if (isShuffle) {
         next = getNextShuffleIndex(index);
         source = 'shuffle';
     } else {
@@ -1126,7 +1208,10 @@ function handleNextAction() {
 
 function prevSong() {
     let prev, source = 'prev';
-    if (isShuffle) {
+    if (myPlaylistMode) {
+        prev = getPrevMyPlaylistIndex(index);
+        source = 'my-playlist';
+    } else if (isShuffle) {
         prev = getPrevShuffleIndex(index);
         source = 'shuffle';
     } else {
@@ -1546,8 +1631,10 @@ function renderPlaylist() {
 
 function renderMyPlaylist() {
     const list = document.getElementById('my-playlist-content');
+    const toolbar = document.getElementById('my-playlist-toolbar');
     if (!list) return;
     const ids = loadMyPlaylist();
+    if (toolbar) toolbar.style.display = ids.length ? 'flex' : 'none';
     if (!ids.length) {
         list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:0.85rem;">Chưa có bài — bấm icon playlist bên cạnh bài hát để thêm</div>';
         return;
@@ -1567,13 +1654,21 @@ function renderMyPlaylist() {
             </div>
         </div>`;
     }).join('');
-    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(list.querySelectorAll('[data-lucide]')) });
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ nodes: Array.from(list.querySelectorAll('[data-lucide]')) });
+        const playAllBtn = document.getElementById('my-playlist-playall-btn');
+        if (playAllBtn) lucide.createIcons({ nodes: Array.from(playAllBtn.querySelectorAll('[data-lucide]')) });
+    }
     list.querySelectorAll('[data-play-idx]').forEach(el => {
         el.onclick = () => {
             const i = parseInt(el.getAttribute('data-play-idx'), 10);
             if (!Number.isNaN(i) && i >= 0) {
+                // Phát 1 bài trong playlist → vẫn giữ vòng playlist của tôi
+                myPlaylistMode = true;
+                myPlaylistQueue = [];
                 document.getElementById('my-playlist-overlay')?.classList.remove('active');
-                window.selectSongFromList(i);
+                changeSong(i, 'my-playlist');
+                setTimeout(() => audio.play().catch(() => {}), 100);
             }
         };
     });
@@ -1584,6 +1679,13 @@ function renderMyPlaylist() {
             renderMyPlaylist();
         };
     });
+    const playAllBtn = document.getElementById('my-playlist-playall-btn');
+    if (playAllBtn) {
+        playAllBtn.onclick = (e) => {
+            e.stopPropagation();
+            playAllMyPlaylist();
+        };
+    }
 }
 
 const playerContainer = document.getElementById('player-container');
