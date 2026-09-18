@@ -304,8 +304,27 @@ let preloadAudioEl = null;
 async function fetchSongsFromFirebase() {
     const db = getDb();
     if (!db) throw new Error('Firebase chưa sẵn sàng');
-    const snap = await db.ref(dataPath('songs')).once('value');
-    return songsObjectToArray(snap.val());
+    const prefix = String((getAdminSettings().sitePrefix || '')).trim();
+    const path = dataPath('songs');
+    try {
+        const snap = await db.ref(path).once('value');
+        const arr = songsObjectToArray(snap.val());
+        // Nếu có prefix nhưng path đó trống / không có quyền → fallback root (tránh site "chết")
+        if (prefix && arr.length === 0) {
+            console.warn(`[songs] Prefix "${prefix}" không có dữ liệu, fallback sang root /songs`);
+            const snapRoot = await db.ref('songs').once('value');
+            return songsObjectToArray(snapRoot.val());
+        }
+        return arr;
+    } catch (e) {
+        const msg = (e && (e.message || e.code)) || String(e);
+        if (prefix && /permission|PERMISSION_DENIED|permission_denied/i.test(msg)) {
+            console.warn(`[songs] Prefix "${prefix}" bị chặn quyền, fallback sang root /songs`, e);
+            const snapRoot = await db.ref('songs').once('value');
+            return songsObjectToArray(snapRoot.val());
+        }
+        throw e;
+    }
 }
 
 async function checkForUpdates() {

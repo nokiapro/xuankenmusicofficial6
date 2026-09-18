@@ -307,16 +307,53 @@
                     </div>
                     <div style="grid-column:1/-1;">
                         <label>Prefix dữ liệu (để tách nhiều web trên cùng Firebase)</label>
-                        <input type="text" id="set-site-prefix" placeholder="vd: site1, xk2... (để trống = root)">
+                        <input type="text" id="set-site-prefix" placeholder="vd: music6, site1... (để trống = root)">
                         <p class="muted" style="margin-top:6px;font-size:0.72rem;">
-                            Khi có prefix, bài hát &amp; user sẽ lưu dưới đường dẫn <code>prefix/songs</code>, <code>prefix/users</code>...
-                            Settings luôn nằm ở root <code>settings</code>. Đổi prefix sẽ trỏ sang bộ dữ liệu khác (dữ liệu cũ vẫn giữ nguyên).
+                            Khi có prefix, bài hát &amp; user lưu dưới <code>prefix/songs</code>, <code>prefix/users</code>...
+                            Settings luôn ở root <code>settings</code>.
                         </p>
                     </div>
                 </div>
-                <div style="margin-top:14px;">
+                <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button class="btn btn-primary" id="save-settings-btn">Lưu cài đặt</button>
+                    <button class="btn btn-warn" id="migrate-prefix-btn" title="Copy songs + users từ root sang prefix đang nhập">Migrate root → prefix</button>
                 </div>
+                <p class="muted" style="margin-top:10px;font-size:0.72rem;">
+                    <b>Migrate:</b> copy <code>songs</code> + <code>users</code> từ root sang prefix (không xóa root).
+                    Cần Firebase Rules cho phép đọc/ghi path prefix trước. Xem hướng dẫn bên dưới.
+                </p>
+                <details style="margin-top:12px;">
+                    <summary style="cursor:pointer;color:var(--accent);font-weight:700;font-size:0.8rem;">Hướng dẫn Firebase Rules cho prefix</summary>
+                    <pre style="margin-top:8px;padding:12px;background:#121218;border-radius:8px;font-size:0.7rem;overflow:auto;color:var(--muted);white-space:pre-wrap;">{
+  "rules": {
+    "settings": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "songs": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "prices": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "music6": {
+      "songs": { ".read": true, ".write": "auth != null" },
+      "users": { ".read": true, ".write": true },
+      "prices": { ".read": true, ".write": "auth != null" }
+    }
+  }
+}</pre>
+                    <p class="muted" style="font-size:0.72rem;margin-top:6px;">
+                        Vào <b>Firebase Console</b> → project <b>music6-dfd59</b> → Realtime Database → tab <b>Rules</b> → dán → Publish.
+                        Sau đó bấm <b>Migrate root → prefix</b> (đã đăng nhập Admin).
+                    </p>
+                </details>
                 <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
             </div>
             <div class="card">
@@ -744,6 +781,65 @@
                 await loadUsers();
             } catch (e) {
                 console.warn('Reload after prefix change', e);
+            }
+        };
+
+        document.getElementById('migrate-prefix-btn').onclick = async () => {
+            const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
+            if (!prefix) {
+                toast('Nhập prefix trước (vd: music6)');
+                return;
+            }
+            if (!confirm(`Migrate songs + users từ ROOT → "${prefix}/..." ?\n\n• Không xóa data root\n• Ghi đè data dưới ${prefix}/ nếu đã có\n• Cần Firebase Rules cho phép path này`)) return;
+
+            const btn = document.getElementById('migrate-prefix-btn');
+            btn.disabled = true;
+            btn.textContent = 'Đang migrate...';
+            try {
+                // 1) Đọc root
+                const [songsSnap, usersSnap, pricesSnap] = await Promise.all([
+                    db().ref('songs').once('value'),
+                    db().ref('users').once('value'),
+                    db().ref('prices').once('value')
+                ]);
+                const songsVal = songsSnap.val() || {};
+                const usersVal = usersSnap.val() || {};
+                const pricesVal = pricesSnap.val();
+
+                const songCount = Object.keys(songsVal).length;
+                const userCount = Object.keys(usersVal).length;
+                if (songCount === 0 && userCount === 0) {
+                    toast('Root không có songs/users để migrate');
+                    return;
+                }
+
+                // 2) Ghi sang prefix
+                await db().ref(prefix + '/songs').set(songsVal);
+                await db().ref(prefix + '/users').set(usersVal);
+                if (pricesVal && typeof pricesVal === 'object') {
+                    await db().ref(prefix + '/prices').set(pricesVal);
+                }
+
+                // 3) Bật prefix trong settings
+                settingsCache.sitePrefix = prefix;
+                document.getElementById('set-site-prefix').value = prefix;
+                await db().ref('settings').update({ sitePrefix: prefix });
+
+                applyBranding();
+                await loadSongs();
+                await loadUsers();
+                toast(`Đã migrate ${songCount} bài + ${userCount} user → ${prefix}/`);
+            } catch (e) {
+                console.error('Migrate failed', e);
+                const msg = (e && (e.code || e.message)) || String(e);
+                if (/permission|PERMISSION_DENIED/i.test(msg)) {
+                    toast('PERMISSION_DENIED — cập nhật Firebase Rules cho path ' + prefix + ' trước');
+                } else {
+                    toast('Migrate lỗi: ' + msg);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Migrate root → prefix';
             }
         };
 
