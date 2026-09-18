@@ -32,6 +32,68 @@ function getDb() {
     return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
 }
 
+// ===== Storage keys & multi-site prefix helpers (định nghĩa sớm) =====
+const STORAGE_ACCOUNTS = 'xuanken_accounts';
+const STORAGE_CURRENT_USER = 'xuanken_current_user';
+const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
+const STORAGE_SONG_PRICES = 'xuanken_song_prices';
+const STORAGE_LISTENS = 'xuanken_listens';
+const STORAGE_THEME = 'xuanken_theme';
+const STORAGE_DEVICE_ID = 'xuanken_device_id';
+
+const DEFAULT_ADMIN_SETTINGS = {
+    adminPassword: 'xuanken2024',
+    songPrice: 10,
+    checkinReward: 15,
+    starterCoins: 20,
+    siteName: 'XuanKen Music Official',
+    siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
+    sitePrefix: ''
+};
+
+function getAdminSettings() {
+    try {
+        const raw = localStorage.getItem(STORAGE_ADMIN_SETTINGS);
+        if (!raw) return { ...DEFAULT_ADMIN_SETTINGS };
+        return { ...DEFAULT_ADMIN_SETTINGS, ...JSON.parse(raw) };
+    } catch (e) {
+        return { ...DEFAULT_ADMIN_SETTINGS };
+    }
+}
+
+function saveAdminSettings(settings) {
+    localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
+}
+
+/** Key localStorage theo prefix (để tách nhiều web) */
+function storageKey(base) {
+    const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
+    return p ? `${p}_${base}` : base;
+}
+
+/** Đường dẫn Firebase theo prefix (settings luôn ở root) */
+function dataPath(key) {
+    const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
+    return p ? `${p}/${key}` : key;
+}
+
+function applyBranding() {
+    const s = getAdminSettings();
+    const name = (s.siteName || DEFAULT_ADMIN_SETTINGS.siteName).trim() || DEFAULT_ADMIN_SETTINGS.siteName;
+    const icon = (s.siteIcon || DEFAULT_ADMIN_SETTINGS.siteIcon).trim() || DEFAULT_ADMIN_SETTINGS.siteIcon;
+    document.title = name;
+    let fav = document.getElementById('site-favicon');
+    if (!fav) {
+        fav = document.querySelector('link[rel="shortcut icon"], link[rel="icon"]');
+        if (fav) fav.id = 'site-favicon';
+    }
+    if (fav && icon) fav.href = icon;
+    const hintTitle = document.querySelector('.hint-title');
+    if (hintTitle && name) {
+        hintTitle.textContent = name.length > 24 ? name.slice(0, 22) + '…' : name.toUpperCase();
+    }
+}
+
 // Helper đổi icon Lucide mà không phá animation của nút
 function setLucideIcon(container, iconName) {
     if (!container) return;
@@ -177,22 +239,61 @@ function getFullAudioCandidates(song) {
     return list.filter(Boolean);
 }
 
+function normalizeAudioUrl(u) {
+    if (!u) return '';
+    try {
+        const url = new URL(u, (typeof location !== 'undefined' ? location.href : 'https://local/'));
+        url.hash = '';
+        return url.href;
+    } catch (e) {
+        return String(u);
+    }
+}
+
+function isSameAudioSrc(a, b) {
+    if (!a || !b) return false;
+    return normalizeAudioUrl(a) === normalizeAudioUrl(b);
+}
+
 function pickFullAudioUrl(song, preferOtherThan) {
     const cands = getFullAudioCandidates(song);
     if (!cands.length) return song.audio || '';
     if (preferOtherThan) {
-        const alt = cands.find(u => u !== preferOtherThan);
+        const pref = normalizeAudioUrl(preferOtherThan);
+        const alt = cands.find(u => normalizeAudioUrl(u) !== pref);
         if (alt) return alt;
     }
     if (cands.length === 1) return cands[0];
     return cands[Math.floor(Math.random() * cands.length)];
 }
 
-/** Link phát: đã mua/thuê → full (random), chưa → demo */
+/**
+ * Link phát ổn định:
+ * - Đã mua/thuê: giữ nguyên link FULL đã chọn cho bài (không random lại mỗi lần gọi)
+ * - Chưa mua: demo
+ * Random chỉ khi lần đầu chọn link full cho bài đó.
+ */
 function getPlayableAudio(song) {
     if (!song) return '';
     if (isSongOwned(song.id)) {
-        return pickFullAudioUrl(song) || song.audio || '';
+        const cands = getFullAudioCandidates(song);
+        if (!cands.length) return song.audio || '';
+        const id = String(song.id);
+        const sticky = lastTriedFullUrl[id];
+        if (sticky && cands.some(c => isSameAudioSrc(c, sticky))) {
+            return sticky;
+        }
+        // Nếu audio đang phát đúng 1 candidate → giữ luôn
+        if (typeof audio !== 'undefined' && audio && audio.src) {
+            const match = cands.find(c => isSameAudioSrc(audio.src, c));
+            if (match) {
+                lastTriedFullUrl[id] = match;
+                return match;
+            }
+        }
+        const picked = pickFullAudioUrl(song);
+        if (picked) lastTriedFullUrl[id] = picked;
+        return picked || song.audio || '';
     }
     return song.audio || '';
 }
@@ -203,7 +304,7 @@ let preloadAudioEl = null;
 async function fetchSongsFromFirebase() {
     const db = getDb();
     if (!db) throw new Error('Firebase chưa sẵn sàng');
-    const snap = await db.ref('songs').once('value');
+    const snap = await db.ref(dataPath('songs')).once('value');
     return songsObjectToArray(snap.val());
 }
 
@@ -220,17 +321,25 @@ async function checkForUpdates() {
         if (lastDataHash !== null && lastDataHash !== newHash) {
             console.log("PHÁT HIỆN THAY ĐỔI DỮ LIỆU (Firebase)...");
             
-            const oldSongIds = new Set(songs.map(s => s.id));
+            const oldSongs = songs.slice();
+            const oldSongIds = new Set(oldSongs.map(s => s.id));
             const addedSongs = newSongs.filter(s => !oldSongIds.has(s.id));
             
-            const currentTime = audio.currentTime;
-            const currentSongId = songs[index]?.id;
+            const currentSongId = oldSongs[index]?.id;
+            
+            const remapIdx = (oldIdx) => {
+                const id = oldSongs[oldIdx]?.id;
+                if (!id) return -1;
+                return newSongs.findIndex(s => s.id === id);
+            };
+            const remapList = (arr) => arr.map(remapIdx).filter(i => i >= 0);
             
             const oldShuffleHistory = [...shuffleHistory];
             const oldRemainingQueue = [...remainingQueue];
             const oldCurrentShuffleCycle = [...currentShuffleCycle];
             const oldIsShuffle = isShuffle;
             
+            // Chỉ cập nhật metadata — KHÔNG đụng audio.src / currentTime / load()
             songs = newSongs;
             lastDataHash = newHash;
             
@@ -239,10 +348,12 @@ async function checkForUpdates() {
                 listenData[song.id] = song.listenCount || 0;
             });
             
-            const newIndex = songs.findIndex(s => s.id === currentSongId);
-            if (newIndex !== -1 && newIndex !== index) {
+            const newIndex = currentSongId
+                ? songs.findIndex(s => s.id === currentSongId)
+                : -1;
+            if (newIndex !== -1) {
                 index = newIndex;
-                
+                // Cập nhật chữ UI nếu tên/ca sĩ đổi — không reload audio
                 if (songTitleEl && songs[index]) {
                     songTitleEl.innerText = songs[index].name;
                     applyGradientToSongTitle();
@@ -253,14 +364,19 @@ async function checkForUpdates() {
                 }
                 autoScaleSongTitle();
                 updateArtImage();
+            } else if (songs.length) {
+                // Bài đang nghe bị xóa khỏi list — giữ audio đang phát, chỉnh index an toàn
+                index = Math.min(index, songs.length - 1);
             }
             
-            if (oldIsShuffle && songs.length === newSongs.length) {
-                shuffleHistory = oldShuffleHistory.filter(i => i < songs.length);
-                remainingQueue = oldRemainingQueue.filter(i => i < songs.length);
-                currentShuffleCycle = oldCurrentShuffleCycle.filter(i => i < songs.length);
-            } else if (isShuffle) {
-                resetShuffleState(index);
+            // Map lại queue shuffle theo ID (tránh index lệch khi đổi thứ tự ABC)
+            if (oldIsShuffle) {
+                shuffleHistory = remapList(oldShuffleHistory);
+                remainingQueue = remapList(oldRemainingQueue);
+                currentShuffleCycle = remapList(oldCurrentShuffleCycle);
+                if (!remainingQueue.length && songs.length) {
+                    resetShuffleState(index);
+                }
             }
             
             renderPlaylist();
@@ -271,10 +387,6 @@ async function checkForUpdates() {
                     showNotification('BÀI HÁT MỚI THÊM:', `<i class="fa-regular fa-star"></i> ${song.id} <i class="fa-regular fa-star"></i>`, '#4ade80', 'plus-circle');
                 });
             }
-            
-            // Không gán audio.currentTime khi đang phát — seek giữa chừng gây giật 1 phát
-            // Chỉ cần cập nhật index/UI; audio tiếp tục stream bình thường
-            void currentTime;
         }
         
         await fetchListenDataSilent();
@@ -307,12 +419,12 @@ async function fetchListenDataSilent() {
         });
         if (hasChange) {
             updateListenStatsModal();
-            localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+            localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
         }
         return listenData;
     } catch (error) {
         console.log('Firebase listen error, using local data');
-        const saved = localStorage.getItem('xuanken_listens');
+        const saved = localStorage.getItem(storageKey(STORAGE_LISTENS));
         if (saved) {
             try { listenData = JSON.parse(saved); } catch (e) {}
             updateListenStatsModal();
@@ -629,7 +741,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         songs[songIndex].listenCount = listenData[songId];
     }
     
-    localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+    localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
     updateListenStatsModal();
     console.log(`GHI NHẬN: ${songName} (${songId}) - ${listenData[songId]}`);
     showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
@@ -638,7 +750,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
     try {
         const db = getDb();
         if (db) {
-            const ref = db.ref('songs/' + songId + '/listenCount');
+            const ref = db.ref(dataPath('songs') + '/' + songId + '/listenCount');
             const result = await ref.transaction(current => (Number(current) || 0) + 1);
             const serverCount = result.snapshot.val() || listenData[songId];
             
@@ -647,7 +759,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
             if (songIndex !== -1) {
                 songs[songIndex].listenCount = serverCount;
             }
-            localStorage.setItem('xuanken_listens', JSON.stringify(listenData));
+            localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
             updateListenStatsModal();
         }
     } catch (error) {
@@ -1064,11 +1176,14 @@ async function loadSong(i) {
     document.documentElement.style.setProperty('--bg-color', colors.bg);
     document.documentElement.style.setProperty('--accent-color', colors.accent);
     
-    audio.pause();
     const playUrl = getPlayableAudio(song);
-    if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[song.id] = playUrl;
-    audio.src = playUrl;
-    audio.load();
+    if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[String(song.id)] = playUrl;
+    // Chỉ đổi src/load khi URL thật sự khác — tránh giật khi gọi lại cùng bài
+    if (!isSameAudioSrc(audio.src, playUrl)) {
+        audio.pause();
+        audio.src = playUrl || '';
+        audio.load();
+    }
     preloadNextSong();
     
     lyrics = [];
@@ -1281,7 +1396,7 @@ async function startPlayback() {
 
     // Không có lịch sử → phát bài hiện tại từ đầu
     if (songs[index]) {
-        const needLoad = !audio.src || audio.src !== getPlayableAudio(songs[index]);
+        const needLoad = !audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index]));
         const playFn = () => {
             audio.play().catch(e => console.log("LỖI PHÁT:", e));
             setTimeout(() => {
@@ -1344,7 +1459,7 @@ function togglePlay() {
         
         if (songs.length > 0 && !isLoadingSongs) {
             hidePlayerLoading();
-            if (songs[index] && (!audio.src || audio.src !== getPlayableAudio(songs[index]))) {
+            if (songs[index] && (!audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index])))) {
                 loadSong(index);
                 setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
             } else if (songs[index]) {
@@ -1981,33 +2096,8 @@ window.selectSongFromList = selectSongFromList;
 
 // ========== USERNAME + CỬA HÀNG XK (Firebase Realtime Database) ==========
 const DEMO_SECONDS = 60;
-const STORAGE_ACCOUNTS = 'xuanken_accounts';
-const STORAGE_CURRENT_USER = 'xuanken_current_user';
-const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
-const STORAGE_SONG_PRICES = 'xuanken_song_prices';
-
-const DEFAULT_ADMIN_SETTINGS = {
-    adminPassword: 'xuanken2024',
-    songPrice: 10,
-    checkinReward: 15,
-    starterCoins: 20
-};
 
 let sheetPricesCache = {};
-
-function getAdminSettings() {
-    try {
-        const raw = localStorage.getItem(STORAGE_ADMIN_SETTINGS);
-        if (!raw) return { ...DEFAULT_ADMIN_SETTINGS };
-        return { ...DEFAULT_ADMIN_SETTINGS, ...JSON.parse(raw) };
-    } catch (e) {
-        return { ...DEFAULT_ADMIN_SETTINGS };
-    }
-}
-
-function saveAdminSettings(settings) {
-    localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
-}
 
 async function syncSettingsFromFirebase() {
     try {
@@ -2018,14 +2108,16 @@ async function syncSettingsFromFirebase() {
         if (val && typeof val === 'object') {
             saveAdminSettings({ ...getAdminSettings(), ...val });
         }
+        applyBranding();
     } catch (e) {
         console.warn('Không đồng bộ Settings Firebase:', e);
+        applyBranding();
     }
 }
 
 function getSongPriceOverrides() {
     try {
-        const raw = localStorage.getItem(STORAGE_SONG_PRICES);
+        const raw = localStorage.getItem(storageKey(STORAGE_SONG_PRICES));
         return raw ? JSON.parse(raw) : {};
     } catch (e) {
         return {};
@@ -2033,7 +2125,7 @@ function getSongPriceOverrides() {
 }
 
 function saveSongPriceOverrides(map) {
-    localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(map || {}));
+    localStorage.setItem(storageKey(STORAGE_SONG_PRICES), JSON.stringify(map || {}));
     sheetPricesCache = { ...(map || {}) };
 }
 
@@ -2050,13 +2142,13 @@ async function syncPricesFromFirebase() {
             }
         });
         // + node prices riêng (nếu có)
-        const snap = await db.ref('prices').once('value');
+        const snap = await db.ref(dataPath('prices')).once('value');
         const prices = snap.val() || {};
         Object.keys(prices).forEach(id => {
             map[id] = Number(prices[id]) || 0;
         });
         sheetPricesCache = map;
-        localStorage.setItem(STORAGE_SONG_PRICES, JSON.stringify(map));
+        localStorage.setItem(storageKey(STORAGE_SONG_PRICES), JSON.stringify(map));
     } catch (e) {
         console.warn('Không đồng bộ Prices Firebase:', e);
         sheetPricesCache = getSongPriceOverrides();
@@ -2065,7 +2157,7 @@ async function syncPricesFromFirebase() {
 
 function getAllAccounts() {
     try {
-        const raw = localStorage.getItem(STORAGE_ACCOUNTS);
+        const raw = localStorage.getItem(storageKey(STORAGE_ACCOUNTS));
         return raw ? JSON.parse(raw) : {};
     } catch (e) {
         return {};
@@ -2073,15 +2165,15 @@ function getAllAccounts() {
 }
 
 function saveAllAccounts(accounts) {
-    localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(accounts || {}));
+    localStorage.setItem(storageKey(STORAGE_ACCOUNTS), JSON.stringify(accounts || {}));
 }
 
 function getCurrentUsername() {
-    return (localStorage.getItem(STORAGE_CURRENT_USER) || '').trim();
+    return (localStorage.getItem(storageKey(STORAGE_CURRENT_USER)) || '').trim();
 }
 
 function setCurrentUsername(name) {
-    localStorage.setItem(STORAGE_CURRENT_USER, String(name || '').trim());
+    localStorage.setItem(storageKey(STORAGE_CURRENT_USER), String(name || '').trim());
 }
 
 function ensureUserAccount(username) {
@@ -2126,7 +2218,7 @@ async function fetchUserFromFirebase(username) {
     try {
         const db = getDb();
         if (!db) throw new Error('No DB');
-        const snap = await db.ref('users/' + key).once('value');
+        const snap = await db.ref(dataPath('users') + '/' + key).once('value');
         const data = snap.val();
         const accounts = getAllAccounts();
         if (data) {
@@ -2158,7 +2250,7 @@ async function fetchUserFromFirebase(username) {
             lastCheckin: '',
             createdAt: Date.now()
         };
-        await db.ref('users/' + key).set(neu);
+        await db.ref(dataPath('users') + '/' + key).set(neu);
         accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt };
         saveAllAccounts(accounts);
         return accounts[name];
@@ -2175,7 +2267,7 @@ async function pushUserToFirebase(username, account) {
     try {
         const db = getDb();
         if (!db) return false;
-        await db.ref('users/' + key).set({
+        await db.ref(dataPath('users') + '/' + key).set({
             username: name,
             coins: account.coins | 0,
             owned: account.owned || [],
@@ -2770,9 +2862,7 @@ updateUsernameBadge();
 updateShopBalanceUI();
 updateCheckinButtonUI();
 
-// Đồng bộ giá + settings từ Firebase (không chặn load nhạc)
-syncPricesFromFirebase();
-syncSettingsFromFirebase();
+// Settings / prices / songs được load ở cuối file (sau khi define đủ hàm)
 
 
 // ===== PRELOAD bài kế tiếp (shuffle / tuần tự) =====
@@ -2856,7 +2946,7 @@ function pushPlaybackSync(force) {
     if (!db) return;
     const key = sanitizeUsernameKey(name);
     try {
-        db.ref('users/' + key + '/playback').set(data);
+        db.ref(dataPath('users') + '/' + key + '/playback').set(data);
     } catch (e) {}
 }
 
@@ -2865,7 +2955,7 @@ async function fetchPlaybackFromFirebase() {
     const db = getDb();
     if (!name || !db) return loadPlaybackLocal();
     try {
-        const snap = await db.ref('users/' + sanitizeUsernameKey(name) + '/playback').once('value');
+        const snap = await db.ref(dataPath('users') + '/' + sanitizeUsernameKey(name) + '/playback').once('value');
         const data = snap.val();
         if (data && data.songId) {
             savePlaybackLocal(data);
@@ -2901,7 +2991,10 @@ async function restorePlaybackState(opts = {}) {
     syncApplying = true;
     playbackRestored = true;
     try {
-        if (songIdx !== index || !audio.src) {
+        // Đang phát đúng bài rồi → không loadSong lại (tránh giật)
+        const alreadyThis = songIdx === index && audio.src &&
+            isSameAudioSrc(audio.src, getPlayableAudio(songs[songIdx]));
+        if (!alreadyThis) {
             await loadSong(songIdx);
         }
         const applySeek = () => {
@@ -3006,7 +3099,11 @@ window.fetchUserFromFirebase = fetchUserFromFirebase;
 window.syncPricesFromFirebase = syncPricesFromFirebase;
 window.getDb = getDb;
 
-loadSongsFromFirebase();
+(async () => {
+    await syncSettingsFromFirebase();
+    syncPricesFromFirebase();
+    loadSongsFromFirebase();
+})();
 
 
 

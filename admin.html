@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <link href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
+    <link id="site-favicon" href="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png" rel="shortcut icon" type="image/x-icon" />
     <title>Admin | XuanKen Music</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
@@ -295,6 +295,25 @@
                         <input type="number" id="set-starter" min="0">
                     </div>
                 </div>
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thương hiệu &amp; đa web</h3>
+                <div class="form-grid">
+                    <div style="grid-column:1/-1;">
+                        <label>Tên web (hiển thị trên tab / title)</label>
+                        <input type="text" id="set-site-name" placeholder="XuanKen Music Official">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label>Icon web / Favicon (URL ảnh .png / .ico)</label>
+                        <input type="url" id="set-site-icon" placeholder="https://.../icon.png">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label>Prefix dữ liệu (để tách nhiều web trên cùng Firebase)</label>
+                        <input type="text" id="set-site-prefix" placeholder="vd: site1, xk2... (để trống = root)">
+                        <p class="muted" style="margin-top:6px;font-size:0.72rem;">
+                            Khi có prefix, bài hát &amp; user sẽ lưu dưới đường dẫn <code>prefix/songs</code>, <code>prefix/users</code>...
+                            Settings luôn nằm ở root <code>settings</code>. Đổi prefix sẽ trỏ sang bộ dữ liệu khác (dữ liệu cũ vẫn giữ nguyên).
+                        </p>
+                    </div>
+                </div>
                 <div style="margin-top:14px;">
                     <button class="btn btn-primary" id="save-settings-btn">Lưu cài đặt</button>
                 </div>
@@ -311,7 +330,7 @@
                     <input type="file" id="import-songs-file" accept=".json,application/json" style="display:none;">
                 </div>
                 <label style="display:block;font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Hoặc dán JSON vào đây</label>
-                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","albumArt":"","lrc1":"","lrc2":"","price":10,"listenCount":0}]'></textarea>
+                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","audioFull2":"","albumArt":"","lrc1":"","lrc2":"","price":10}]'></textarea>
                 <div class="row-actions" style="margin-top:12px;">
                     <button class="btn btn-primary" id="import-songs-paste-btn">Nhập từ ô trên</button>
                 </div>
@@ -328,7 +347,10 @@
         const DEFAULT_SETTINGS = {
             songPrice: 10,
             checkinReward: 15,
-            starterCoins: 20
+            starterCoins: 20,
+            siteName: 'XuanKen Music Official',
+            siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
+            sitePrefix: ''
         };
 
         let songsCache = [];
@@ -340,6 +362,20 @@
 
         function db() {
             return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
+        }
+
+        /** Đường dẫn Firebase theo prefix (settings luôn ở root) */
+        function dataPath(key) {
+            const p = String(settingsCache.sitePrefix || '').trim().replace(/^\/+|\/+$/g, '');
+            return p ? `${p}/${key}` : key;
+        }
+
+        function applyBranding() {
+            const name = (settingsCache.siteName || DEFAULT_SETTINGS.siteName).trim() || DEFAULT_SETTINGS.siteName;
+            const icon = (settingsCache.siteIcon || DEFAULT_SETTINGS.siteIcon).trim() || DEFAULT_SETTINGS.siteIcon;
+            document.title = 'Admin | ' + name;
+            const fav = document.getElementById('site-favicon');
+            if (fav && icon) fav.href = icon;
         }
 
         function toast(msg) {
@@ -368,10 +404,14 @@
             document.getElementById('set-song-price').value = settingsCache.songPrice;
             document.getElementById('set-checkin').value = settingsCache.checkinReward;
             document.getElementById('set-starter').value = settingsCache.starterCoins;
+            document.getElementById('set-site-name').value = settingsCache.siteName || '';
+            document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
+            document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
+            applyBranding();
         }
 
         async function loadSongs() {
-            const snap = await db().ref('songs').once('value');
+            const snap = await db().ref(dataPath('songs')).once('value');
             const obj = snap.val() || {};
             songsCache = Object.keys(obj).map(id => ({
                 id: String(obj[id].id || id),
@@ -399,7 +439,7 @@
         }
 
         async function loadUsers() {
-            const snap = await db().ref('users').once('value');
+            const snap = await db().ref(dataPath('users')).once('value');
             const obj = snap.val() || {};
             usersCache = {};
             Object.keys(obj).forEach(k => {
@@ -558,7 +598,7 @@
                 btn.onclick = async () => {
                     const id = btn.getAttribute('data-del');
                     if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
-                    await db().ref('songs/' + id).remove();
+                    await db().ref(dataPath('songs') + '/' + id).remove();
                     toast('Đã xóa ' + id);
                     await loadSongs();
                 };
@@ -597,7 +637,7 @@
                     const input = tbody.querySelector('.coin-input[data-user="' + name.replace(/"/g, '') + '"]');
                     const coins = Math.max(0, parseInt(input.value, 10) || 0);
                     const key = usersCache[name].key || sanitizeKey(name);
-                    await db().ref('users/' + key + '/coins').set(coins);
+                    await db().ref(dataPath('users') + '/' + key + '/coins').set(coins);
                     usersCache[name].coins = coins;
                     toast('Đã lưu xu ' + name);
                     refreshStats();
@@ -608,7 +648,7 @@
                     const name = btn.getAttribute('data-gift');
                     const key = usersCache[name].key || sanitizeKey(name);
                     const coins = (usersCache[name].coins | 0) + 50;
-                    await db().ref('users/' + key + '/coins').set(coins);
+                    await db().ref(dataPath('users') + '/' + key + '/coins').set(coins);
                     usersCache[name].coins = coins;
                     toast('+50 xu ' + name);
                     renderUsers(document.getElementById('user-search').value);
@@ -620,7 +660,7 @@
                     const name = btn.getAttribute('data-del-user');
                     if (!confirm('Xóa user "' + name + '"?')) return;
                     const key = usersCache[name].key || sanitizeKey(name);
-                    await db().ref('users/' + key).remove();
+                    await db().ref(dataPath('users') + '/' + key).remove();
                     delete usersCache[name];
                     toast('Đã xóa ' + name);
                     renderUsers(document.getElementById('user-search').value);
@@ -653,7 +693,7 @@
             // Đọc listenCount thật từ Firebase — không bao giờ giảm khi sửa bài
             let liveCount = 0;
             try {
-                const snap = await db().ref('songs/' + id + '/listenCount').once('value');
+                const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
                 liveCount = Number(snap.val()) || 0;
             } catch (e) {}
             const cacheCount = (songsCache.find(s => s.id === id) || {}).listenCount || 0;
@@ -672,7 +712,7 @@
                 publishAt,
                 listenCount: Math.max(liveCount, cacheCount, 0)
             };
-            await db().ref('songs/' + id).set(payload);
+            await db().ref(dataPath('songs') + '/' + id).set(payload);
             toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
             await loadSongs();
         };
@@ -685,12 +725,26 @@
             settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
             settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
             settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
+            settingsCache.siteName = (document.getElementById('set-site-name').value || '').trim() || DEFAULT_SETTINGS.siteName;
+            settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
+            settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
             await db().ref('settings').set({
                 songPrice: settingsCache.songPrice,
                 checkinReward: settingsCache.checkinReward,
-                starterCoins: settingsCache.starterCoins
+                starterCoins: settingsCache.starterCoins,
+                siteName: settingsCache.siteName,
+                siteIcon: settingsCache.siteIcon,
+                sitePrefix: settingsCache.sitePrefix
             });
+            applyBranding();
             toast('Đã lưu cài đặt Firebase');
+            // Reload data theo prefix mới
+            try {
+                await loadSongs();
+                await loadUsers();
+            } catch (e) {
+                console.warn('Reload after prefix change', e);
+            }
         };
 
         function exportSongsJson() {
@@ -739,7 +793,7 @@
                 // Bài mới: listenCount = 0
                 let liveCount = 0;
                 try {
-                    const snap = await db().ref('songs/' + id + '/listenCount').once('value');
+                    const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
                     if (snap.exists()) liveCount = Number(snap.val()) || 0;
                 } catch (e) {}
 
@@ -758,7 +812,7 @@
                     publishAt: item.publishAt || null,
                     listenCount: liveCount
                 };
-                await db().ref('songs/' + id).set(payload);
+                await db().ref(dataPath('songs') + '/' + id).set(payload);
                 ok++;
             }
             toast('Nhập xong: ' + ok + ' bài (không đụng lượt nghe)' + (skip ? ', bỏ qua ' + skip : ''));
