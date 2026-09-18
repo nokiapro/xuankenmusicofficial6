@@ -40,6 +40,9 @@ const STORAGE_SONG_PRICES = 'xuanken_song_prices';
 const STORAGE_LISTENS = 'xuanken_listens';
 const STORAGE_THEME = 'xuanken_theme';
 const STORAGE_DEVICE_ID = 'xuanken_device_id';
+/** Nhớ đã xác nhận PIN trên máy này (hết hạn 7 ngày) */
+const STORAGE_PIN_TRUST = 'xuanken_pin_trust';
+const PIN_TRUST_MS = 7 * 24 * 60 * 60 * 1000;
 
 const DEFAULT_ADMIN_SETTINGS = {
     adminPassword: 'xuanken2024',
@@ -48,7 +51,11 @@ const DEFAULT_ADMIN_SETTINGS = {
     starterCoins: 20,
     siteName: 'XuanKen Music Official',
     siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
-    sitePrefix: ''
+    sitePrefix: '',
+    /** Bắt buộc nhập PIN khi vào player */
+    requirePin: true,
+    /** Cho phép tạo username mới từ màn hình đầu (tắt = chỉ user admin đã tạo) */
+    allowRegister: true
 };
 
 function getAdminSettings() {
@@ -2211,7 +2218,8 @@ function ensureUserAccount(username) {
             myPlaylist: [],
             rentals: {},
             lastCheckin: '',
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            pin: ''
         };
         saveAllAccounts(accounts);
     } else {
@@ -2252,7 +2260,8 @@ async function fetchUserFromFirebase(username) {
                 rentals: (data.rentals && typeof data.rentals === 'object') ? data.rentals : {},
                 lastCheckin: data.lastCheckin || '',
                 createdAt: data.createdAt || Date.now(),
-                rank: data.rank || 'member'
+                rank: data.rank || 'member',
+                pin: data.pin != null ? String(data.pin) : ''
             };
             saveAllAccounts(accounts);
             return accounts[name];
@@ -2270,7 +2279,8 @@ async function fetchUserFromFirebase(username) {
             rentals: {},
             lastCheckin: '',
             createdAt: Date.now(),
-            rank: 'member'
+            rank: 'member',
+            pin: ''
         };
         await db.ref(dataPath('users') + '/' + key).set(neu);
         accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt, rank: 'member' };
@@ -2300,7 +2310,8 @@ async function pushUserToFirebase(username, account) {
             rentals: account.rentals || {},
             lastCheckin: account.lastCheckin || '',
             createdAt: account.createdAt || Date.now(),
-            rank: account.rank || 'member'
+            rank: account.rank || 'member',
+            pin: account.pin != null ? String(account.pin) : ''
         });
         return true;
     } catch (e) {
@@ -2790,8 +2801,153 @@ function closeShopModal() {
     if (modal) modal.classList.remove('show');
 }
 
-async function loginWithUsername(rawName) {
+
+/** PIN 6 số — UI ô giống upload.xuanken.name.vn */
+const PIN_LEN = 6;
+
+function buildPinBoxes() {
+    const wrap = document.getElementById('pin-boxes');
+    if (!wrap) return;
+    let html = '';
+    for (let i = 0; i < PIN_LEN; i++) {
+        html += '<div class="pin-box empty' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">–</div>';
+    }
+    wrap.innerHTML = html;
+}
+
+function renderPinBoxes(digits) {
+    const boxes = document.querySelectorAll('#pin-boxes .pin-box');
+    if (!boxes.length) return;
+    const d = String(digits || '').replace(/\D/g, '').slice(0, PIN_LEN);
+    boxes.forEach((box, i) => {
+        box.classList.remove('empty', 'active', 'filled', 'error');
+        if (i < d.length) {
+            box.textContent = '•';
+            box.classList.add('filled');
+        } else {
+            box.textContent = '–';
+            box.classList.add('empty');
+            if (i === d.length) box.classList.add('active');
+        }
+    });
+}
+
+function getPinValue() {
+    const inp = document.getElementById('pin-hidden');
+    return inp ? String(inp.value || '').replace(/\D/g, '').slice(0, PIN_LEN) : '';
+}
+
+function clearPinInput() {
+    const inp = document.getElementById('pin-hidden');
+    if (inp) inp.value = '';
+    renderPinBoxes('');
+}
+
+function focusPinInput() {
+    const inp = document.getElementById('pin-hidden');
+    if (inp) {
+        try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
+    }
+}
+
+function shakePinBoxes() {
+    document.querySelectorAll('#pin-boxes .pin-box').forEach(b => {
+        b.classList.add('error');
+    });
+    setTimeout(() => {
+        clearPinInput();
+        focusPinInput();
+    }, 450);
+}
+
+function initPinBoxes() {
+    const inp = document.getElementById('pin-hidden');
+    const wrap = document.getElementById('pin-boxes');
+    if (!inp || !wrap) return;
+    buildPinBoxes();
+    wrap.addEventListener('click', (e) => {
+        e.preventDefault();
+        focusPinInput();
+    });
+    inp.addEventListener('input', () => {
+        let v = inp.value.replace(/\D/g, '').slice(0, PIN_LEN);
+        inp.value = v;
+        renderPinBoxes(v);
+    });
+    inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace') {
+            setTimeout(() => renderPinBoxes(inp.value.replace(/\D/g, '').slice(0, PIN_LEN)), 0);
+        }
+    });
+}
+
+
+function readPinTrust() {
+    try {
+        const raw = localStorage.getItem(storageKey(STORAGE_PIN_TRUST));
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        if (!o || !o.username || !o.verifiedAt) return null;
+        return o;
+    } catch (e) {
+        return null;
+    }
+}
+
+/** Máy này đã nhập đúng PIN cho username trong vòng 7 ngày? */
+function isPinTrusted(username) {
+    const name = String(username || '').trim();
+    if (!name) return false;
+    const t = readPinTrust();
+    if (!t || t.username !== name) return false;
+    const at = Number(t.verifiedAt) || 0;
+    if (!at) return false;
+    return (Date.now() - at) < PIN_TRUST_MS;
+}
+
+function markPinTrusted(username) {
+    const name = String(username || '').trim();
+    if (!name) return;
+    try {
+        localStorage.setItem(storageKey(STORAGE_PIN_TRUST), JSON.stringify({
+            username: name,
+            verifiedAt: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function clearPinTrust() {
+    try {
+        localStorage.removeItem(storageKey(STORAGE_PIN_TRUST));
+    } catch (e) {}
+}
+
+function setPinSectionVisible(show) {
+    const boxes = document.getElementById('pin-boxes');
+    const hint = document.getElementById('pin-hint');
+    const label = document.querySelector('label.username-label[for="pin-hidden"], label.username-label');
+    // label "MÃ PIN" — tìm label gần pin-boxes
+    const form = document.getElementById('username-form');
+    let pinLabel = null;
+    if (form) {
+        form.querySelectorAll('.username-label').forEach(el => {
+            if (/PIN/i.test(el.textContent || '')) pinLabel = el;
+        });
+    }
+    const display = show ? '' : 'none';
+    if (boxes) boxes.style.display = show ? 'flex' : 'none';
+    if (hint) hint.style.display = display;
+    if (pinLabel) pinLabel.style.display = display;
+    if (!show) clearPinInput();
+}
+
+async function loginWithUsername(rawName, rawPin) {
     const name = String(rawName || '').trim().replace(/\s+/g, ' ');
+    const pin = String(rawPin || '').trim();
+    const settings = getAdminSettings();
+    const requirePin = settings.requirePin !== false;
+    const allowRegister = settings.allowRegister !== false;
+
     if (!name || name.length < 2) {
         return { ok: false, message: 'Username tối thiểu 2 ký tự' };
     }
@@ -2801,12 +2957,82 @@ async function loginWithUsername(rawName) {
     if (!/^[\w\u00C0-\u024F\u1E00-\u1EFF .-]+$/i.test(name)) {
         return { ok: false, message: 'Username không hợp lệ' };
     }
+    // Đã xác nhận PIN trên máy này (< 7 ngày) → bỏ qua nhập PIN
+    const pinTrusted = isPinTrusted(name);
+    if (requirePin && !pinTrusted) {
+        if (!/^[0-9]{6}$/.test(pin)) {
+            return { ok: false, message: 'PIN phải đúng 6 chữ số' };
+        }
+    }
+
+    // Chỉ đọc user — không tự tạo trong bước kiểm tra
+    const key = sanitizeUsernameKey(name);
+    let remote = null;
+    let dbOk = false;
+    try {
+        const db = getDb();
+        if (db) {
+            const snap = await db.ref(dataPath('users') + '/' + key).once('value');
+            remote = snap.val();
+            dbOk = true;
+        }
+    } catch (e) {
+        console.warn('Kiểm tra user Firebase lỗi:', e);
+    }
+
+    if (remote) {
+        const savedPin = remote.pin != null ? String(remote.pin) : '';
+        if (!pinTrusted) {
+            if (savedPin) {
+                if (pin !== savedPin) {
+                    return { ok: false, message: 'Sai mã PIN' };
+                }
+            } else if (requirePin) {
+                // User cũ chưa có PIN → lần này đặt PIN mới
+                if (!/^[0-9]{6}$/.test(pin)) {
+                    return { ok: false, message: 'Tài khoản chưa có PIN — hãy đặt PIN 6 số mới' };
+                }
+            }
+        }
+        // Đồng bộ local + cập nhật PIN nếu trước đó trống
+        await fetchUserFromSheet(name);
+        const acc = ensureUserAccount(name);
+        if (requirePin && pin && (!acc.pin || acc.pin === '')) {
+            acc.pin = pin;
+            const accounts = getAllAccounts();
+            if (accounts[name]) accounts[name].pin = pin;
+            saveAllAccounts(accounts);
+            await pushUserToSheet(name, accounts[name] || acc);
+        }
+    } else {
+        // User chưa tồn tại
+        if (!allowRegister) {
+            return { ok: false, message: 'Username chưa được đăng ký — liên hệ admin' };
+        }
+        if (requirePin && !/^[0-9]{6}$/.test(pin)) {
+            return { ok: false, message: 'Đăng ký mới cần đặt PIN đúng 6 số' };
+        }
+        // Tạo user mới (fetchUserFromFirebase sẽ create)
+        await fetchUserFromSheet(name);
+        const acc = ensureUserAccount(name);
+        if (pin) {
+            acc.pin = pin;
+            const accounts = getAllAccounts();
+            if (accounts[name]) accounts[name].pin = pin;
+            saveAllAccounts(accounts);
+            await pushUserToSheet(name, accounts[name] || acc);
+        } else {
+            await pushUserToSheet(name, acc);
+        }
+    }
+
     setCurrentUsername(name);
-    // Ưu tiên lấy từ Google Sheet, fallback local
-    await fetchUserFromSheet(name);
-    const acc = ensureUserAccount(name);
-    // Bảo đảm user tồn tại trên Sheet
-    await pushUserToSheet(name, acc);
+    // Nhớ máy này đã xác nhận PIN (7 ngày) — thiết bị khác vẫn phải nhập
+    if (requirePin) {
+        if (pinTrusted || /^[0-9]{6}$/.test(pin)) {
+            markPinTrusted(name);
+        }
+    }
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
@@ -2820,6 +3046,24 @@ function setupUsernameGate() {
     const err = document.getElementById('username-error');
     const startBtn = document.getElementById('username-start-btn');
     const existing = getCurrentUsername();
+    initPinBoxes();
+
+    function refreshPinVisibility() {
+        const settings = getAdminSettings();
+        const requirePin = settings.requirePin !== false;
+        const name = (input && input.value || '').trim();
+        if (!requirePin) {
+            setPinSectionVisible(false);
+            return;
+        }
+        // Cùng máy + đúng user + còn trong 7 ngày → ẩn PIN
+        const trusted = name && isPinTrusted(name);
+        setPinSectionVisible(!trusted);
+        const hint = document.getElementById('pin-hint');
+        if (hint && !trusted) {
+            hint.textContent = 'Nhập đúng 6 chữ số · User mới = đặt PIN mới';
+        }
+    }
     
     if (existing && input) {
         input.value = existing;
@@ -2831,6 +3075,15 @@ function setupUsernameGate() {
         });
         updateUsernameBadge();
     }
+    refreshPinVisibility();
+
+    if (input) {
+        input.addEventListener('input', () => {
+            refreshPinVisibility();
+            if (err) err.style.display = 'none';
+        });
+        input.addEventListener('change', refreshPinVisibility);
+    }
     
     const submit = async () => {
         if (!input) return;
@@ -2839,15 +3092,19 @@ function setupUsernameGate() {
             startBtn.style.opacity = '0.7';
         }
         try {
-            const result = await loginWithUsername(input.value);
+            const name = input.value;
+            const needPin = getAdminSettings().requirePin !== false && !isPinTrusted(String(name || '').trim());
+            const result = await loginWithUsername(name, needPin ? getPinValue() : '');
             if (!result.ok) {
                 if (err) {
                     err.textContent = result.message;
                     err.style.display = 'block';
                 }
+                if (/PIN|pin|mã/i.test(result.message || '')) shakePinBoxes();
                 return;
             }
             if (err) err.style.display = 'none';
+            refreshPinVisibility();
             startPlayback();
         } finally {
             if (startBtn) {
@@ -2883,7 +3140,17 @@ function setupUsernameGate() {
                 }
                 return;
             }
-            if (!e.target.closest('input') && !e.target.closest('button')) {
+            // Hết hạn 7 ngày / máy lạ → bắt nhập PIN lại
+            if (getAdminSettings().requirePin !== false && !isPinTrusted(getCurrentUsername())) {
+                setPinSectionVisible(true);
+                focusPinInput();
+                if (err) {
+                    err.textContent = 'Nhập lại mã PIN 6 số để tiếp tục';
+                    err.style.display = 'block';
+                }
+                return;
+            }
+            if (!e.target.closest('input') && !e.target.closest('button') && !e.target.closest('.pin-boxes')) {
                 startPlayback();
             }
         };
