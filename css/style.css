@@ -2283,6 +2283,101 @@ body.dark .username-input::placeholder {
     box-shadow: 0 0 0 3px rgba(140,0,255,0.25), 0 8px 24px rgba(0,0,0,0.12);
 }
 
+
+/* PIN boxes — giống upload.xuanken.name.vn, chỉ 6 số */
+.pin-boxes {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    width: 100%;
+    max-width: 280px;
+    margin: 2px auto 0;
+    padding: 0 2px;
+    cursor: text;
+}
+.pin-box {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 42px;
+    height: 46px;
+    border: 2px solid rgba(140, 0, 255, 0.25);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #111;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
+    font-family: inherit;
+}
+body.dark .pin-box {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border-color: rgba(255,255,255,0.18);
+}
+.pin-box.empty {
+    color: rgba(0,0,0,0.28);
+    font-weight: 600;
+}
+body.dark .pin-box.empty {
+    color: rgba(255,255,255,0.35);
+}
+.pin-box.active {
+    border-color: #8c00ff;
+    box-shadow:
+        0 0 0 3px rgba(140, 0, 255, 0.2),
+        0 0 14px rgba(140, 0, 255, 0.35);
+    animation: pinGlow 1.4s ease-in-out infinite;
+}
+.pin-box.filled {
+    border-color: #8c00ff;
+    background: rgba(140, 0, 255, 0.12);
+    box-shadow:
+        0 0 0 2px rgba(140, 0, 255, 0.15),
+        0 0 10px rgba(140, 0, 255, 0.22);
+    animation: pinFillIn 0.25s ease;
+}
+body.dark .pin-box.filled {
+    background: rgba(140, 0, 255, 0.28);
+}
+.pin-box.error {
+    border-color: #ff0040;
+    box-shadow: 0 0 0 3px rgba(255, 0, 64, 0.2), 0 0 12px rgba(255, 0, 64, 0.3);
+    animation: pinShake 0.35s ease;
+}
+@keyframes pinGlow {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(140, 0, 255, 0.18), 0 0 10px rgba(140, 0, 255, 0.22); }
+    50% { box-shadow: 0 0 0 5px rgba(140, 0, 255, 0.28), 0 0 18px rgba(140, 0, 255, 0.45); }
+}
+@keyframes pinFillIn {
+    from { transform: scale(0.85); opacity: 0.6; }
+    to { transform: scale(1); opacity: 1; }
+}
+@keyframes pinShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+#pin-hidden {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    height: 0;
+    width: 0;
+    border: 0;
+    padding: 0;
+}
+
+.username-pin-hint {
+    margin: 6px 0 0;
+    font-size: 0.68rem;
+    color: var(--text-secondary, #888);
+    text-align: center;
+    line-height: 1.35;
+    opacity: 0.9;
+}
 .username-error {
     font-size: 0.72rem;
     color: #ff4444;
