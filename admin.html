@@ -641,7 +641,6 @@
                 toast('ID không được chứa . # $ [ ] /');
                 return;
             }
-            const existing = songsCache.find(s => s.id === id);
             const audioFull = document.getElementById('s-audio-full').value.trim();
             const audioFull2 = document.getElementById('s-audio-full-2').value.trim();
             const rentRaw = document.getElementById('s-rent-price').value.trim();
@@ -651,6 +650,13 @@
                 const d = new Date(pubLocal);
                 if (!Number.isNaN(d.getTime())) publishAt = d.toISOString();
             }
+            // Đọc listenCount thật từ Firebase — không bao giờ giảm khi sửa bài
+            let liveCount = 0;
+            try {
+                const snap = await db().ref('songs/' + id + '/listenCount').once('value');
+                liveCount = Number(snap.val()) || 0;
+            } catch (e) {}
+            const cacheCount = (songsCache.find(s => s.id === id) || {}).listenCount || 0;
             const payload = {
                 id,
                 name,
@@ -664,10 +670,10 @@
                 price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
                 rentPrice: rentRaw === '' ? null : Math.max(0, parseInt(rentRaw, 10) || 0),
                 publishAt,
-                listenCount: existing ? (existing.listenCount || 0) : 0
+                listenCount: Math.max(liveCount, cacheCount, 0)
             };
             await db().ref('songs/' + id).set(payload);
-            toast('Đã lưu bài ' + id);
+            toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
             await loadSongs();
         };
 
@@ -688,6 +694,7 @@
         };
 
         function exportSongsJson() {
+            // Không xuất listenCount — import sau không đụng lượt nghe
             const data = songsCache.map(s => ({
                 id: s.id,
                 name: s.name,
@@ -700,8 +707,7 @@
                 lrc2: s.lrc2 || '',
                 price: s.price != null ? s.price : settingsCache.songPrice,
                 rentPrice: s.rentPrice != null ? s.rentPrice : null,
-                publishAt: s.publishAt || null,
-                listenCount: s.listenCount || 0
+                publishAt: s.publishAt || null
             }));
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -712,7 +718,7 @@
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            toast('Đã xuất ' + data.length + ' bài hát');
+            toast('Đã xuất ' + data.length + ' bài (không gồm lượt nghe)');
         }
 
         async function importSongsFromArray(arr) {
@@ -729,7 +735,14 @@
                     skip++;
                     continue;
                 }
-                const existing = songsCache.find(s => s.id === id);
+                // Bài đã có: giữ listenCount trên Firebase (bỏ qua field trong JSON nếu có)
+                // Bài mới: listenCount = 0
+                let liveCount = 0;
+                try {
+                    const snap = await db().ref('songs/' + id + '/listenCount').once('value');
+                    if (snap.exists()) liveCount = Number(snap.val()) || 0;
+                } catch (e) {}
+
                 const payload = {
                     id,
                     name,
@@ -743,12 +756,12 @@
                     price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
                     rentPrice: item.rentPrice != null ? Math.max(0, Number(item.rentPrice) || 0) : null,
                     publishAt: item.publishAt || null,
-                    listenCount: existing ? (existing.listenCount || 0) : (Number(item.listenCount) || 0)
+                    listenCount: liveCount
                 };
                 await db().ref('songs/' + id).set(payload);
                 ok++;
             }
-            toast('Nhập xong: ' + ok + ' bài' + (skip ? ', bỏ qua ' + skip : ''));
+            toast('Nhập xong: ' + ok + ' bài (không đụng lượt nghe)' + (skip ? ', bỏ qua ' + skip : ''));
             await loadSongs();
         }
 
