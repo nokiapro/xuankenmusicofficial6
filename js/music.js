@@ -65,7 +65,11 @@ function saveAdminSettings(settings) {
     localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
 }
 
-/** Key localStorage theo prefix (để tách nhiều web) */
+/**
+ * Key localStorage theo sitePrefix (vd music6_xuanken_accounts).
+ * Settings (STORAGE_ADMIN_SETTINGS) cố ý KHÔNG prefix — chứa sitePrefix để các key khác biết dùng prefix nào.
+ * Mỗi web set sitePrefix khác nhau → localStorage tách biệt, không đè lên nhau.
+ */
 function storageKey(base) {
     const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
     return p ? `${p}_${base}` : base;
@@ -2042,7 +2046,7 @@ function setThemeIcon(isDark) {
 }
 
 function loadTheme() {
-    const savedTheme = localStorage.getItem('xuanken_theme');
+    const savedTheme = localStorage.getItem(storageKey(STORAGE_THEME));
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (savedTheme === 'dark' || (!savedTheme && systemDark)) {
         document.body.classList.add('dark');
@@ -2061,12 +2065,12 @@ function toggleTheme() {
     
     if (document.body.classList.contains('dark')) {
         document.body.classList.remove('dark');
-        localStorage.setItem('xuanken_theme', 'light');
+        localStorage.setItem(storageKey(STORAGE_THEME), 'light');
         setThemeIcon(false);
         showNotification('LIGHT MODE:', 'ĐÃ CHUYỂN LIGHT', '#ff9800', 'sun');
     } else {
         document.body.classList.add('dark');
-        localStorage.setItem('xuanken_theme', 'dark');
+        localStorage.setItem(storageKey(STORAGE_THEME), 'dark');
         setThemeIcon(true);
         showNotification('DARK MODE:', 'ĐÃ CHUYỂN DARK', '#bb86fc', 'moon');
     }
@@ -2084,7 +2088,7 @@ function toggleTheme() {
 if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 loadTheme();
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    const savedTheme = localStorage.getItem('xuanken_theme');
+    const savedTheme = localStorage.getItem(storageKey(STORAGE_THEME));
     if (!savedTheme) {
         if (e.matches) {
             document.body.classList.add('dark');
@@ -2665,7 +2669,6 @@ function updateShopUserProfile() {
     const name = getCurrentUsername();
     const nameEl = document.getElementById('shop-user-name');
     const badgeEl = document.getElementById('shop-rank-badge');
-    const subEl = document.querySelector('.shop-user-sub');
     const acc = getCurrentAccount();
     const rank = getUserRank(acc);
 
@@ -2681,7 +2684,6 @@ function updateShopUserProfile() {
             badgeEl.className = 'rank-badge rank-' + rank;
         }
     }
-    if (subEl) subEl.textContent = rank === 'member' ? 'Thành viên' : rankLabel(rank);
 }
 
 function updateUsernameBadge() {
@@ -2953,10 +2955,17 @@ function preloadNextSong() {
 // Máy A nghe đến phút X → dừng/thoát → lưu.
 // Máy A/B/C vào lại (cùng username) → mở đúng bài + đúng phút đó.
 const DEVICE_ID = (() => {
-    let id = localStorage.getItem('xuanken_device_id');
+    let id = localStorage.getItem(storageKey(STORAGE_DEVICE_ID));
     if (!id) {
-        id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-        localStorage.setItem('xuanken_device_id', id);
+        // fallback key cũ (không prefix) → chuyển sang key mới nếu có
+        const legacy = localStorage.getItem(STORAGE_DEVICE_ID);
+        if (legacy) {
+            id = legacy;
+            try { localStorage.setItem(storageKey(STORAGE_DEVICE_ID), id); } catch (e) {}
+        } else {
+            id = 'd_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem(storageKey(STORAGE_DEVICE_ID), id);
+        }
     }
     return id;
 })();
@@ -2966,7 +2975,8 @@ let playbackRestored = false;
 
 function getLocalPlaybackKey() {
     const name = getCurrentUsername();
-    return name ? ('xuanken_playback_' + sanitizeUsernameKey(name)) : null;
+    if (!name) return null;
+    return storageKey('xuanken_playback_' + sanitizeUsernameKey(name));
 }
 
 function savePlaybackLocal(data) {
