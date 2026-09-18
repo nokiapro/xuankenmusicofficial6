@@ -242,6 +242,12 @@
                         <label>Lịch đăng bài (để trống = hiện ngay)</label>
                         <input id="s-publish-at" type="datetime-local">
                     </div>
+                    <div class="full" style="display:flex;align-items:center;gap:10px;padding-top:4px;">
+                        <input type="checkbox" id="s-hidden" style="width:18px;height:18px;accent-color:var(--warn);">
+                        <label for="s-hidden" style="margin:0;text-transform:none;font-size:0.85rem;color:var(--warn);cursor:pointer;">
+                            <i class="fa-solid fa-eye-slash"></i> Ẩn bài tạm thời (link lỗi / đang sửa — player không hiện)
+                        </label>
+                    </div>
                     <div class="full">
                         <label>Link ảnh bìa</label>
                         <input id="s-art" placeholder="https://.../anh.jpg">
@@ -272,6 +278,7 @@
                                 <th>Ca sĩ</th>
                                 <th>Nghe</th>
                                 <th>Giá</th>
+                                <th>TT</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -417,6 +424,8 @@
         };
 
         let songsCache = [];
+        /** ID gốc khi đang sửa (null = thêm mới). Đổi ID → rename, không tạo bản trùng. */
+        let editingSongId = null;
         let usersCache = {};
         let settingsCache = { ...DEFAULT_SETTINGS };
         let songsPage = 1;
@@ -489,7 +498,8 @@
                 lrc2: obj[id].lrc2 || '',
                 price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice,
                 rentPrice: obj[id].rentPrice != null ? Number(obj[id].rentPrice) : null,
-                publishAt: obj[id].publishAt || null
+                publishAt: obj[id].publishAt || null,
+                hidden: !!obj[id].hidden
             }));
             // Sắp xếp theo bảng chữ cái (tên bài, rồi ID)
             songsCache.sort((a, b) => {
@@ -539,6 +549,7 @@
         }
 
         function fillSongForm(song) {
+            editingSongId = song.id || null;
             document.getElementById('s-id').value = song.id || '';
             document.getElementById('s-name').value = song.name || '';
             document.getElementById('s-artist').value = song.artist || '';
@@ -560,13 +571,16 @@
             } else {
                 document.getElementById('s-publish-at').value = '';
             }
+            document.getElementById('s-hidden').checked = !!song.hidden;
         }
 
         function clearSongForm() {
+            editingSongId = null;
             ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
                 document.getElementById(id).value = '';
             });
             document.getElementById('s-price').value = settingsCache.songPrice;
+            document.getElementById('s-hidden').checked = false;
         }
 
         function getFilteredSongs(filter) {
@@ -631,18 +645,24 @@
             const pageList = list.slice(start, start + SONGS_PER_PAGE);
 
             if (!list.length) {
-                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="muted">Chưa có bài hát — thêm ở form phía trên</td></tr>`;
                 renderSongsPagination(0);
                 return;
             }
-            tbody.innerHTML = pageList.map(s => `<tr>
+            tbody.innerHTML = pageList.map(s => `<tr style="${s.hidden ? 'opacity:0.55;' : ''}">
                 <td><code>${escapeHtml(s.id)}</code></td>
                 <td>${escapeHtml(s.name)}</td>
                 <td>${escapeHtml(s.artist)}</td>
                 <td>${s.listenCount || 0}</td>
                 <td>${s.price != null ? s.price : settingsCache.songPrice}</td>
+                <td>${s.hidden
+                    ? '<span style="color:var(--warn);font-size:0.75rem;"><i class="fa-solid fa-eye-slash"></i> Ẩn</span>'
+                    : '<span style="color:var(--ok);font-size:0.75rem;"><i class="fa-solid fa-eye"></i> Hiện</span>'}</td>
                 <td>
                     <div class="row-actions">
+                        <button class="btn ${s.hidden ? 'btn-ok' : 'btn-warn'}" data-toggle-hide="${escapeHtml(s.id)}" title="${s.hidden ? 'Hiện lại bài' : 'Ẩn tạm thời'}">
+                            <i class="fa-solid ${s.hidden ? 'fa-eye' : 'fa-eye-slash'}"></i> ${s.hidden ? 'Hiện' : 'Ẩn'}
+                        </button>
                         <button class="btn btn-ok" data-edit="${escapeHtml(s.id)}"><i class="fa-solid fa-pen"></i> Sửa</button>
                         <button class="btn btn-danger" data-del="${escapeHtml(s.id)}"><i class="fa-solid fa-trash"></i> Xóa</button>
                     </div>
@@ -664,6 +684,17 @@
                     if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
                     await db().ref(dataPath('songs') + '/' + id).remove();
                     toast('Đã xóa ' + id);
+                    await loadSongs();
+                };
+            });
+            tbody.querySelectorAll('[data-toggle-hide]').forEach(btn => {
+                btn.onclick = async () => {
+                    const id = btn.getAttribute('data-toggle-hide');
+                    const song = songsCache.find(x => x.id === id);
+                    if (!song) return;
+                    const next = !song.hidden;
+                    await db().ref(dataPath('songs') + '/' + id + '/hidden').set(next);
+                    toast(next ? ('Đã ẩn "' + id + '" — player không còn hiện') : ('Đã hiện lại "' + id + '"'));
                     await loadSongs();
                 };
             });
@@ -772,13 +803,24 @@
                 const d = new Date(pubLocal);
                 if (!Number.isNaN(d.getTime())) publishAt = d.toISOString();
             }
-            // Đọc listenCount thật từ Firebase — không bao giờ giảm khi sửa bài
+            // ID gốc khi đang sửa (để rename nếu đổi ID)
+            const originalId = editingSongId;
+            const isRename = originalId && originalId !== id;
+
+            // Nếu đổi ID mà ID mới đã tồn tại → chặn
+            if (isRename && songsCache.some(s => s.id === id)) {
+                toast('ID mới "' + id + '" đã tồn tại — chọn ID khác');
+                return;
+            }
+
+            // Đọc listenCount từ bài gốc (khi sửa/đổi ID) hoặc từ ID hiện tại (khi thêm)
+            const countSourceId = originalId || id;
             let liveCount = 0;
             try {
-                const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
+                const snap = await db().ref(dataPath('songs') + '/' + countSourceId + '/listenCount').once('value');
                 liveCount = Number(snap.val()) || 0;
             } catch (e) {}
-            const cacheCount = (songsCache.find(s => s.id === id) || {}).listenCount || 0;
+            const cacheCount = (songsCache.find(s => s.id === countSourceId) || {}).listenCount || 0;
             const payload = {
                 id,
                 name,
@@ -792,11 +834,27 @@
                 price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
                 rentPrice: rentRaw === '' ? null : Math.max(0, parseInt(rentRaw, 10) || 0),
                 publishAt,
+                hidden: !!document.getElementById('s-hidden').checked,
                 listenCount: Math.max(liveCount, cacheCount, 0)
             };
+
+            // Ghi bài (ID mới hoặc giữ nguyên)
             await db().ref(dataPath('songs') + '/' + id).set(payload);
-            toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
+
+            // Đổi ID → xóa bản cũ (chỉ 1 bài, không nhân bản)
+            if (isRename) {
+                await db().ref(dataPath('songs') + '/' + originalId).remove();
+                toast('Đã đổi ID ' + originalId + ' → ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
+            } else {
+                toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
+            }
+
+            editingSongId = null;
             await loadSongs();
+            // Giữ form đúng bài vừa lưu (đang edit tiếp được)
+            const saved = songsCache.find(s => s.id === id);
+            if (saved) fillSongForm(saved);
+            else clearSongForm();
         };
 
         document.getElementById('clear-song-form-btn').onclick = () => clearSongForm();
@@ -902,7 +960,8 @@
                 lrc2: s.lrc2 || '',
                 price: s.price != null ? s.price : settingsCache.songPrice,
                 rentPrice: s.rentPrice != null ? s.rentPrice : null,
-                publishAt: s.publishAt || null
+                publishAt: s.publishAt || null,
+                hidden: !!s.hidden
             }));
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -951,6 +1010,7 @@
                     price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
                     rentPrice: item.rentPrice != null ? Math.max(0, Number(item.rentPrice) || 0) : null,
                     publishAt: item.publishAt || null,
+                    hidden: !!item.hidden,
                     listenCount: liveCount
                 };
                 await db().ref(dataPath('songs') + '/' + id).set(payload);
