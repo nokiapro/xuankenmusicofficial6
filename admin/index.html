@@ -791,7 +791,7 @@
             </div>
         </div>
 
-        <div class="panel" id="panel-settings">
+                <div class="panel" id="panel-settings">
             <div class="card">
                 <h2>Cài đặt hệ thống</h2>
                 <div class="form-grid">
@@ -808,7 +808,13 @@
                         <input type="number" id="set-starter" min="0">
                     </div>
                 </div>
-                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Bảo mật đăng nhập</h3>
+                <div class="row-actions form-actions">
+                    <button class="btn btn-primary" id="save-settings-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Bảo mật đăng nhập</h2>
                 <div class="form-grid">
                     <div class="full check-row">
                         <input type="checkbox" id="set-require-pin" checked>
@@ -820,11 +826,13 @@
                     </div>
                 </div>
                 <p class="muted" style="margin:8px 0 0;font-size:0.72rem;">
-                    Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase (admin tạo / đã từng vào) mới đăng nhập được.
-                    Admin có thể đặt / xoá PIN từng user ở tab Người dùng.
+                    Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase mới đăng nhập được.
+                    Admin đặt / xoá PIN từng user ở tab Người dùng.
                 </p>
-                
-                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thông báo &amp; Flash sale</h3>
+            </div>
+
+            <div class="card">
+                <h2>Thông báo &amp; Flash sale</h2>
                 <div class="form-grid">
                     <div class="full">
                         <label>Banner toàn site</label>
@@ -835,7 +843,7 @@
                         <input type="number" id="set-flash-pct" min="0" max="90" value="0">
                     </div>
                     <div>
-                        <label>Flash sale đến (ISO / datetime-local)</label>
+                        <label>Flash sale đến</label>
                         <input type="datetime-local" id="set-flash-until">
                     </div>
                     <div>
@@ -843,11 +851,14 @@
                         <input type="number" id="set-invite-reward" min="0" value="20">
                     </div>
                     <div class="full">
-                        <label>Broadcast toast (gửi ngay khi Lưu cài đặt nếu có nội dung)</label>
+                        <label>Broadcast toast (gửi ngay khi bấm Lưu cài đặt hệ thống nếu có nội dung)</label>
                         <input type="text" id="set-broadcast" placeholder="Tin nhắn bắn tới mọi client đang mở...">
                     </div>
                 </div>
-                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Gift code</h3>
+            </div>
+
+            <div class="card">
+                <h2>Gift code</h2>
                 <div class="form-grid">
                     <div>
                         <label>Mã (VD: XUAN2026)</label>
@@ -862,14 +873,19 @@
                     </div>
                 </div>
                 <div id="gift-list" class="muted" style="margin-top:8px;font-size:0.75rem;"></div>
-                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Công cụ</h3>
-                <div class="row-actions form-actions">
+            </div>
+
+            <div class="card">
+                <h2>Công cụ</h2>
+                <div class="row-actions form-actions" style="border:none;padding-top:0;margin-top:0;">
                     <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn"><i class="fa-solid fa-key"></i> Xóa PIN toàn bộ user</button>
                     <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
                 </div>
                 <pre id="dead-link-report" style="margin-top:8px;font-size:0.7rem;max-height:160px;overflow:auto;display:none;"></pre>
+            </div>
 
-                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thương hiệu &amp; đa web</h3>
+            <div class="card">
+                <h2>Thương hiệu &amp; đa web</h2>
                 <div class="form-grid">
                     <div style="grid-column:1/-1;">
                         <label>Tên web (hiển thị trên tab / title)</label>
@@ -889,47 +905,14 @@
                     </div>
                 </div>
                 <div class="row-actions form-actions">
-                    <button class="btn btn-primary" id="save-settings-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
                     <button class="btn btn-warn" id="migrate-prefix-btn" title="Copy songs + users từ root sang prefix đang nhập"><i class="fa-solid fa-right-left"></i> Migrate root → prefix</button>
                 </div>
                 <p class="muted" style="margin-top:10px;font-size:0.72rem;">
                     <b>Migrate:</b> copy <code>songs</code> + <code>users</code> từ root sang prefix (không xóa root).
-                    Cần Firebase Rules cho phép đọc/ghi path prefix trước. Xem hướng dẫn bên dưới.
                 </p>
-                <details style="margin-top:12px;">
-                    <summary>Hướng dẫn Firebase Rules cho prefix</summary>
-                    <pre>{
-  "rules": {
-    "settings": {
-      ".read": true,
-      ".write": "auth != null"
-    },
-    "songs": {
-      ".read": true,
-      ".write": "auth != null"
-    },
-    "users": {
-      ".read": true,
-      ".write": true
-    },
-    "prices": {
-      ".read": true,
-      ".write": "auth != null"
-    },
-    "music6": {
-      "songs": { ".read": true, ".write": "auth != null" },
-      "users": { ".read": true, ".write": true },
-      "prices": { ".read": true, ".write": "auth != null" }
-    }
-  }
-}</pre>
-                    <p class="muted" style="font-size:0.72rem;margin-top:6px;">
-                        Vào <b>Firebase Console</b> → project <b>music6-dfd59</b> → Realtime Database → tab <b>Rules</b> → dán → Publish.
-                        Sau đó bấm <b>Migrate root → prefix</b> (đã đăng nhập Admin).
-                    </p>
-                </details>
                 <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
             </div>
+
             <div class="card">
                 <h2>Xuất / nhập danh sách bài hát</h2>
                 <p class="muted" style="margin-bottom:12px;">
