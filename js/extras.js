@@ -581,14 +581,7 @@
 
   // ----- Extras panel UI -----
   function ensureExtrasUi() {
-    if ($('extras-fab')) return;
-    const fab = document.createElement('button');
-    fab.id = 'extras-fab';
-    fab.type = 'button';
-    fab.className = 'extras-fab';
-    fab.title = 'Tiện ích';
-    fab.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i>';
-    document.body.appendChild(fab);
+    if ($('extras-panel')) return;
 
     const panel = document.createElement('div');
     panel.id = 'extras-panel';
@@ -613,7 +606,25 @@
       <div id="gacha-list" class="gacha-list" style="display:none"></div>
     `;
     document.body.appendChild(panel);
-    fab.onclick = () => panel.classList.toggle('show');
+
+    function togglePanel(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      panel.classList.toggle('show');
+      if (typeof lucide !== 'undefined') {
+        try { lucide.createIcons({ nodes: [document.getElementById('extras-btn')].filter(Boolean) }); } catch (err) {}
+      }
+    }
+
+    const bindExtrasBtn = () => {
+      const btn = $('extras-btn');
+      if (!btn || btn._xkBound) return;
+      btn._xkBound = true;
+      btn.addEventListener('click', togglePanel);
+    };
+    bindExtrasBtn();
+    // Player hiện sau login → bind lại
+    setInterval(bindExtrasBtn, 1500);
+
     panel.querySelector('#extras-close').onclick = () => panel.classList.remove('show');
     panel.querySelector('#gift-redeem-btn').onclick = () => redeemGiftCode($('gift-code-input').value);
     panel.querySelectorAll('[data-x]').forEach(btn => {
