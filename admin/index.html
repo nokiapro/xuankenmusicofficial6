@@ -463,14 +463,24 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 4px;
             margin-top: 14px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
+            padding-bottom: 4px;
+        }
+        .pagination::-webkit-scrollbar { height: 3px; }
+        .pagination::-webkit-scrollbar-thumb {
+            background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea);
+            border-radius: 50px;
         }
         .pagination button {
-            min-width: 40px;
-            height: 40px;
-            padding: 0 12px;
+            min-width: 36px;
+            height: 36px;
+            padding: 0 8px;
+            flex-shrink: 0;
             border-radius: 10px;
             border: 1px solid var(--border);
             background: var(--card2);
@@ -899,6 +909,11 @@
                         <label>Xu</label>
                         <input type="number" id="gift-new-coins" min="1" value="50">
                     </div>
+                    <div>
+                        <label>Số lần dùng</label>
+                        <input type="number" id="gift-new-uses" min="-1" value="1" placeholder="1">
+                        <p class="muted" style="margin-top:4px;font-size:0.68rem;">1 = một lần · 10 = mười lần · <b>-1</b> = vĩnh viễn (không giới hạn)</p>
+                    </div>
                     <div class="full">
                         <button type="button" class="btn btn-ok" id="gift-create-btn"><i class="fa-solid fa-ticket"></i> Tạo gift code</button>
                     </div>
@@ -939,6 +954,15 @@
                 <div class="row-actions form-actions" style="border:none;padding-top:0;margin-top:0;">
                     <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn"><i class="fa-solid fa-key"></i> Xóa PIN toàn bộ user</button>
                     <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
+                </div>
+                <div id="tools-progress-wrap" style="display:none;margin-top:12px;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted);margin-bottom:6px;">
+                        <span id="tools-progress-label">Đang xử lý...</span>
+                        <span id="tools-progress-pct">0%</span>
+                    </div>
+                    <div style="height:10px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden;">
+                        <div id="tools-progress-bar" style="height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#ff0040,#8c00ff,#17adca);transition:width 0.2s ease;"></div>
+                    </div>
                 </div>
                 <pre id="dead-link-report" style="margin-top:8px;font-size:0.7rem;max-height:160px;overflow:auto;display:none;"></pre>
             </div>
@@ -1198,29 +1222,27 @@
             const el = document.getElementById('songs-pagination');
             if (!el) return;
             if (totalPages <= 1) {
-                el.innerHTML = totalPages === 1
-                    ? `<span class="page-info">Trang 1 / 1</span>`
-                    : '';
+                el.innerHTML = '';
                 return;
             }
+            // 1 hàng: ‹ 1 2 3 … n ›  (tự giới hạn số nút theo độ rộng)
+            const maxButtons = window.innerWidth < 480 ? 3 : (window.innerWidth < 700 ? 5 : 7);
             let html = `<button type="button" data-page="prev" ${songsPage <= 1 ? 'disabled' : ''}>‹</button>`;
-            const maxButtons = 7;
             let start = Math.max(1, songsPage - Math.floor(maxButtons / 2));
             let end = Math.min(totalPages, start + maxButtons - 1);
             start = Math.max(1, end - maxButtons + 1);
             if (start > 1) {
                 html += `<button type="button" data-page="1">1</button>`;
-                if (start > 2) html += `<span class="page-info">…</span>`;
+                if (start > 2) html += `<button type="button" disabled>…</button>`;
             }
             for (let p = start; p <= end; p++) {
                 html += `<button type="button" data-page="${p}" class="${p === songsPage ? 'active' : ''}">${p}</button>`;
             }
             if (end < totalPages) {
-                if (end < totalPages - 1) html += `<span class="page-info">…</span>`;
+                if (end < totalPages - 1) html += `<button type="button" disabled>…</button>`;
                 html += `<button type="button" data-page="${totalPages}">${totalPages}</button>`;
             }
             html += `<button type="button" data-page="next" ${songsPage >= totalPages ? 'disabled' : ''}>›</button>`;
-            html += `<span class="page-info">Trang ${songsPage} / ${totalPages}</span>`;
             el.innerHTML = html;
             el.querySelectorAll('button[data-page]').forEach(btn => {
                 btn.onclick = () => {
@@ -1787,7 +1809,12 @@
                 if (!keys.length) { el.textContent = 'Chưa có gift code'; return; }
                 el.innerHTML = keys.map(k => {
                     const g = obj[k] || {};
-                    const used = g.usedBy ? ('dùng bởi ' + escapeHtml(String(g.usedBy))) : 'còn trống';
+                    const maxU = g.maxUses == null ? 1 : Number(g.maxUses);
+                    const cnt = Number(g.usedCount) || 0;
+                    const lim = maxU < 0 ? '∞' : String(maxU);
+                    const used = (cnt > 0 || (g.usedBy && String(g.usedBy).trim()))
+                      ? ('đã dùng ' + cnt + '/' + lim + (g.usedBy ? (' · cuối: ' + escapeHtml(String(g.usedBy))) : ''))
+                      : ('còn trống · tối đa ' + lim);
                     return '<div style="margin:4px 0;"><code>' + escapeHtml(k) + '</code> · ' + (g.coins|0) + ' xu · ' + used +
                         ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-gift="' + escapeHtml(k) + '">Xóa</button></div>';
                 }).join('');
@@ -1809,11 +1836,13 @@
                 const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins').value, 10) || 0);
                 if (!code || code.length < 2) { toast('Nhập mã gift (tối thiểu 2 ký tự)'); return; }
                 if (/[.#$\[\]\/]/.test(code)) { toast('Mã không được chứa . # $ [ ] /'); return; }
-                const payload = { coins: coins, createdAt: Date.now(), usedBy: '' };
+                const maxUsesRaw = parseInt(document.getElementById('gift-new-uses') && document.getElementById('gift-new-uses').value, 10);
+                const maxUses = Number.isFinite(maxUsesRaw) ? maxUsesRaw : 1;
+                const payload = { coins: coins, createdAt: Date.now(), usedBy: '', usedCount: 0, maxUses: maxUses, usedByMap: {} };
                 // Ghi root giftCodes (dễ rules) + dưới prefix nếu có
                 await db().ref('giftCodes/' + code).set(payload);
                 try { await db().ref(dataPath('giftCodes') + '/' + code).set(payload); } catch (e2) {}
-                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu)');
+                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu · ' + (maxUses < 0 ? '∞' : maxUses) + ' lần)');
                 document.getElementById('gift-new-code').value = '';
                 loadGiftCodes();
             } catch (err) {
@@ -1826,13 +1855,21 @@
             if (!confirm('Xóa PIN của TẤT CẢ user? Họ sẽ đặt PIN mới lần vào sau.')) return;
             const snap = await db().ref(dataPath('users')).once('value');
             const obj = snap.val() || {};
+            const keys = Object.keys(obj);
+            bulkPin.disabled = true;
             let n = 0;
-            for (const k of Object.keys(obj)) {
+            for (let i = 0; i < keys.length; i++) {
+                const k = keys[i];
+                setToolsProgress(true, (i / Math.max(1, keys.length)) * 100, 'Xóa PIN: ' + k);
                 await db().ref(dataPath('users') + '/' + k + '/pin').set('');
                 n++;
+                setToolsProgress(true, ((i + 1) / Math.max(1, keys.length)) * 100, 'Đã xóa ' + (i + 1) + '/' + keys.length);
             }
+            setToolsProgress(true, 100, 'Hoàn tất');
+            bulkPin.disabled = false;
             toast('Đã xóa PIN ' + n + ' user');
             await loadUsers();
+            setTimeout(() => setToolsProgress(false, 0, ''), 2000);
         };
         function probeAudioUrl(url, timeoutMs) {
             return new Promise((resolve) => {
@@ -1851,23 +1888,48 @@
                 a.src = url;
             });
         }
+        function setToolsProgress(show, pct, label) {
+            const wrap = document.getElementById('tools-progress-wrap');
+            const bar = document.getElementById('tools-progress-bar');
+            const pctEl = document.getElementById('tools-progress-pct');
+            const lab = document.getElementById('tools-progress-label');
+            if (!wrap) return;
+            wrap.style.display = show ? 'block' : 'none';
+            if (bar) bar.style.width = Math.max(0, Math.min(100, pct || 0)) + '%';
+            if (pctEl) pctEl.textContent = Math.round(pct || 0) + '%';
+            if (lab && label) lab.textContent = label;
+        }
         const deadBtn = document.getElementById('check-dead-links-btn');
         if (deadBtn) deadBtn.onclick = async () => {
             const report = document.getElementById('dead-link-report');
             report.style.display = 'block';
-            report.textContent = 'Đang kiểm tra (phát metadata audio)...';
-            const lines = [];
+            report.textContent = 'Đang kiểm tra...';
+            const jobs = [];
             for (const s of songsCache) {
                 for (const [label, url] of [['demo', s.audio], ['full', s.audioFull], ['full2', s.audioFull2]]) {
-                    if (!url) continue;
-                    const r = await probeAudioUrl(url, 12000);
-                    if (r.ok) lines.push(s.id + ' ' + label + ': OK (' + r.detail + ')');
-                    else lines.push(s.id + ' ' + label + ': LỖI (' + r.detail + ') — ' + url);
-                    report.textContent = lines.join('\n');
+                    if (url) jobs.push({ id: s.id, label, url });
                 }
             }
-            report.textContent = lines.join('\n') || 'Không có link';
+            if (!jobs.length) {
+                report.textContent = 'Không có link';
+                toast('Không có link');
+                return;
+            }
+            deadBtn.disabled = true;
+            const lines = [];
+            for (let i = 0; i < jobs.length; i++) {
+                const j = jobs[i];
+                setToolsProgress(true, ((i) / jobs.length) * 100, 'Kiểm tra ' + j.id + ' (' + j.label + ')...');
+                const r = await probeAudioUrl(j.url, 12000);
+                if (r.ok) lines.push(j.id + ' ' + j.label + ': OK (' + r.detail + ')');
+                else lines.push(j.id + ' ' + j.label + ': LỖI (' + r.detail + ') — ' + j.url);
+                report.textContent = lines.join('\n');
+                setToolsProgress(true, ((i + 1) / jobs.length) * 100, 'Đã xong ' + (i + 1) + '/' + jobs.length);
+            }
+            setToolsProgress(true, 100, 'Hoàn tất');
+            deadBtn.disabled = false;
             toast('Xong kiểm tra link');
+            setTimeout(() => setToolsProgress(false, 0, ''), 2000);
         };
         // load gifts when settings tab
         document.querySelectorAll('.tab').forEach(tab => {
