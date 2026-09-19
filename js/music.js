@@ -3012,9 +3012,14 @@ async function renderShopThumbs() {
         const has = owned.includes(id);
         const isActive = active === id;
         let btn = '';
-        if (isActive) btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>';
-        else if (has) btn = '<button type="button" class="shop-buy-btn" data-use-thumb="' + id.replace(/"/g, '') + '">DÙNG</button>';
-        else btn = '<button type="button" class="shop-buy-btn" data-buy-thumb="' + id.replace(/"/g, '') + '">MUA ' + (Number(th.price) || 0) + ' XK</button>';
+        if (isActive) {
+            btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>' +
+                '<button type="button" class="shop-buy-btn shop-rent-btn" data-clear-thumb="1">HỦY DÙNG</button>';
+        } else if (has) {
+            btn = '<button type="button" class="shop-buy-btn" data-use-thumb="' + id.replace(/"/g, '') + '">DÙNG</button>';
+        } else {
+            btn = '<button type="button" class="shop-buy-btn" data-buy-thumb="' + id.replace(/"/g, '') + '">MUA ' + (Number(th.price) || 0) + ' XK</button>';
+        }
         const name = (typeof escapeHtml === 'function' ? escapeHtml(th.name || id) : (th.name || id));
         const url = th.url ? String(th.url).replace(/"/g, '&quot;') : '';
         return '<div class="shop-thumb-item" data-thumb-id="' + id.replace(/"/g, '') + '">' +
@@ -3039,6 +3044,15 @@ async function renderShopThumbs() {
             if (typeof showNotification === 'function') showNotification('THUMB:', 'Đã áp dụng', '#4ade80', 'check');
         };
     });
+    list.querySelectorAll('[data-clear-thumb]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            updateCurrentAccount(acc => { acc.activeThumb = ''; });
+            applyActiveProgressThumb();
+            renderShopThumbs();
+            if (typeof showNotification === 'function') showNotification('THUMB:', 'Đã về mặc định', '#60a5fa', 'check');
+        };
+    });
 }
 
 function buyProgressThumb(thumbId, thumbsList) {
@@ -3060,12 +3074,11 @@ function buyProgressThumb(thumbId, thumbsList) {
         acc.coins = (acc.coins | 0) - price;
         if (!Array.isArray(acc.ownedThumbs)) acc.ownedThumbs = [];
         if (!acc.ownedThumbs.includes(String(thumbId))) acc.ownedThumbs.push(String(thumbId));
-        acc.activeThumb = String(thumbId);
+        // Không auto bật — hiện nút DÙNG để user chọn
     });
-    applyActiveProgressThumb();
     renderShopThumbs();
     updateShopBalanceUI();
-    showNotification('MUA THUMB:', th.name || thumbId, '#4ade80', 'shopping-bag');
+    showNotification('MUA THUMB:', (th.name || thumbId) + ' — bấm DÙNG để áp dụng', '#4ade80', 'shopping-bag');
 }
 
 

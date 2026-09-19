@@ -2726,10 +2726,9 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-tab-bar {
   display: flex;
   gap: 8px;
-  margin: 12px 12px 8px;
-  padding: 12px 0 4px;
+  margin: 14px 12px 12px;
+  padding: 0;
   flex-shrink: 0;
-  border-top: 1px solid var(--border-color);
 }
 .shop-tab {
   flex: 1;
@@ -2863,4 +2862,15 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar-thumb {
     background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
     border-radius: 50px;
+}
+
+.shop-thumb-item {
+  flex-wrap: wrap;
+}
+.shop-thumb-item .shop-owned-badge,
+.shop-thumb-item .shop-buy-btn {
+  margin-left: auto;
+}
+.shop-thumb-item .shop-buy-btn.shop-rent-btn {
+  margin-left: 6px;
 }
