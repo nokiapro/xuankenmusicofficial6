@@ -2508,15 +2508,9 @@ body.dark .user-badge {
   background: #ff0040; color: #fff; font-weight: 800; font-size: 0.7rem;
   padding: 6px 10px; border-radius: 999px; box-shadow: 0 4px 14px rgba(255,0,64,0.4);
 }
-.extras-fab {
-  position: fixed; right: 14px; bottom: 88px; z-index: 9970;
-  width: 48px; height: 48px; border-radius: 50%;
-  border: none; cursor: pointer;
-  background: linear-gradient(135deg, #ff0040, #8c00ff); color: #fff;
-  box-shadow: 0 6px 20px rgba(140,0,255,0.4); font-size: 1.1rem;
-}
+.extras-fab { display: none !important; }
 .extras-panel {
-  position: fixed; right: 14px; bottom: 148px; z-index: 9971;
+  position: fixed; left: 12px; top: 100px; right: auto; z-index: 9971;
   width: min(300px, calc(100vw - 28px));
   background: #16161e; border: 1px solid #2a2a38; border-radius: 16px;
   padding: 12px; display: none; color: #f2f2f5;
@@ -2577,3 +2571,12 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 #current-art.frame-neon { box-shadow: 0 0 0 3px #22d3ee, 0 0 24px rgba(34,211,238,0.6); border-radius: 12px; }
 #current-art.frame-crystal { box-shadow: 0 0 0 3px #e879f9, 0 0 24px rgba(232,121,249,0.5); border-radius: 50%; }
 #current-art.frame-legend { box-shadow: 0 0 0 3px #ff0040, 0 0 0 6px #8c00ff, 0 0 28px rgba(140,0,255,0.6); border-radius: 12px; }
+
+/* extras panel */
+.extras-panel.show {
+  animation: extrasIn 0.2s ease;
+}
+@keyframes extrasIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
