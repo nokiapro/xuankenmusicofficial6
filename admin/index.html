@@ -823,6 +823,52 @@
                     Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase (admin tạo / đã từng vào) mới đăng nhập được.
                     Admin có thể đặt / xoá PIN từng user ở tab Người dùng.
                 </p>
+                
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thông báo &amp; Flash sale</h3>
+                <div class="form-grid">
+                    <div class="full">
+                        <label>Banner toàn site</label>
+                        <input type="text" id="set-site-banner" placeholder="Thông báo hiện trên đầu player...">
+                    </div>
+                    <div>
+                        <label>Flash sale %</label>
+                        <input type="number" id="set-flash-pct" min="0" max="90" value="0">
+                    </div>
+                    <div>
+                        <label>Flash sale đến (ISO / datetime-local)</label>
+                        <input type="datetime-local" id="set-flash-until">
+                    </div>
+                    <div>
+                        <label>Xu thưởng invite</label>
+                        <input type="number" id="set-invite-reward" min="0" value="20">
+                    </div>
+                    <div class="full">
+                        <label>Broadcast toast (gửi ngay khi Lưu cài đặt nếu có nội dung)</label>
+                        <input type="text" id="set-broadcast" placeholder="Tin nhắn bắn tới mọi client đang mở...">
+                    </div>
+                </div>
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Gift code</h3>
+                <div class="form-grid">
+                    <div>
+                        <label>Mã (VD: XUAN2026)</label>
+                        <input type="text" id="gift-new-code" placeholder="CODE" maxlength="24">
+                    </div>
+                    <div>
+                        <label>Xu</label>
+                        <input type="number" id="gift-new-coins" min="1" value="50">
+                    </div>
+                    <div class="full">
+                        <button type="button" class="btn btn-ok" id="gift-create-btn"><i class="fa-solid fa-ticket"></i> Tạo gift code</button>
+                    </div>
+                </div>
+                <div id="gift-list" class="muted" style="margin-top:8px;font-size:0.75rem;"></div>
+                <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Công cụ</h3>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn"><i class="fa-solid fa-key"></i> Xóa PIN toàn bộ user</button>
+                    <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
+                </div>
+                <pre id="dead-link-report" style="margin-top:8px;font-size:0.7rem;max-height:160px;overflow:auto;display:none;"></pre>
+
                 <h3 style="margin:18px 0 10px;font-size:0.95rem;color:var(--text);">Thương hiệu &amp; đa web</h3>
                 <div class="form-grid">
                     <div style="grid-column:1/-1;">
@@ -917,7 +963,11 @@
             siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
             sitePrefix: '',
             requirePin: true,
-            allowRegister: true
+            allowRegister: true,
+            siteBanner: '',
+            flashSalePercent: 0,
+            flashSaleUntil: '',
+            inviteReward: 20
         };
 
         let songsCache = [];
@@ -975,6 +1025,18 @@
             document.getElementById('set-starter').value = settingsCache.starterCoins;
             document.getElementById('set-require-pin').checked = settingsCache.requirePin !== false;
             document.getElementById('set-allow-register').checked = settingsCache.allowRegister !== false;
+            if (document.getElementById('set-site-banner')) document.getElementById('set-site-banner').value = settingsCache.siteBanner || '';
+            if (document.getElementById('set-flash-pct')) document.getElementById('set-flash-pct').value = settingsCache.flashSalePercent || 0;
+            if (document.getElementById('set-invite-reward')) document.getElementById('set-invite-reward').value = settingsCache.inviteReward || 20;
+            if (document.getElementById('set-flash-until') && settingsCache.flashSaleUntil) {
+                try {
+                    const d = new Date(settingsCache.flashSaleUntil);
+                    if (!Number.isNaN(d.getTime())) {
+                        const pad = n => String(n).padStart(2,'0');
+                        document.getElementById('set-flash-until').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+                    }
+                } catch(e) {}
+            }
             document.getElementById('set-site-name').value = settingsCache.siteName || '';
             document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
             document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
@@ -1024,7 +1086,8 @@
                     lastCheckin: u.lastCheckin || '',
                     createdAt: u.createdAt || 0,
                     rank: u.rank || 'member',
-                    pin: u.pin != null ? String(u.pin) : ''
+                    pin: u.pin != null ? String(u.pin) : '',
+                    banned: !!u.banned
                 };
             });
             renderUsers(document.getElementById('user-search').value);
@@ -1236,6 +1299,7 @@
                         <div class="row-actions">
                             <button class="btn btn-ok" data-save-user="${escapeHtml(name)}"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
                             <button class="btn btn-warn" data-gift="${escapeHtml(name)}"><i class="fa-solid fa-gift"></i> +50</button>
+                            <button class="btn ${a.banned ? 'btn-ok' : 'btn-danger'}" data-ban-user="${escapeHtml(name)}"><i class="fa-solid fa-ban"></i> ${a.banned ? 'Mở' : 'Khóa'}</button>
                             <button class="btn btn-danger" data-del-user="${escapeHtml(name)}"><i class="fa-solid fa-trash"></i> Xóa</button>
                         </div>
                     </td>
@@ -1286,6 +1350,20 @@
                     toast('Đã xóa ' + name);
                     renderUsers(document.getElementById('user-search').value);
                     refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-ban-user]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-ban-user');
+                    const u = usersCache[name];
+                    if (!u) return;
+                    const next = !u.banned;
+                    const reason = next ? (prompt('Lý do khóa (tuỳ chọn):') || '') : '';
+                    const key = u.key || sanitizeKey(name);
+                    await db().ref(dataPath('users') + '/' + key).update({ banned: next, banReason: reason });
+                    u.banned = next;
+                    toast(next ? ('Đã khóa ' + name) : ('Đã mở khóa ' + name));
+                    renderUsers(document.getElementById('user-search').value);
                 };
             });
         }
@@ -1375,6 +1453,16 @@
             settingsCache.starterCoins = Math.max(0, parseInt(document.getElementById('set-starter').value, 10) || 0);
             settingsCache.requirePin = !!document.getElementById('set-require-pin').checked;
             settingsCache.allowRegister = !!document.getElementById('set-allow-register').checked;
+            settingsCache.siteBanner = (document.getElementById('set-site-banner') && document.getElementById('set-site-banner').value || '').trim();
+            settingsCache.flashSalePercent = Math.max(0, Math.min(90, parseInt(document.getElementById('set-flash-pct') && document.getElementById('set-flash-pct').value, 10) || 0));
+            settingsCache.inviteReward = Math.max(0, parseInt(document.getElementById('set-invite-reward') && document.getElementById('set-invite-reward').value, 10) || 0);
+            const fu = document.getElementById('set-flash-until') && document.getElementById('set-flash-until').value;
+            settingsCache.flashSaleUntil = fu ? new Date(fu).toISOString() : '';
+            const bc = document.getElementById('set-broadcast') && document.getElementById('set-broadcast').value.trim();
+            if (bc) {
+                await db().ref('settings/broadcast').set({ msg: bc, at: Date.now() });
+                document.getElementById('set-broadcast').value = '';
+            }
             settingsCache.siteName = (document.getElementById('set-site-name').value || '').trim() || DEFAULT_SETTINGS.siteName;
             settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
             settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
@@ -1639,6 +1727,75 @@
         };
 
         // Theo dõi trạng thái đăng nhập
+        
+        // Gift codes
+        async function loadGiftCodes() {
+            const el = document.getElementById('gift-list');
+            if (!el) return;
+            try {
+                const snap = await db().ref(dataPath('giftCodes')).once('value');
+                const obj = snap.val() || {};
+                const keys = Object.keys(obj);
+                if (!keys.length) { el.textContent = 'Chưa có gift code'; return; }
+                el.innerHTML = keys.map(k => {
+                    const g = obj[k];
+                    return '<div><code>' + escapeHtml(k) + '</code> · ' + (g.coins|0) + ' xu · ' + (g.usedBy ? ('dùng bởi ' + escapeHtml(g.usedBy)) : 'còn trống') + '</div>';
+                }).join('');
+            } catch (e) { el.textContent = 'Không tải được gift codes'; }
+        }
+        const giftBtn = document.getElementById('gift-create-btn');
+        if (giftBtn) giftBtn.onclick = async () => {
+            const code = (document.getElementById('gift-new-code').value || '').trim().toUpperCase();
+            const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins').value, 10) || 0);
+            if (!code || /[.#$\[\]\/]/.test(code)) { toast('Mã không hợp lệ'); return; }
+            await db().ref(dataPath('giftCodes') + '/' + code).set({ coins, createdAt: Date.now(), usedBy: null });
+            toast('Đã tạo ' + code);
+            document.getElementById('gift-new-code').value = '';
+            loadGiftCodes();
+        };
+        const bulkPin = document.getElementById('bulk-reset-pin-btn');
+        if (bulkPin) bulkPin.onclick = async () => {
+            if (!confirm('Xóa PIN của TẤT CẢ user? Họ sẽ đặt PIN mới lần vào sau.')) return;
+            const snap = await db().ref(dataPath('users')).once('value');
+            const obj = snap.val() || {};
+            let n = 0;
+            for (const k of Object.keys(obj)) {
+                await db().ref(dataPath('users') + '/' + k + '/pin').set('');
+                n++;
+            }
+            toast('Đã xóa PIN ' + n + ' user');
+            await loadUsers();
+        };
+        const deadBtn = document.getElementById('check-dead-links-btn');
+        if (deadBtn) deadBtn.onclick = async () => {
+            const report = document.getElementById('dead-link-report');
+            report.style.display = 'block';
+            report.textContent = 'Đang kiểm tra...';
+            const lines = [];
+            for (const s of songsCache) {
+                for (const [label, url] of [['demo', s.audio], ['full', s.audioFull], ['full2', s.audioFull2]]) {
+                    if (!url) continue;
+                    try {
+                        const ctrl = new AbortController();
+                        const to = setTimeout(() => ctrl.abort(), 8000);
+                        const res = await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
+                        clearTimeout(to);
+                        lines.push(s.id + ' ' + label + ': checked (no-cors — xem thủ công nếu nghi ngờ)');
+                    } catch (e) {
+                        lines.push(s.id + ' ' + label + ': LỖI / timeout — ' + url);
+                    }
+                }
+            }
+            report.textContent = lines.join('\n') || 'Không có link';
+            toast('Xong kiểm tra link');
+        };
+        // load gifts when settings tab
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.dataset.tab === 'settings') loadGiftCodes();
+            });
+        });
+
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 showApp();
