@@ -69,32 +69,27 @@
 
     <div class="player-container" id="player-container" style="display: none;">
         <div class="header-section">
-            <div class="top-left-action">
-                <div class="top-left-stack">
-                    <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
-                        <i data-lucide="timer"></i>
-                    </div>
-                    <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
-                        <i data-lucide="list-plus"></i>
-                    </div>
+            <div class="top-bar-icons">
+                <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
+                    <i data-lucide="timer"></i>
                 </div>
                 <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
                     <i data-lucide="headphones"></i>
                 </div>
-                <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
-                    <i data-lucide="list-music"></i>
+                <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
+                    <i data-lucide="list-plus"></i>
                 </div>
                 <div class="btn-icon" id="extras-btn" title="Tiện ích">
                     <i data-lucide="sparkles"></i>
                 </div>
-            </div>
-
-            <div class="top-right-action">
+                <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
+                    <i data-lucide="store"></i>
+                </div>
                 <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
                     <i data-lucide="sun" id="theme-icon"></i>
                 </div>
-                <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
-                    <i data-lucide="store"></i>
+                <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
+                    <i data-lucide="list-music"></i>
                 </div>
             </div>
             
@@ -201,6 +196,37 @@
                 <button id="cancel-timer-btn" class="timer-cancel-btn">
                     <i data-lucide="trash-2"></i> HỦY HẸN GIỜ
                 </button>
+            </div>
+        </div>
+
+
+        <!-- Tiện ích -->
+        <div id="extras-modal" class="shop-modal extras-modal">
+            <div class="shop-modal-header">
+                <div class="close-shop" id="close-extras-btn">
+                    <i data-lucide="x"></i>
+                </div>
+                <div class="shop-title"><i data-lucide="sparkles"></i> TIỆN ÍCH</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="extras-modal-body">
+                <div id="user-xp-badge" class="user-xp-badge" style="display:none;"></div>
+                <div class="extras-section">
+                    <label class="extras-label">Gift code</label>
+                    <div class="extras-row">
+                        <input id="gift-code-input" placeholder="Nhập mã..." maxlength="24" />
+                        <button type="button" id="gift-redeem-btn" class="extras-btn-primary">Nhận</button>
+                    </div>
+                </div>
+                <div class="extras-actions-grid">
+                    <button type="button" class="extras-action-btn" data-x="react"><i data-lucide="flame"></i><span>Reaction</span></button>
+                    <button type="button" class="extras-action-btn" data-x="offline"><i data-lucide="download"></i><span>Offline</span></button>
+                    <button type="button" class="extras-action-btn" data-x="freeze"><i data-lucide="snowflake"></i><span>+Freeze</span></button>
+                    <button type="button" class="extras-action-btn" data-x="review"><i data-lucide="calendar"></i><span>Year review</span></button>
+                    <button type="button" class="extras-action-btn" data-x="qr"><i data-lucide="qr-code"></i><span>QR check-in</span></button>
+                    <button type="button" class="extras-action-btn" data-x="gacha"><i data-lucide="frame"></i><span>Gacha frame</span></button>
+                </div>
+                <div id="gacha-list" class="gacha-list" style="display:none;"></div>
             </div>
         </div>
 
