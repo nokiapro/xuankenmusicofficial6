@@ -360,7 +360,14 @@ async function checkForUpdates() {
             
             const oldSongs = songs.slice();
             const oldSongIds = new Set(oldSongs.map(s => s.id));
-            const addedSongs = newSongs.filter(s => !oldSongIds.has(s.id));
+            const addedSongs = newSongs.filter(s => {
+                if (oldSongIds.has(s.id)) return false;
+                if (notifiedNewSongIds.has(s.id)) return false;
+                notifiedNewSongIds.add(s.id);
+                return true;
+            });
+            // Đánh dấu các bài đang có để không báo lại sau reload list
+            newSongs.forEach(s => { if (oldSongIds.has(s.id)) notifiedNewSongIds.add(s.id); });
             
             const currentSongId = oldSongs[index]?.id;
             
@@ -421,7 +428,15 @@ async function checkForUpdates() {
             
             if (addedSongs.length > 0) {
                 addedSongs.forEach(song => {
-                    showNotification('BÀI HÁT MỚI THÊM:', `<i class="fa-regular fa-star"></i> ${song.id} <i class="fa-regular fa-star"></i>`, '#4ade80', 'plus-circle');
+                    const title = song.name || song.id;
+                    const wasScheduled = song.publishAt && Date.parse(song.publishAt) <= Date.now();
+                    const head = wasScheduled ? 'ADMIN ĐÃ ĐĂNG BÀI MỚI:' : 'BÀI HÁT MỚI:';
+                    showNotification(
+                        head,
+                        `<i class="fa-regular fa-star"></i> ${title} <i class="fa-regular fa-star"></i>`,
+                        '#4ade80',
+                        'sparkles'
+                    );
                 });
             }
         }
@@ -470,12 +485,101 @@ async function fetchListenDataSilent() {
     return listenData;
 }
 
+let publishCheckTimer = null;
+let songsRealtimeBound = false;
+/** ID bài đã từng hiện cho user này (tránh spam thông báo) */
+let notifiedNewSongIds = new Set();
+
 function startAutoRefresh(intervalSeconds = 60) {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    setTimeout(() => checkForUpdates(), 5000);
-    autoRefreshInterval = setInterval(checkForUpdates, intervalSeconds * 1000);
-    console.log(`ĐÃ BẬT TỰ ĐỘNG CẬP NHẬT ${intervalSeconds} GIÂY`);
+    setTimeout(() => checkForUpdates(), 3000);
+    // Kiểm tra thường hơn để bắt giờ đăng bài (15s)
+    autoRefreshInterval = setInterval(checkForUpdates, Math.min(intervalSeconds, 15) * 1000);
+    console.log('ĐÃ BẬT TỰ ĐỘNG CẬP NHẬT + lịch đăng bài');
+    startSongsRealtimeListener();
+    scheduleNextPublishUnlock();
 }
+
+/** Lấy toàn bộ bài (kể cả chưa tới publishAt) — để hẹn giờ mở */
+async function fetchSongsRawFromFirebase() {
+    const db = getDb();
+    if (!db) return [];
+    const path = dataPath('songs');
+    let snap;
+    try {
+        snap = await db.ref(path).once('value');
+    } catch (e) {
+        snap = await db.ref('songs').once('value');
+    }
+    const obj = snap.val() || {};
+    return Object.keys(obj).map(id => {
+        const s = obj[id] || {};
+        return {
+            id: String(s.id || id),
+            name: s.name || id,
+            publishAt: s.publishAt || null,
+            hidden: !!s.hidden,
+            audio: s.audio || ''
+        };
+    }).filter(s => s.audio && !s.hidden);
+}
+
+/** Hẹn đúng giây publishAt gần nhất → refresh + thông báo */
+async function scheduleNextPublishUnlock() {
+    if (publishCheckTimer) {
+        clearTimeout(publishCheckTimer);
+        publishCheckTimer = null;
+    }
+    try {
+        const raw = await fetchSongsRawFromFirebase();
+        const now = Date.now();
+        let nextAt = null;
+        raw.forEach(s => {
+            if (!s.publishAt) return;
+            const t = Date.parse(s.publishAt);
+            if (Number.isNaN(t) || t <= now) return;
+            if (nextAt == null || t < nextAt) nextAt = t;
+        });
+        if (nextAt == null) return;
+        const wait = Math.max(500, Math.min(nextAt - now + 300, 24 * 3600 * 1000));
+        publishCheckTimer = setTimeout(async () => {
+            await checkForUpdates();
+            scheduleNextPublishUnlock();
+        }, wait);
+        console.log('Hẹn mở bài mới sau', Math.round(wait / 1000), 'giây');
+    } catch (e) {
+        console.warn('scheduleNextPublishUnlock', e);
+    }
+}
+
+function startSongsRealtimeListener() {
+    if (songsRealtimeBound) return;
+    const db = getDb();
+    if (!db) return;
+    songsRealtimeBound = true;
+    const path = dataPath('songs');
+    let ready = false;
+    let debounceTimer = null;
+    const onChange = () => {
+        if (!ready) return; // bỏ qua lần gắn listener (child_added hàng loạt)
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            checkForUpdates();
+            scheduleNextPublishUnlock();
+        }, 400);
+    };
+    try {
+        db.ref(path).on('child_added', onChange);
+        db.ref(path).on('child_changed', onChange);
+        db.ref(path).on('child_removed', onChange);
+        // Sau 1.5s mới nhận sự kiện thật (thêm bài / sửa publishAt)
+        setTimeout(() => { ready = true; }, 1500);
+    } catch (e) {
+        console.warn('songs realtime', e);
+        songsRealtimeBound = false;
+    }
+}
+
 
 function stopAutoRefresh() {
     if (autoRefreshInterval) {
@@ -500,6 +604,7 @@ async function loadSongsFromFirebase() {
         if (list && list.length > 0) {
             songs = list;
             lastDataHash = generateDataHash(songs);
+            notifiedNewSongIds = new Set(songs.map(s => s.id));
             
             listenData = {};
             songs.forEach(song => {
