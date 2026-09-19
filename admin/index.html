@@ -1790,23 +1790,22 @@
         // Theo dõi trạng thái đăng nhập
         
         // Gift codes
+        function giftCodesPath() {
+            // Chỉ dùng prefix (music6) — không ghi root nữa
+            return dataPath('giftCodes');
+        }
         async function loadGiftCodes() {
             const el = document.getElementById('gift-list');
             if (!el) return;
             try {
-                let obj = {};
-                try {
-                    const snap = await db().ref('giftCodes').once('value');
-                    obj = snap.val() || {};
-                } catch (e1) {}
-                if (!Object.keys(obj).length) {
-                    try {
-                        const snap2 = await db().ref(dataPath('giftCodes')).once('value');
-                        obj = snap2.val() || {};
-                    } catch (e2) {}
-                }
+                const path = giftCodesPath();
+                const snap = await db().ref(path).once('value');
+                const obj = snap.val() || {};
                 const keys = Object.keys(obj);
-                if (!keys.length) { el.textContent = 'Chưa có gift code'; return; }
+                if (!keys.length) {
+                    el.textContent = 'Chưa có gift code (path: ' + path + ')';
+                    return;
+                }
                 el.innerHTML = keys.map(k => {
                     const g = obj[k] || {};
                     const maxU = g.maxUses == null ? 1 : Number(g.maxUses);
@@ -1821,13 +1820,18 @@
                 el.querySelectorAll('[data-del-gift]').forEach(btn => {
                     btn.onclick = async () => {
                         const c = btn.getAttribute('data-del-gift');
-                        await db().ref('giftCodes/' + c).remove();
-                        try { await db().ref(dataPath('giftCodes') + '/' + c).remove(); } catch (e) {}
-                        toast('Đã xóa ' + c);
-                        loadGiftCodes();
+                        try {
+                            await db().ref(giftCodesPath() + '/' + c).remove();
+                            toast('Đã xóa ' + c);
+                            loadGiftCodes();
+                        } catch (err) {
+                            toast('Xóa lỗi: ' + (err.code || err.message || err));
+                        }
                     };
                 });
-            } catch (e) { el.textContent = 'Không tải được gift codes: ' + (e.message || e); }
+            } catch (e) {
+                el.textContent = 'Không tải được gift codes: ' + (e.message || e) + ' — path ' + giftCodesPath();
+            }
         }
         const giftBtn = document.getElementById('gift-create-btn');
         if (giftBtn) giftBtn.onclick = async () => {
@@ -1839,15 +1843,14 @@
                 const maxUsesRaw = parseInt(document.getElementById('gift-new-uses') && document.getElementById('gift-new-uses').value, 10);
                 const maxUses = Number.isFinite(maxUsesRaw) ? maxUsesRaw : 1;
                 const payload = { coins: coins, createdAt: Date.now(), usedBy: '', usedCount: 0, maxUses: maxUses, usedByMap: {} };
-                // Ghi root giftCodes (dễ rules) + dưới prefix nếu có
-                await db().ref('giftCodes/' + code).set(payload);
-                try { await db().ref(dataPath('giftCodes') + '/' + code).set(payload); } catch (e2) {}
-                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu · ' + (maxUses < 0 ? '∞' : maxUses) + ' lần)');
+                const path = giftCodesPath() + '/' + code;
+                await db().ref(path).set(payload);
+                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu · ' + (maxUses < 0 ? '∞' : maxUses) + ' lần) @ ' + path);
                 document.getElementById('gift-new-code').value = '';
                 loadGiftCodes();
             } catch (err) {
                 console.error(err);
-                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — kiểm tra Firebase Rules path giftCodes');
+                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — path ' + giftCodesPath() + ' · kiểm tra prefix music6 + Rules');
             }
         };
         const bulkPin = document.getElementById('bulk-reset-pin-btn');
