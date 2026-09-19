@@ -55,7 +55,11 @@ const DEFAULT_ADMIN_SETTINGS = {
     /** Bắt buộc nhập PIN khi vào player */
     requirePin: true,
     /** Cho phép tạo username mới từ màn hình đầu (tắt = chỉ user admin đã tạo) */
-    allowRegister: true
+    allowRegister: true,
+    siteBanner: '',
+    flashSalePercent: 0,
+    flashSaleUntil: '',
+    inviteReward: 20
 };
 
 function getAdminSettings() {
@@ -762,46 +766,74 @@ async function fetchListenData() {
 
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
-    
-    isUpdatingListen = true;
-    
-    // 1. Cộng local + hiện toast NGAY (không chờ Firebase) — tránh phải pause mới hiện
-    if (!listenData[songId]) listenData[songId] = 0;
-    listenData[songId]++;
-    
-    const songIndex = songs.findIndex(s => s.id === songId);
-    if (songIndex !== -1) {
-        songs[songIndex].listenCount = listenData[songId];
+    const sid = String(songId);
+    const user = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
+    // Mỗi user chỉ cộng 1 lần / bài (kể cả đăng nhập lại, máy khác cùng account)
+    if (user) {
+        const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+        const listened = (acc && acc.listenedSongs && typeof acc.listenedSongs === 'object') ? acc.listenedSongs : {};
+        if (listened[sid]) {
+            // Đã từng qua mốc 5s với user này → không cộng nữa
+            return false;
+        }
+    } else {
+        // Chưa đăng nhập: không cộng lượt (tránh spam ảo)
+        return false;
     }
-    
-    localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
-    updateListenStatsModal();
-    console.log(`GHI NHẬN: ${songName} (${songId}) - ${listenData[songId]}`);
-    showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
-    
-    // 2. Đồng bộ Firebase ở background (không block UI)
+
+    isUpdatingListen = true;
     try {
+        // Đánh dấu user đã tính bài này (local ngay)
+        updateCurrentAccount(acc => {
+            if (!acc.listenedSongs || typeof acc.listenedSongs !== 'object') acc.listenedSongs = {};
+            acc.listenedSongs[sid] = Date.now();
+            // XP nghe bài lần đầu
+            acc.xp = (Number(acc.xp) || 0) + 5;
+            acc.seasonXp = (Number(acc.seasonXp) || 0) + 5;
+            const lvl = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
+            acc.level = lvl;
+        });
+
+        if (!listenData[sid]) listenData[sid] = 0;
+        listenData[sid]++;
+        const songIndex = songs.findIndex(s => String(s.id) === sid);
+        if (songIndex !== -1) songs[songIndex].listenCount = listenData[sid];
+        localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
+        updateListenStatsModal();
+        console.log(`GHI NHẬN (1 lần/user): ${songName} (${sid}) → ${listenData[sid]}`);
+        showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${sid} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
+
         const db = getDb();
         if (db) {
-            const ref = db.ref(dataPath('songs') + '/' + songId + '/listenCount');
+            const ref = db.ref(dataPath('songs') + '/' + sid + '/listenCount');
             const result = await ref.transaction(current => (Number(current) || 0) + 1);
-            const serverCount = result.snapshot.val() || listenData[songId];
-            
-            // Cập nhật lại cho khớp server (nếu có người khác cũng đang nghe)
-            listenData[songId] = serverCount;
-            if (songIndex !== -1) {
-                songs[songIndex].listenCount = serverCount;
-            }
+            const serverCount = result.snapshot.val() || listenData[sid];
+            listenData[sid] = serverCount;
+            if (songIndex !== -1) songs[songIndex].listenCount = serverCount;
             localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
             updateListenStatsModal();
+            // Firebase user.listenedSongs
+            const key = sanitizeUsernameKey(user);
+            await db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now());
+            const acc2 = getCurrentAccount();
+            if (acc2) {
+                await db.ref(dataPath('users') + '/' + key).update({
+                    xp: Number(acc2.xp) || 0,
+                    seasonXp: Number(acc2.seasonXp) || 0,
+                    level: Number(acc2.level) || 1
+                });
+            }
         }
+        if (typeof window.onListenCounted === 'function') {
+            try { window.onListenCounted(sid); } catch (e) {}
+        }
+        return true;
     } catch (error) {
-        console.error('LỖI TĂNG LƯỢT NGHE (Firebase):', error);
-        // Local đã cộng rồi, không cần làm gì thêm
+        console.error('LỖI TĂNG LƯỢT NGHE:', error);
+        return false;
     } finally {
         isUpdatingListen = false;
     }
-    return true;
 }
 
 function updateListenStatsModal() {
@@ -2219,7 +2251,16 @@ function ensureUserAccount(username) {
             rentals: {},
             lastCheckin: '',
             createdAt: Date.now(),
-            pin: ''
+            pin: '',
+            banned: false,
+            xp: 0,
+            level: 1,
+            seasonXp: 0,
+            achievements: [],
+            frame: '',
+            streak: 0,
+            streakFreeze: 0,
+            listenedSongs: {}
         };
         saveAllAccounts(accounts);
     } else {
@@ -2261,7 +2302,19 @@ async function fetchUserFromFirebase(username) {
                 lastCheckin: data.lastCheckin || '',
                 createdAt: data.createdAt || Date.now(),
                 rank: data.rank || 'member',
-                pin: data.pin != null ? String(data.pin) : ''
+                pin: data.pin != null ? String(data.pin) : '',
+                banned: !!data.banned,
+                banReason: data.banReason || '',
+                xp: Number(data.xp) || 0,
+                level: Number(data.level) || 1,
+                seasonXp: Number(data.seasonXp) || 0,
+                achievements: Array.isArray(data.achievements) ? data.achievements.map(String) : [],
+                frame: data.frame || '',
+                streak: Number(data.streak) || 0,
+                streakFreeze: Number(data.streakFreeze) || 0,
+                listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
+                inviteBy: data.inviteBy || '',
+                profiles: Array.isArray(data.profiles) ? data.profiles : []
             };
             saveAllAccounts(accounts);
             return accounts[name];
@@ -2311,7 +2364,18 @@ async function pushUserToFirebase(username, account) {
             lastCheckin: account.lastCheckin || '',
             createdAt: account.createdAt || Date.now(),
             rank: account.rank || 'member',
-            pin: account.pin != null ? String(account.pin) : ''
+            pin: account.pin != null ? String(account.pin) : '',
+            banned: !!account.banned,
+            banReason: account.banReason || '',
+            xp: Number(account.xp) || 0,
+            level: Number(account.level) || 1,
+            seasonXp: Number(account.seasonXp) || 0,
+            achievements: account.achievements || [],
+            frame: account.frame || '',
+            streak: Number(account.streak) || 0,
+            streakFreeze: Number(account.streakFreeze) || 0,
+            listenedSongs: account.listenedSongs || {},
+            inviteBy: account.inviteBy || ''
         });
         return true;
     } catch (e) {
@@ -2556,7 +2620,16 @@ function getSongPrice(song) {
         const p = Number(song.price);
         if (!Number.isNaN(p) && p >= 0) return p;
     }
-    return settings.songPrice;
+    let price = settings.songPrice;
+    // Flash sale toàn site
+    try {
+        const pct = Number(settings.flashSalePercent) || 0;
+        const until = settings.flashSaleUntil ? Date.parse(settings.flashSaleUntil) : 0;
+        if (pct > 0 && pct < 100 && until && Date.now() < until) {
+            price = Math.max(0, Math.round(price * (100 - pct) / 100));
+        }
+    } catch (e) {}
+    return price;
 }
 
 function hasCheckedInToday() {
@@ -2574,11 +2647,30 @@ function doDailyCheckin() {
         return false;
     }
     const reward = getAdminSettings().checkinReward;
+    let streakMsg = '';
     updateCurrentAccount(acc => {
-        acc.coins = (acc.coins | 0) + reward;
-        acc.lastCheckin = getTodayKey();
+        const today = getTodayKey();
+        const y = new Date(); y.setDate(y.getDate() - 1);
+        const yKey = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+        let streak = Number(acc.streak) || 0;
+        if (acc.lastCheckin === yKey) streak += 1;
+        else if (acc.lastCheckin === today) { /* no-op */ }
+        else if ((Number(acc.streakFreeze) || 0) > 0 && acc.lastCheckin !== today) {
+            acc.streakFreeze = (Number(acc.streakFreeze) || 0) - 1;
+            streak = Math.max(1, streak); // giữ streak nhờ freeze
+            streakMsg = ' (dùng 1 Streak Freeze)';
+        } else {
+            streak = 1;
+        }
+        acc.streak = streak;
+        acc.coins = (acc.coins | 0) + reward + Math.min(10, Math.floor(streak / 7) * 5);
+        acc.lastCheckin = today;
+        acc.xp = (Number(acc.xp) || 0) + 10;
+        acc.seasonXp = (Number(acc.seasonXp) || 0) + 10;
+        acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
     });
-    showNotification('ĐIỂM DANH:', `+${reward} XU XK`, '#4ade80', 'coins');
+    const st = (getCurrentAccount() || {}).streak || 1;
+    showNotification('ĐIỂM DANH:', `+${reward} XU · Streak ${st}${streakMsg}`, '#4ade80', 'coins');
     updateCheckinButtonUI();
     updateShopBalanceUI();
     updateUsernameBadge();
@@ -2981,6 +3073,9 @@ async function loginWithUsername(rawName, rawPin) {
     }
 
     if (remote) {
+        if (remote.banned) {
+            return { ok: false, message: 'Tài khoản đã bị khóa' + (remote.banReason ? (': ' + remote.banReason) : '') };
+        }
         const savedPin = remote.pin != null ? String(remote.pin) : '';
         if (!pinTrusted) {
             if (savedPin) {
@@ -3419,6 +3514,13 @@ window.rentSong = rentSong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
 window.getCurrentUsername = getCurrentUsername;
+// Expose for extras.js
+Object.defineProperty(window, 'songs', { get: () => songs });
+Object.defineProperty(window, 'index', { get: () => index });
+window.audio = typeof audio !== 'undefined' ? audio : document.getElementById('audio-player');
+window.handleNextAction = typeof handleNextAction === 'function' ? handleNextAction : undefined;
+window.prevSong = typeof prevSong === 'function' ? prevSong : undefined;
+
 window.toggleFavorite = toggleFavorite;
 window.toggleLike = toggleLike;
 window.toggleDislike = toggleDislike;
