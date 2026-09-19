@@ -2313,6 +2313,8 @@ async function fetchUserFromFirebase(username) {
                 streak: Number(data.streak) || 0,
                 streakFreeze: Number(data.streakFreeze) || 0,
                 listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
+                ownedThumbs: Array.isArray(data.ownedThumbs) ? data.ownedThumbs.map(String) : [],
+                activeThumb: data.activeThumb || '',
                 inviteBy: data.inviteBy || '',
                 profiles: Array.isArray(data.profiles) ? data.profiles : []
             };
@@ -2375,6 +2377,8 @@ async function pushUserToFirebase(username, account) {
             streak: Number(account.streak) || 0,
             streakFreeze: Number(account.streakFreeze) || 0,
             listenedSongs: account.listenedSongs || {},
+            ownedThumbs: account.ownedThumbs || [],
+            activeThumb: account.activeThumb || '',
             inviteBy: account.inviteBy || ''
         });
         return true;
@@ -2422,6 +2426,7 @@ function saveCoins(n) {
     updateCurrentAccount(acc => { acc.coins = Math.max(0, n | 0); });
     updateShopBalanceUI();
     updateUsernameBadge();
+        if (typeof applyActiveProgressThumb === "function") applyActiveProgressThumb();
 }
 
 function loadOwnedSongs() {
@@ -2502,15 +2507,32 @@ function rentSong(songId) {
     });
     showNotification('THUÊ 24H:', String(songId), '#4ade80', 'clock');
     renderShopList();
+    if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
-    // Nếu đang demo bài này → mở full
-    if (songs[index] && String(songs[index].id) === String(songId)) {
+    // Thuê bài đang demo / đang nghe → full từ mốc 1 phút (giống mua)
+    const isCurrentOrDemo = (songs[index] && String(songs[index].id) === String(songId))
+        || (demoLockedSongId != null && String(demoLockedSongId) === String(songId));
+    if (isCurrentOrDemo) {
+        const songIdx = songs.findIndex(s => String(s.id) === String(songId));
+        if (songIdx !== -1) index = songIdx;
         demoLockedSongId = null;
         const fullUrl = getPlayableAudio(songs[index]);
         if (fullUrl) {
             audio.src = fullUrl;
             audio.load();
-            audio.play().catch(() => {});
+            const seekPlay = () => {
+                try {
+                    const seekTo = Math.min(DEMO_SECONDS, (audio.duration || DEMO_SECONDS) - 0.5);
+                    audio.currentTime = Math.max(0, seekTo);
+                } catch (e) {}
+                audio.play().catch(() => {});
+                if (typeof updateProgressUI === 'function') updateProgressUI();
+            };
+            audio.addEventListener('loadedmetadata', function once() {
+                audio.removeEventListener('loadedmetadata', once);
+                seekPlay();
+            });
+            if (audio.readyState >= 1) seekPlay();
         }
     }
     return true;
@@ -2706,6 +2728,7 @@ function buySong(songId) {
     });
     showNotification('MUA THÀNH CÔNG:', String(songId), '#4ade80', 'shopping-bag');
     renderShopList();
+    if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
     updateUsernameBadge();
     
@@ -2831,8 +2854,7 @@ function renderShopList(highlightSongId) {
         if (owned && loadOwnedSongs().includes(id)) {
             action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
         } else if (rented) {
-            const leftH = Math.max(1, Math.ceil((getRentExpiry(id) - Date.now()) / 3600000));
-            action = `<span class="shop-owned-badge">THUÊ CÒN ~${leftH}H</span>
+            action = `<span class="shop-owned-badge shop-rent-countdown" data-rent-exp="${getRentExpiry(id)}">THUÊ …</span>
                 <button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
         } else {
             action = `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
@@ -2862,6 +2884,24 @@ function renderShopList(highlightSongId) {
         };
     });
 
+    if (window._shopRentTimer) clearInterval(window._shopRentTimer);
+    const tickRent = () => {
+        list.querySelectorAll('.shop-rent-countdown[data-rent-exp]').forEach(el => {
+            const exp = Number(el.getAttribute('data-rent-exp')) || 0;
+            let left = Math.max(0, exp - Date.now());
+            if (left <= 0) {
+                el.textContent = 'HẾT HẠN THUÊ';
+                return;
+            }
+            const h = Math.floor(left / 3600000);
+            const mi = Math.floor((left % 3600000) / 60000);
+            const s = Math.floor((left % 60000) / 1000);
+            el.textContent = 'THUÊ ' + String(h).padStart(2,'0') + ':' + String(mi).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        });
+    };
+    tickRent();
+    window._shopRentTimer = setInterval(tickRent, 1000);
+
     if (focusId) {
         const el = list.querySelector(`.shop-item[data-song-id="${CSS.escape ? CSS.escape(focusId) : focusId}"]`);
         if (el) {
@@ -2878,6 +2918,7 @@ function openShopModal(highlightSongId) {
     updateShopBalanceUI();
     updateCheckinButtonUI();
     renderShopList(highlightSongId);
+    if (typeof renderShopThumbs === "function") renderShopThumbs();
     modal.classList.remove('show');
     void modal.offsetWidth;
     requestAnimationFrame(() => {

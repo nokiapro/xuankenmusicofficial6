@@ -218,15 +218,32 @@
                         <button type="button" id="gift-redeem-btn" class="extras-btn-primary">Nhận</button>
                     </div>
                 </div>
-                <div class="extras-actions-grid">
-                    <button type="button" class="extras-action-btn" data-x="react"><i data-lucide="flame"></i><span>Reaction</span></button>
-                    <button type="button" class="extras-action-btn" data-x="offline"><i data-lucide="download"></i><span>Offline</span></button>
-                    <button type="button" class="extras-action-btn" data-x="freeze"><i data-lucide="snowflake"></i><span>+Freeze</span></button>
-                    <button type="button" class="extras-action-btn" data-x="review"><i data-lucide="calendar"></i><span>Year review</span></button>
-                    <button type="button" class="extras-action-btn" data-x="qr"><i data-lucide="qr-code"></i><span>QR check-in</span></button>
-                    <button type="button" class="extras-action-btn" data-x="gacha"><i data-lucide="frame"></i><span>Gacha frame</span></button>
+                <div class="extras-section">
+                    <label class="extras-label">Top bài nghe nhiều</label>
+                    <div class="extras-actions-grid extras-rank-grid">
+                        <button type="button" class="extras-action-btn" data-x="top-week"><i data-lucide="trophy"></i><span>Top tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="top-month"><i data-lucide="medal"></i><span>Top tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="top-year"><i data-lucide="crown"></i><span>Top năm</span></button>
+                    </div>
                 </div>
-                <div id="gacha-list" class="gacha-list" style="display:none;"></div>
+                <div class="extras-section">
+                    <label class="extras-label">Review của bạn</label>
+                    <div class="extras-actions-grid extras-rank-grid">
+                        <button type="button" class="extras-action-btn" data-x="rev-week"><i data-lucide="calendar-days"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="rev-month"><i data-lucide="calendar"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="rev-year"><i data-lucide="calendar-range"></i><span>Năm</span></button>
+                    </div>
+                </div>
+                <div id="extras-result" class="extras-result"></div>
+                <div class="extras-section extras-chat-section">
+                    <label class="extras-label">Chat toàn web</label>
+                    <div id="global-chat-box" class="global-chat-box"></div>
+                    <div class="extras-row">
+                        <input id="global-chat-input" placeholder="Nhắn tin… @username" maxlength="300" />
+                        <button type="button" id="global-chat-send" class="extras-btn-primary">Gửi</button>
+                    </div>
+                    <p class="extras-chat-hint">Admin: <code>/mute user 1h</code> · <code>/mute user forever</code> · <code>/unmute user</code></p>
+                </div>
             </div>
         </div>
 
@@ -261,7 +278,16 @@
                 </button>
             </div>
             <div class="shop-hint" id="shop-hint">Chưa sở hữu bài → chỉ nghe demo 60 giây (1 phút). Điểm danh mỗi ngày nhận xu XK để mua nhạc.</div>
-            <div class="shop-list" id="shop-list"></div>
+            <div class="shop-sections">
+                <div class="shop-section">
+                    <div class="shop-section-title"><i data-lucide="music"></i> Mua nhạc</div>
+                    <div class="shop-list" id="shop-list"></div>
+                </div>
+                <div class="shop-section">
+                    <div class="shop-section-title"><i data-lucide="image"></i> Progress thumb</div>
+                    <div class="shop-list" id="shop-thumb-list"></div>
+                </div>
+            </div>
         </div>
     </div>
 

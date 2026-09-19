@@ -189,9 +189,7 @@
         const id = window.songs && window.songs[window.index] && window.songs[window.index].id;
         if (id && typeof toggleFavorite === 'function') toggleFavorite(String(id));
       } else if (e.key === '?') {
-        toast('PHÍM TẮT', 'Space play · ←→ bài · F yêu thích · R reaction', '#a78bfa');
-      } else if (e.key === 'r' || e.key === 'R') {
-        sendReaction('🔥');
+        toast('PHÍM TẮT', 'Space play · ←→ bài · F yêu thích', '#a78bfa');
       }
     });
   }
@@ -332,29 +330,33 @@
 
   // ----- 33 Gift code -----
   async function redeemGiftCode(code) {
-    code = String(code || '').trim().toUpperCase();
+    code = String(code || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!code) return toast('GIFT', 'Nhập mã', '#ff9800');
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
     if (!user) return toast('GIFT', 'Cần đăng nhập', '#ff4444');
     try {
       const db = getDb();
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
-      const ref = db.ref((typeof dataPath === 'function' ? dataPath('giftCodes') : 'giftCodes') + '/' + code);
-      const snap = await ref.once('value');
+      let ref = db.ref('giftCodes/' + code);
+      let snap = await ref.once('value');
+      if (!snap.exists() && typeof dataPath === 'function') {
+        ref = db.ref(dataPath('giftCodes') + '/' + code);
+        snap = await ref.once('value');
+      }
       const data = snap.val();
       if (!data) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
-      if (data.usedBy) return toast('GIFT', 'Mã đã được dùng', '#ff9800');
+      if (data.usedBy && String(data.usedBy).trim()) return toast('GIFT', 'Mã đã được dùng', '#ff9800');
       const coins = Number(data.coins) || 0;
       await ref.update({ usedBy: user, usedAt: Date.now() });
       updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
       toast('GIFT', '+' + coins + ' xu XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
-    } catch (e) {
-      toast('GIFT', 'Lỗi: ' + (e.message || e), '#ff4444');
+    } catch (err) {
+      toast('GIFT', 'Lỗi: ' + (err.message || err), '#ff4444');
     }
   }
 
-  // ----- 96 Invite -----
+
   async function applyInvite(code) {
     code = String(code || '').trim();
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
@@ -588,6 +590,7 @@
         try { lucide.createIcons({ nodes: Array.from(panel.querySelectorAll('[data-lucide]')) }); } catch (err) {}
       }
       updateXpUi();
+      startGlobalChat();
     }
     function closeExtras() {
       panel.classList.remove('show');
@@ -612,7 +615,6 @@
       closeBtn._xkBound = true;
       closeBtn.addEventListener('click', (ev) => {
         ev.preventDefault();
-        ev.stopPropagation();
         closeExtras();
       });
     }
@@ -623,29 +625,177 @@
       giftBtn.onclick = () => redeemGiftCode(($('gift-code-input') || {}).value);
     }
 
+    function showResult(html) {
+      const box = $('extras-result');
+      if (!box) return;
+      box.innerHTML = html;
+      box.classList.add('show');
+    }
+
+    function topSongsByPeriod(period) {
+      const songs = window.songs || [];
+      const sorted = [...songs].sort((a, b) => (Number(b.listenCount) || 0) - (Number(a.listenCount) || 0));
+      const top = sorted.slice(0, 10);
+      const title = period === 'week' ? 'Top tuần' : period === 'month' ? 'Top tháng' : 'Top năm';
+      // listenCount là tổng — chưa có breakdown theo tuần/tháng (hiển thị top tổng, gắn nhãn)
+      let html = '<b>' + title + '</b> <span style="opacity:.7">(theo lượt nghe hiện tại)</span><br/>';
+      if (!top.length) html += 'Chưa có dữ liệu';
+      else top.forEach((s, i) => {
+        html += (i + 1) + '. ' + escapeHtml(s.name || s.id) + ' — <b>' + (s.listenCount || 0) + '</b><br/>';
+      });
+      showResult(html);
+    }
+
+    function userReview(period) {
+      const acc = getAcc();
+      if (!acc) return toast('REVIEW', 'Cần đăng nhập', '#ff9800');
+      const listened = acc.listenedSongs ? Object.keys(acc.listenedSongs).length : 0;
+      const owned = (acc.owned || []).length;
+      const label = period === 'week' ? 'Tuần này' : period === 'month' ? 'Tháng này' : 'Năm nay';
+      // Approximate from available fields
+      let html = '<b>Review ' + label + '</b><br/>';
+      html += '• Bài đã nghe (unique): <b>' + listened + '</b><br/>';
+      html += '• Đã mua: <b>' + owned + '</b><br/>';
+      html += '• Level: <b>' + (acc.level || 1) + '</b> · XP: <b>' + (acc.xp || 0) + '</b><br/>';
+      html += '• Season XP: <b>' + (acc.seasonXp || 0) + '</b><br/>';
+      html += '• Streak điểm danh: <b>' + (acc.streak || 0) + '</b><br/>';
+      if (period === 'year') {
+        html += '• Rank: <b>' + (acc.rank || 'member') + '</b>';
+      }
+      showResult(html);
+    }
+
     panel.querySelectorAll('[data-x]').forEach(btn => {
       if (btn._xkBound) return;
       btn._xkBound = true;
       btn.onclick = () => {
         const x = btn.getAttribute('data-x');
-        if (x === 'react') sendReaction('🔥');
-        if (x === 'offline') cacheCurrentForOffline();
-        if (x === 'freeze') buyStreakFreeze();
-        if (x === 'review') openYearReview();
-        if (x === 'qr') openQrCheckin();
-        if (x === 'gacha') {
-          const box = $('gacha-list');
-          if (!box) return;
-          box.style.display = box.style.display === 'none' ? 'block' : 'none';
-          box.innerHTML = FRAMES.map(f =>
-            `<button type="button" data-frame="${f.id}">${f.name} (${f.cost}xu)</button>`
-          ).join('');
-          box.querySelectorAll('[data-frame]').forEach(b => {
-            b.onclick = () => buyFrame(b.getAttribute('data-frame'));
-          });
-        }
+        if (x === 'top-week') topSongsByPeriod('week');
+        if (x === 'top-month') topSongsByPeriod('month');
+        if (x === 'top-year') topSongsByPeriod('year');
+        if (x === 'rev-week') userReview('week');
+        if (x === 'rev-month') userReview('month');
+        if (x === 'rev-year') userReview('year');
       };
     });
+
+    const sendBtn = $('global-chat-send');
+    const input = $('global-chat-input');
+    if (sendBtn && !sendBtn._xkBound) {
+      sendBtn._xkBound = true;
+      sendBtn.onclick = () => sendGlobalChat();
+    }
+    if (input && !input._xkBound) {
+      input._xkBound = true;
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); sendGlobalChat(); }
+      });
+    }
+  }
+
+  let _chatStarted = false;
+  function startGlobalChat() {
+    if (_chatStarted) return;
+    const box = $('global-chat-box');
+    if (!box) return;
+    try {
+      const db = getDb();
+      if (!db) { box.textContent = 'Không kết nối chat'; return; }
+      _chatStarted = true;
+      const path = (typeof dataPath === 'function' ? dataPath('chat') : 'chat');
+      db.ref(path).limitToLast(40).on('value', snap => {
+        const val = snap.val() || {};
+        const items = Object.keys(val).map(k => ({ k, ...val[k] })).sort((a, b) => (a.t || 0) - (b.t || 0));
+        box.innerHTML = items.map(m => {
+          const rank = (m.rank || 'member').toLowerCase();
+          const badge = rank !== 'member' ? '<span class="chat-badge ' + escapeHtml(rank) + '">' + escapeHtml(rank) + '</span>' : '';
+          let text = escapeHtml(m.text || '');
+          text = text.replace(/@([\\w\\u00C0-\\u024F\\u1E00-\\u1EFF.-]+)/gi, '<span class="chat-mention">@$1</span>');
+          return '<div class="chat-msg">' + badge + '<span class="chat-user">' + escapeHtml(m.u || '?') + '</span> ' + text + '</div>';
+        }).join('') || '<div style="opacity:.6">Chưa có tin nhắn</div>';
+        box.scrollTop = box.scrollHeight;
+      });
+    } catch (err) {
+      box.textContent = 'Lỗi chat';
+    }
+  }
+
+  async function isChatMuted(username) {
+    try {
+      const db = getDb();
+      if (!db) return false;
+      const snap = await db.ref('settings/chatMutes/' + (typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(username) : username)).once('value');
+      const v = snap.val();
+      if (!v) return false;
+      if (v === 'forever' || v.forever) return true;
+      const until = Number(v.until || v) || 0;
+      return until > Date.now();
+    } catch (e) { return false; }
+  }
+
+  async function sendGlobalChat() {
+    const input = $('global-chat-input');
+    let text = (input && input.value || '').trim();
+    if (!text) return;
+    const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
+    if (!user) return toast('CHAT', 'Cần đăng nhập', '#ff4444');
+    const acc = getAcc() || {};
+    const rank = (acc.rank || 'member').toLowerCase();
+    const isAdmin = rank === 'admin' || rank === 'owner' || rank === 'mod';
+
+    // Admin mute commands
+    if (isAdmin && text.startsWith('/')) {
+      const parts = text.split(/\\s+/);
+      const cmd = (parts[0] || '').toLowerCase();
+      const target = parts[1] || '';
+      if ((cmd === '/mute' || cmd === '/unmute') && target) {
+        try {
+          const db = getDb();
+          const key = typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(target) : target;
+          if (cmd === '/unmute') {
+            await db.ref('settings/chatMutes/' + key).remove();
+            toast('CHAT', 'Đã gỡ cấm ' + target, '#4ade80');
+          } else {
+            const dur = (parts[2] || '1h').toLowerCase();
+            let payload;
+            if (dur === 'forever' || dur === 'vĩnh' || dur === 'vinhvien') {
+              payload = { forever: true, by: user, at: Date.now() };
+            } else {
+              const hours = parseFloat(dur) || (dur.endsWith('h') ? parseFloat(dur) : 1);
+              const h = Number.isFinite(hours) && hours > 0 ? hours : 1;
+              payload = { until: Date.now() + h * 3600000, by: user, at: Date.now() };
+            }
+            await db.ref('settings/chatMutes/' + key).set(payload);
+            toast('CHAT', 'Đã cấm chat ' + target, '#ff9800');
+          }
+          if (input) input.value = '';
+          return;
+        } catch (err) {
+          toast('CHAT', 'Lỗi mute: ' + (err.message || err), '#ff4444');
+          return;
+        }
+      }
+    }
+
+    if (await isChatMuted(user)) {
+      toast('CHAT', 'Bạn đang bị cấm chat', '#ff4444');
+      return;
+    }
+
+    try {
+      const db = getDb();
+      if (!db) return;
+      const path = (typeof dataPath === 'function' ? dataPath('chat') : 'chat');
+      await db.ref(path).push({
+        u: user,
+        rank: rank,
+        text: text.slice(0, 300),
+        t: Date.now()
+      });
+      if (input) input.value = '';
+    } catch (err) {
+      toast('CHAT', 'Không gửi được: ' + (err.message || err), '#ff4444');
+    }
   }
 
 

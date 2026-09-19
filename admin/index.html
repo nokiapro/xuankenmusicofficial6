@@ -179,7 +179,7 @@
             letter-spacing: 0.5px;
         }
         @media (min-width: 768px) {
-            .stat { text-align: left; padding: 14px; }
+            .stat { text-align: center; padding: 14px; }
             .stat .n { font-size: 1.45rem; }
         }
 
@@ -630,6 +630,16 @@
         @media (max-width: 719px) {
             .coin-input, .rank-select { max-width: 140px; }
         }
+    
+        /* admin scrollbar — giống player */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #ff0040, #8c00ff);
+            border-radius: 999px;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: #8c00ff; }
+        * { scrollbar-width: thin; scrollbar-color: #8c00ff transparent; }
     </style>
 
     <script>
@@ -829,6 +839,9 @@
                     Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase mới đăng nhập được.
                     Admin đặt / xoá PIN từng user ở tab Người dùng.
                 </p>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-security-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
+                </div>
             </div>
 
             <div class="card">
@@ -851,9 +864,12 @@
                         <input type="number" id="set-invite-reward" min="0" value="20">
                     </div>
                     <div class="full">
-                        <label>Broadcast toast (gửi ngay khi bấm Lưu cài đặt hệ thống nếu có nội dung)</label>
+                        <label>Broadcast toast (gửi ngay khi Lưu nếu có nội dung)</label>
                         <input type="text" id="set-broadcast" placeholder="Tin nhắn bắn tới mọi client đang mở...">
                     </div>
+                </div>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-flash-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
                 </div>
             </div>
 
@@ -873,6 +889,34 @@
                     </div>
                 </div>
                 <div id="gift-list" class="muted" style="margin-top:8px;font-size:0.75rem;"></div>
+            </div>
+
+
+            <div class="card">
+                <h2>Progress thumb (cửa hàng)</h2>
+                <p class="muted" style="margin-bottom:10px;font-size:0.75rem;">Ảnh thumb thanh progress — user mua trong cửa hàng.</p>
+                <div class="form-grid">
+                    <div>
+                        <label>ID (vd: cinnamoroll)</label>
+                        <input type="text" id="thumb-new-id" placeholder="cinnamoroll" maxlength="32">
+                    </div>
+                    <div>
+                        <label>Tên hiển thị</label>
+                        <input type="text" id="thumb-new-name" placeholder="Cinnamoroll">
+                    </div>
+                    <div class="full">
+                        <label>URL ảnh (PNG/GIF trong suốt tốt)</label>
+                        <input type="url" id="thumb-new-url" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label>Giá (xu)</label>
+                        <input type="number" id="thumb-new-price" min="0" value="30">
+                    </div>
+                    <div class="full">
+                        <button type="button" class="btn btn-ok" id="thumb-add-btn"><i class="fa-solid fa-plus"></i> Thêm thumb</button>
+                    </div>
+                </div>
+                <div id="thumb-admin-list" class="muted" style="margin-top:10px;font-size:0.75rem;"></div>
             </div>
 
             <div class="card">
@@ -905,12 +949,8 @@
                     </div>
                 </div>
                 <div class="row-actions form-actions">
-                    <button class="btn btn-warn" id="migrate-prefix-btn" title="Copy songs + users từ root sang prefix đang nhập"><i class="fa-solid fa-right-left"></i> Migrate root → prefix</button>
+                    <button type="button" class="btn btn-primary" id="save-brand-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
                 </div>
-                <p class="muted" style="margin-top:10px;font-size:0.72rem;">
-                    <b>Migrate:</b> copy <code>songs</code> + <code>users</code> từ root sang prefix (không xóa root).
-                </p>
-                <p class="muted" style="margin-top:12px;">Đăng nhập bằng Firebase Auth · project <b>music6-dfd59</b></p>
             </div>
 
             <div class="card">
@@ -1468,7 +1508,8 @@
             }
         };
 
-        document.getElementById('migrate-prefix-btn').onclick = async () => {
+        const migrateBtnEl = document.getElementById('migrate-prefix-btn');
+        if (migrateBtnEl) migrateBtnEl.onclick = async () => {
             const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
             if (!prefix) {
                 toast('Nhập prefix trước (vd: music6)');
@@ -1716,25 +1757,54 @@
             const el = document.getElementById('gift-list');
             if (!el) return;
             try {
-                const snap = await db().ref(dataPath('giftCodes')).once('value');
-                const obj = snap.val() || {};
+                let obj = {};
+                try {
+                    const snap = await db().ref('giftCodes').once('value');
+                    obj = snap.val() || {};
+                } catch (e1) {}
+                if (!Object.keys(obj).length) {
+                    try {
+                        const snap2 = await db().ref(dataPath('giftCodes')).once('value');
+                        obj = snap2.val() || {};
+                    } catch (e2) {}
+                }
                 const keys = Object.keys(obj);
                 if (!keys.length) { el.textContent = 'Chưa có gift code'; return; }
                 el.innerHTML = keys.map(k => {
-                    const g = obj[k];
-                    return '<div><code>' + escapeHtml(k) + '</code> · ' + (g.coins|0) + ' xu · ' + (g.usedBy ? ('dùng bởi ' + escapeHtml(g.usedBy)) : 'còn trống') + '</div>';
+                    const g = obj[k] || {};
+                    const used = g.usedBy ? ('dùng bởi ' + escapeHtml(String(g.usedBy))) : 'còn trống';
+                    return '<div style="margin:4px 0;"><code>' + escapeHtml(k) + '</code> · ' + (g.coins|0) + ' xu · ' + used +
+                        ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-gift="' + escapeHtml(k) + '">Xóa</button></div>';
                 }).join('');
-            } catch (e) { el.textContent = 'Không tải được gift codes'; }
+                el.querySelectorAll('[data-del-gift]').forEach(btn => {
+                    btn.onclick = async () => {
+                        const c = btn.getAttribute('data-del-gift');
+                        await db().ref('giftCodes/' + c).remove();
+                        try { await db().ref(dataPath('giftCodes') + '/' + c).remove(); } catch (e) {}
+                        toast('Đã xóa ' + c);
+                        loadGiftCodes();
+                    };
+                });
+            } catch (e) { el.textContent = 'Không tải được gift codes: ' + (e.message || e); }
         }
         const giftBtn = document.getElementById('gift-create-btn');
         if (giftBtn) giftBtn.onclick = async () => {
-            const code = (document.getElementById('gift-new-code').value || '').trim().toUpperCase();
-            const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins').value, 10) || 0);
-            if (!code || /[.#$\[\]\/]/.test(code)) { toast('Mã không hợp lệ'); return; }
-            await db().ref(dataPath('giftCodes') + '/' + code).set({ coins, createdAt: Date.now(), usedBy: null });
-            toast('Đã tạo ' + code);
-            document.getElementById('gift-new-code').value = '';
-            loadGiftCodes();
+            try {
+                const code = (document.getElementById('gift-new-code').value || '').trim().toUpperCase().replace(/\s+/g, '');
+                const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins').value, 10) || 0);
+                if (!code || code.length < 2) { toast('Nhập mã gift (tối thiểu 2 ký tự)'); return; }
+                if (/[.#$\[\]\/]/.test(code)) { toast('Mã không được chứa . # $ [ ] /'); return; }
+                const payload = { coins: coins, createdAt: Date.now(), usedBy: '' };
+                // Ghi root giftCodes (dễ rules) + dưới prefix nếu có
+                await db().ref('giftCodes/' + code).set(payload);
+                try { await db().ref(dataPath('giftCodes') + '/' + code).set(payload); } catch (e2) {}
+                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu)');
+                document.getElementById('gift-new-code').value = '';
+                loadGiftCodes();
+            } catch (err) {
+                console.error(err);
+                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — kiểm tra Firebase Rules path giftCodes');
+            }
         };
         const bulkPin = document.getElementById('bulk-reset-pin-btn');
         if (bulkPin) bulkPin.onclick = async () => {
@@ -1749,24 +1819,36 @@
             toast('Đã xóa PIN ' + n + ' user');
             await loadUsers();
         };
+        function probeAudioUrl(url, timeoutMs) {
+            return new Promise((resolve) => {
+                const a = new Audio();
+                let done = false;
+                const finish = (ok, detail) => {
+                    if (done) return;
+                    done = true;
+                    try { a.removeAttribute('src'); a.load(); } catch (e) {}
+                    resolve({ ok, detail });
+                };
+                const to = setTimeout(() => finish(false, 'timeout'), timeoutMs || 10000);
+                a.preload = 'metadata';
+                a.onloadedmetadata = () => { clearTimeout(to); finish(true, Math.round(a.duration || 0) + 's'); };
+                a.onerror = () => { clearTimeout(to); finish(false, 'error'); };
+                a.src = url;
+            });
+        }
         const deadBtn = document.getElementById('check-dead-links-btn');
         if (deadBtn) deadBtn.onclick = async () => {
             const report = document.getElementById('dead-link-report');
             report.style.display = 'block';
-            report.textContent = 'Đang kiểm tra...';
+            report.textContent = 'Đang kiểm tra (phát metadata audio)...';
             const lines = [];
             for (const s of songsCache) {
                 for (const [label, url] of [['demo', s.audio], ['full', s.audioFull], ['full2', s.audioFull2]]) {
                     if (!url) continue;
-                    try {
-                        const ctrl = new AbortController();
-                        const to = setTimeout(() => ctrl.abort(), 8000);
-                        const res = await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: ctrl.signal });
-                        clearTimeout(to);
-                        lines.push(s.id + ' ' + label + ': checked (no-cors — xem thủ công nếu nghi ngờ)');
-                    } catch (e) {
-                        lines.push(s.id + ' ' + label + ': LỖI / timeout — ' + url);
-                    }
+                    const r = await probeAudioUrl(url, 12000);
+                    if (r.ok) lines.push(s.id + ' ' + label + ': OK (' + r.detail + ')');
+                    else lines.push(s.id + ' ' + label + ': LỖI (' + r.detail + ') — ' + url);
+                    report.textContent = lines.join('\n');
                 }
             }
             report.textContent = lines.join('\n') || 'Không có link';
@@ -1778,6 +1860,102 @@
                 if (tab.dataset.tab === 'settings') loadGiftCodes();
             });
         });
+
+
+        async function saveSettingsPartial(fields) {
+            try {
+                await db().ref('settings').update(fields);
+                Object.assign(settingsCache, fields);
+                toast('Đã lưu cài đặt');
+                applySiteBranding();
+            } catch (e) {
+                toast('Lỗi lưu: ' + (e.message || e));
+            }
+        }
+        const saveSec = document.getElementById('save-security-btn');
+        if (saveSec) saveSec.onclick = () => saveSettingsPartial({
+            requirePin: !!document.getElementById('set-require-pin').checked,
+            allowRegister: !!document.getElementById('set-allow-register').checked
+        });
+        const saveFlash = document.getElementById('save-flash-btn');
+        if (saveFlash) saveFlash.onclick = async () => {
+            const fu = document.getElementById('set-flash-until') && document.getElementById('set-flash-until').value;
+            const bc = (document.getElementById('set-broadcast') && document.getElementById('set-broadcast').value || '').trim();
+            const fields = {
+                siteBanner: (document.getElementById('set-site-banner').value || '').trim(),
+                flashSalePercent: Math.max(0, Math.min(90, parseInt(document.getElementById('set-flash-pct').value, 10) || 0)),
+                flashSaleUntil: fu ? new Date(fu).toISOString() : '',
+                inviteReward: Math.max(0, parseInt(document.getElementById('set-invite-reward').value, 10) || 0)
+            };
+            if (bc) {
+                await db().ref('settings/broadcast').set({ msg: bc, at: Date.now() });
+                document.getElementById('set-broadcast').value = '';
+            }
+            await saveSettingsPartial(fields);
+        };
+        const saveBrand = document.getElementById('save-brand-btn');
+        if (saveBrand) saveBrand.onclick = () => {
+            const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
+            saveSettingsPartial({
+                siteName: (document.getElementById('set-site-name').value || '').trim(),
+                siteIcon: (document.getElementById('set-site-icon').value || '').trim(),
+                sitePrefix: prefix
+            });
+        };
+
+        // Progress thumbs
+        async function loadThumbAdmin() {
+            const el = document.getElementById('thumb-admin-list');
+            if (!el) return;
+            try {
+                const snap = await db().ref('settings/progressThumbs').once('value');
+                const arr = snap.val();
+                const list = Array.isArray(arr) ? arr : (arr && typeof arr === 'object' ? Object.values(arr) : []);
+                if (!list.length) { el.textContent = 'Chưa có thumb'; return; }
+                el.innerHTML = list.map((th, i) =>
+                    '<div style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+                    (th.url ? '<img src="' + escapeHtml(th.url) + '" style="width:28px;height:28px;object-fit:contain;">' : '') +
+                    '<code>' + escapeHtml(th.id || '') + '</code> ' + escapeHtml(th.name || '') + ' · ' + (th.price|0) + ' xu' +
+                    ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-thumb="' + i + '">Xóa</button></div>'
+                ).join('');
+                el.querySelectorAll('[data-del-thumb]').forEach(btn => {
+                    btn.onclick = async () => {
+                        const idx = parseInt(btn.getAttribute('data-del-thumb'), 10);
+                        const snap = await db().ref('settings/progressThumbs').once('value');
+                        let list = snap.val() || [];
+                        if (!Array.isArray(list)) list = Object.values(list);
+                        list.splice(idx, 1);
+                        await db().ref('settings/progressThumbs').set(list);
+                        toast('Đã xóa thumb');
+                        loadThumbAdmin();
+                    };
+                });
+            } catch (e) { el.textContent = 'Lỗi tải thumbs'; }
+        }
+        const thumbAdd = document.getElementById('thumb-add-btn');
+        if (thumbAdd) thumbAdd.onclick = async () => {
+            const id = (document.getElementById('thumb-new-id').value || '').trim().replace(/[.#$\[\]\/]/g, '_');
+            const name = (document.getElementById('thumb-new-name').value || '').trim() || id;
+            const url = (document.getElementById('thumb-new-url').value || '').trim();
+            const price = Math.max(0, parseInt(document.getElementById('thumb-new-price').value, 10) || 0);
+            if (!id || !url) { toast('Cần ID và URL'); return; }
+            const snap = await db().ref('settings/progressThumbs').once('value');
+            let list = snap.val() || [];
+            if (!Array.isArray(list)) list = Object.values(list);
+            list = list.filter(x => x && x.id !== id);
+            list.push({ id, name, url, price });
+            await db().ref('settings/progressThumbs').set(list);
+            toast('Đã thêm thumb ' + id);
+            document.getElementById('thumb-new-id').value = '';
+            document.getElementById('thumb-new-url').value = '';
+            loadThumbAdmin();
+        };
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.dataset.tab === 'settings') { loadGiftCodes(); loadThumbAdmin(); }
+            });
+        });
+
 
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
