@@ -2958,6 +2958,117 @@ function renderShopList(highlightSongId) {
     }
 }
 
+
+async function fetchProgressThumbs() {
+    try {
+        const db = getDb();
+        if (!db) return [];
+        const snap = await db.ref('settings/progressThumbs').once('value');
+        const v = snap.val();
+        if (Array.isArray(v)) return v.filter(x => x && (x.id || x.url));
+        if (v && typeof v === 'object') return Object.values(v).filter(x => x && (x.id || x.url));
+    } catch (e) {
+        console.warn('fetchProgressThumbs', e);
+    }
+    return [];
+}
+
+function applyActiveProgressThumb() {
+    const thumb = document.getElementById('progress-thumb');
+    if (!thumb) return;
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    const id = acc && acc.activeThumb;
+    if (!id) {
+        thumb.classList.remove('has-custom-img');
+        thumb.style.backgroundImage = '';
+        return;
+    }
+    fetchProgressThumbs().then(list => {
+        const th = list.find(x => String(x.id) === String(id));
+        if (th && th.url) {
+            thumb.classList.add('has-custom-img');
+            thumb.style.backgroundImage = 'url("' + String(th.url).replace(/"/g, '%22') + '")';
+        } else {
+            thumb.classList.remove('has-custom-img');
+            thumb.style.backgroundImage = '';
+        }
+    }).catch(() => {});
+}
+
+async function renderShopThumbs() {
+    const list = document.getElementById('shop-thumb-list');
+    if (!list) return;
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:0.75rem;">Đang tải...</div>';
+    const thumbs = await fetchProgressThumbs();
+    if (!thumbs.length) {
+        list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:0.78rem;">Chưa có progress thumb<br/><span style="opacity:0.7">Admin thêm ở Cài đặt → Progress thumb</span></div>';
+        return;
+    }
+    const acc = (typeof getCurrentAccount === 'function' && getCurrentAccount()) || {};
+    const owned = Array.isArray(acc.ownedThumbs) ? acc.ownedThumbs.map(String) : [];
+    const active = acc.activeThumb ? String(acc.activeThumb) : '';
+    list.innerHTML = thumbs.map(th => {
+        const id = String(th.id || '');
+        const has = owned.includes(id);
+        const isActive = active === id;
+        let btn = '';
+        if (isActive) btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>';
+        else if (has) btn = '<button type="button" class="shop-buy-btn" data-use-thumb="' + id.replace(/"/g, '') + '">DÙNG</button>';
+        else btn = '<button type="button" class="shop-buy-btn" data-buy-thumb="' + id.replace(/"/g, '') + '">MUA ' + (Number(th.price) || 0) + ' XK</button>';
+        const name = (typeof escapeHtml === 'function' ? escapeHtml(th.name || id) : (th.name || id));
+        const url = th.url ? String(th.url).replace(/"/g, '&quot;') : '';
+        return '<div class="shop-thumb-item" data-thumb-id="' + id.replace(/"/g, '') + '">' +
+            (url ? '<img src="' + url + '" alt="" loading="lazy">' : '<div style="width:40px;height:40px;border-radius:8px;background:var(--progress-bg);"></div>') +
+            '<div class="info"><div class="name">' + name + '</div>' +
+            '<div class="price">' + (has ? 'Đã sở hữu' : ((Number(th.price) || 0) + ' xu')) + '</div></div>' +
+            btn + '</div>';
+    }).join('');
+    list.querySelectorAll('[data-buy-thumb]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            buyProgressThumb(btn.getAttribute('data-buy-thumb'), thumbs);
+        };
+    });
+    list.querySelectorAll('[data-use-thumb]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const tid = btn.getAttribute('data-use-thumb');
+            updateCurrentAccount(acc => { acc.activeThumb = tid; });
+            applyActiveProgressThumb();
+            renderShopThumbs();
+            if (typeof showNotification === 'function') showNotification('THUMB:', 'Đã áp dụng', '#4ade80', 'check');
+        };
+    });
+}
+
+function buyProgressThumb(thumbId, thumbsList) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP', '#ff4444', 'user');
+        return;
+    }
+    const th = (thumbsList || []).find(x => String(x.id) === String(thumbId));
+    if (!th) {
+        showNotification('LỖI:', 'Không tìm thấy thumb', '#ff4444', 'alert-circle');
+        return;
+    }
+    const price = Number(th.price) || 0;
+    if (loadCoins() < price) {
+        showNotification('THIẾU XU:', 'Cần ' + price + ' XK', '#ff9800', 'coins');
+        return;
+    }
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) - price;
+        if (!Array.isArray(acc.ownedThumbs)) acc.ownedThumbs = [];
+        if (!acc.ownedThumbs.includes(String(thumbId))) acc.ownedThumbs.push(String(thumbId));
+        acc.activeThumb = String(thumbId);
+    });
+    applyActiveProgressThumb();
+    renderShopThumbs();
+    updateShopBalanceUI();
+    showNotification('MUA THUMB:', th.name || thumbId, '#4ade80', 'shopping-bag');
+}
+
+
 function openShopModal(highlightSongId) {
     const modal = document.getElementById('shop-modal');
     if (!modal) return;
@@ -3621,6 +3732,8 @@ window.buySong = buySong;
 window.rentSong = rentSong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
+window.renderShopThumbs = renderShopThumbs;
+window.fetchProgressThumbs = fetchProgressThumbs;
 window.getCurrentUsername = getCurrentUsername;
 // Expose for extras.js
 Object.defineProperty(window, 'songs', { get: () => songs });

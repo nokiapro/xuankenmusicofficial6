@@ -2726,8 +2726,10 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-tab-bar {
   display: flex;
   gap: 8px;
-  padding: 0 12px 10px;
+  margin: 12px 12px 8px;
+  padding: 12px 0 4px;
   flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
 }
 .shop-tab {
   flex: 1;
