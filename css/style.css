@@ -2905,3 +2905,34 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-item .shop-buy-btn.shop-rent-btn {
   margin-left: 6px;
 }
+
+.chat-msg-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.4;
+}
+.chat-msg .chat-user { font-weight: 800; color: #c4b5fd; }
+.chat-time-toggle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--progress-bg);
+  color: var(--text-secondary);
+  font-size: 0.55rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.chat-time-toggle.open { color: #c4b5fd; border-color: rgba(140,0,255,0.5); }
+.chat-msg-time {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.85;
+  padding: 2px 0 4px 4px;
+  width: 100%;
+}
