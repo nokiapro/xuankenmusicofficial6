@@ -349,18 +349,36 @@
         if (snap.exists()) { ref = r; data = snap.val(); break; }
       }
       if (!data || !ref) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
-      if (data.usedBy && String(data.usedBy).trim()) return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
       const coins = Number(data.coins) || 0;
-      // Transaction: chỉ 1 người nhận được
+      const maxUses = data.maxUses == null ? 1 : Number(data.maxUses); // -1 = vĩnh viễn
+      const usedCount = Number(data.usedCount) || 0;
+      const usedByMap = (data.usedByMap && typeof data.usedByMap === 'object') ? data.usedByMap : {};
+      // 1 user chỉ nhận 1 lần / mã
+      if (usedByMap[user]) return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
+      // maxUses = 1 kiểu cũ: usedBy string
+      if (maxUses === 1 && data.usedBy && String(data.usedBy).trim() && !data.usedByMap) {
+        return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
+      }
+      if (maxUses >= 0 && usedCount >= maxUses) {
+        return toast('GIFT', 'Mã đã hết lượt dùng', '#ff9800');
+      }
       const result = await ref.transaction(current => {
         if (!current) return current;
-        if (current.usedBy && String(current.usedBy).trim()) return; // abort
-        current.usedBy = user;
+        const max = current.maxUses == null ? 1 : Number(current.maxUses);
+        const cnt = Number(current.usedCount) || 0;
+        const map = (current.usedByMap && typeof current.usedByMap === 'object') ? current.usedByMap : {};
+        if (map[user]) return; // abort — đã nhận
+        if (max === 1 && current.usedBy && String(current.usedBy).trim() && !current.usedByMap) return;
+        if (max >= 0 && cnt >= max) return;
+        if (!current.usedByMap) current.usedByMap = {};
+        current.usedByMap[user] = Date.now();
+        current.usedCount = cnt + 1;
+        current.usedBy = user; // user cuối
         current.usedAt = Date.now();
         return current;
       });
       if (!result.committed) {
-        return toast('GIFT', 'Mã đã được dùng hoặc không ghi được (Rules)', '#ff9800');
+        return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
       }
       updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
       toast('GIFT', '+' + coins + ' xu XK', '#4ade80');
@@ -783,11 +801,40 @@
         const items = Object.keys(val).map(k => ({ k, ...val[k] })).sort((a, b) => (a.t || 0) - (b.t || 0));
         box.innerHTML = items.map(m => {
           const rank = (m.rank || 'member').toLowerCase();
-          const badge = rank !== 'member' ? '<span class="chat-badge ' + escapeHtml(rank) + '">' + escapeHtml(rank) + '</span>' : '';
+          const badge = '<span class="chat-badge ' + escapeHtml(rank) + '">' + escapeHtml(rank) + '</span>';
           let text = escapeHtml(m.text || '');
-          text = text.replace(/@([\\w\\u00C0-\\u024F\\u1E00-\\u1EFF.-]+)/gi, '<span class="chat-mention">@$1</span>');
-          return '<div class="chat-msg">' + badge + '<span class="chat-user">' + escapeHtml(m.u || '?') + '</span> ' + text + '</div>';
+          text = text.replace(/@([\w\u00C0-\u024F\u1E00-\u1EFF.-]+)/gi, '<span class="chat-mention">@$1</span>');
+          const ts = Number(m.t) || 0;
+          let timeStr = '';
+          if (ts) {
+            const d = new Date(ts);
+            const pad = n => String(n).padStart(2, '0');
+            timeStr = pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear()
+              + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+          }
+          return '<div class="chat-msg">'
+            + '<div class="chat-msg-main">'
+            + badge
+            + '<span class="chat-user">' + escapeHtml(m.u || '?') + ':</span> '
+            + '<span class="chat-text">' + text + '</span>'
+            + (timeStr ? '<button type="button" class="chat-time-toggle" title="Thời gian">▼</button>' : '')
+            + '</div>'
+            + (timeStr ? '<div class="chat-msg-time" hidden>' + escapeHtml(timeStr) + '</div>' : '')
+            + '</div>';
         }).join('') || '<div style="opacity:.6">Chưa có tin nhắn</div>';
+        box.querySelectorAll('.chat-time-toggle').forEach(btn => {
+          btn.onclick = (ev) => {
+            ev.preventDefault();
+            const wrap = btn.closest('.chat-msg');
+            const timeEl = wrap && wrap.querySelector('.chat-msg-time');
+            if (!timeEl) return;
+            const open = timeEl.hasAttribute('hidden');
+            if (open) timeEl.removeAttribute('hidden');
+            else timeEl.setAttribute('hidden', '');
+            btn.classList.toggle('open', open);
+            btn.textContent = open ? '▲' : '▼';
+          };
+        });
         box.scrollTop = box.scrollHeight;
       });
     } catch (err) {

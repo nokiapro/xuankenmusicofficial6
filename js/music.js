@@ -940,13 +940,33 @@ async function incrementListenCount(songId, songName, source = 'normal') {
 
         const db = getDb();
         if (db) {
-            const ref = db.ref(dataPath('songs') + '/' + sid + '/listenCount');
-            const result = await ref.transaction(current => (Number(current) || 0) + 1);
-            const serverCount = result.snapshot.val() || listenData[sid];
-            listenData[sid] = serverCount;
-            if (songIndex !== -1) songs[songIndex].listenCount = serverCount;
-            localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
-            updateListenStatsModal();
+            // Thử path prefix rồi root — rules cần cho phép ghi listenCount (không cần auth)
+            let serverCount = listenData[sid];
+            let wrote = false;
+            const paths = [dataPath('songs') + '/' + sid + '/listenCount'];
+            if (dataPath('songs') !== 'songs') paths.push('songs/' + sid + '/listenCount');
+            for (const p of paths) {
+                try {
+                    const ref = db.ref(p);
+                    const result = await ref.transaction(current => (Number(current) || 0) + 1);
+                    if (result && result.committed) {
+                        serverCount = result.snapshot.val() || serverCount;
+                        wrote = true;
+                        break;
+                    }
+                } catch (e) {
+                    console.warn('listenCount write fail', p, e && (e.code || e.message));
+                }
+            }
+            if (wrote) {
+                listenData[sid] = serverCount;
+                if (songIndex !== -1) songs[songIndex].listenCount = serverCount;
+                localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
+                updateListenStatsModal();
+                if (typeof renderPlaylist === 'function') renderPlaylist();
+            } else {
+                console.warn('Không ghi được listenCount lên Firebase — kiểm tra Rules songs/$id/listenCount');
+            }
             // Firebase user.listenedSongs
             const key = sanitizeUsernameKey(user);
             await db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now());
