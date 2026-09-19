@@ -2,8 +2,8 @@
  * XuanKen Music — extras pack
  * 12 ban (in music.js) · 13 banner · 29 badges · 32 flash · 33 gift · 43 bulk PIN (admin)
  * 46 dead link (admin) · 51 hotkeys · 62 story · 64 reactions · 69 XP · 70 season
- * 72 gacha · 73 freeze · 74 hidden ach · 83 multi-profile · 84 night · 85 media session
- * 86 share card · 89 offline · 94 broadcast · 96 invite · 98 countdown · 99 QR · 100 year review
+ * 72 gacha · 73 freeze · 74 hidden ach · 84 night · 85 media session
+ * 89 offline · 94 broadcast · 96 invite · 98 countdown · 99 QR · 100 year review
  */
 (function () {
   'use strict';
@@ -188,10 +188,8 @@
       } else if (e.key === 'f' || e.key === 'F') {
         const id = window.songs && window.songs[window.index] && window.songs[window.index].id;
         if (id && typeof toggleFavorite === 'function') toggleFavorite(String(id));
-      } else if (e.key === 's' || e.key === 'S') {
-        openShareCard();
       } else if (e.key === '?') {
-        toast('PHÍM TẮT', 'Space play · ←→ bài · F yêu thích · S share · R reaction', '#a78bfa');
+        toast('PHÍM TẮT', 'Space play · ←→ bài · F yêu thích · R reaction', '#a78bfa');
       } else if (e.key === 'r' || e.key === 'R') {
         sendReaction('🔥');
       }
@@ -581,64 +579,63 @@
 
   // ----- Extras panel UI -----
   function ensureExtrasUi() {
-    if ($('extras-panel')) return;
+    const panel = $('extras-modal');
+    if (!panel) return;
 
-    const panel = document.createElement('div');
-    panel.id = 'extras-panel';
-    panel.className = 'extras-panel';
-    panel.innerHTML = `
-      <div class="extras-panel-h">Tiện ích <button type="button" id="extras-close">&times;</button></div>
-      <div id="user-xp-badge" class="user-xp-badge"></div>
-      <div class="extras-row">
-        <input id="gift-code-input" placeholder="Mã gift code" maxlength="24" />
-        <button type="button" id="gift-redeem-btn">Nhận</button>
-      </div>
-      <div class="extras-actions">
-        <button type="button" data-x="share">Share card</button>
-        <button type="button" data-x="react">Reaction 🔥</button>
-        <button type="button" data-x="story">Story</button>
-        <button type="button" data-x="offline">Offline</button>
-        <button type="button" data-x="freeze">+Freeze (30xu)</button>
-        <button type="button" data-x="review">Year review</button>
-        <button type="button" data-x="qr">QR check-in</button>
-        <button type="button" data-x="gacha">Gacha frame</button>
-      </div>
-      <div id="gacha-list" class="gacha-list" style="display:none"></div>
-    `;
-    document.body.appendChild(panel);
-
-    function togglePanel(e) {
-      if (e) { e.preventDefault(); e.stopPropagation(); }
-      panel.classList.toggle('show');
+    function openExtras() {
+      panel.classList.add('show');
       if (typeof lucide !== 'undefined') {
-        try { lucide.createIcons({ nodes: [document.getElementById('extras-btn')].filter(Boolean) }); } catch (err) {}
+        try { lucide.createIcons({ nodes: Array.from(panel.querySelectorAll('[data-lucide]')) }); } catch (err) {}
       }
+      updateXpUi();
+    }
+    function closeExtras() {
+      panel.classList.remove('show');
     }
 
     const bindExtrasBtn = () => {
       const btn = $('extras-btn');
       if (!btn || btn._xkBound) return;
       btn._xkBound = true;
-      btn.addEventListener('click', togglePanel);
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (panel.classList.contains('show')) closeExtras();
+        else openExtras();
+      });
     };
     bindExtrasBtn();
-    // Player hiện sau login → bind lại
     setInterval(bindExtrasBtn, 1500);
 
-    panel.querySelector('#extras-close').onclick = () => panel.classList.remove('show');
-    panel.querySelector('#gift-redeem-btn').onclick = () => redeemGiftCode($('gift-code-input').value);
+    const closeBtn = $('close-extras-btn');
+    if (closeBtn && !closeBtn._xkBound) {
+      closeBtn._xkBound = true;
+      closeBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        closeExtras();
+      });
+    }
+
+    const giftBtn = $('gift-redeem-btn');
+    if (giftBtn && !giftBtn._xkBound) {
+      giftBtn._xkBound = true;
+      giftBtn.onclick = () => redeemGiftCode(($('gift-code-input') || {}).value);
+    }
+
     panel.querySelectorAll('[data-x]').forEach(btn => {
+      if (btn._xkBound) return;
+      btn._xkBound = true;
       btn.onclick = () => {
         const x = btn.getAttribute('data-x');
-        if (x === 'share') openShareCard();
         if (x === 'react') sendReaction('🔥');
-        if (x === 'story') openStoryIfAny();
         if (x === 'offline') cacheCurrentForOffline();
         if (x === 'freeze') buyStreakFreeze();
         if (x === 'review') openYearReview();
         if (x === 'qr') openQrCheckin();
         if (x === 'gacha') {
           const box = $('gacha-list');
+          if (!box) return;
           box.style.display = box.style.display === 'none' ? 'block' : 'none';
           box.innerHTML = FRAMES.map(f =>
             `<button type="button" data-frame="${f.id}">${f.name} (${f.cost}xu)</button>`
@@ -651,6 +648,7 @@
     });
   }
 
+
   function boot() {
     ensureExtrasUi();
     applyBanner();
@@ -659,9 +657,6 @@
     initHotkeys();
     listenReactions();
     autoNightMode();
-    renderProfileSwitcher();
-    const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
-    if (name) saveProfileToDevice(name);
     updateXpUi();
     applyFrame();
     checkAchievements();
@@ -679,8 +674,6 @@
     const _orig = window.loginWithUsername;
     // save profile when username set
     setInterval(() => {
-      const n = typeof getCurrentUsername === 'function' && getCurrentUsername();
-      if (n) saveProfileToDevice(n);
       updateXpUi();
       applyFrame();
     }, 5000);
@@ -690,7 +683,7 @@
   else setTimeout(boot, 600);
 
   window.xkExtras = {
-    redeemGiftCode, openShareCard, sendReaction, buyFrame, buyStreakFreeze,
+    redeemGiftCode, sendReaction, buyFrame, buyStreakFreeze,
     openYearReview, openQrCheckin, applyInvite, unlockAchievement, checkAchievements
   };
 })();
