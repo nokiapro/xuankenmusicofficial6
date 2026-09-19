@@ -743,10 +743,24 @@ body.dark .album-art {
     text-transform: uppercase;
     letter-spacing: 1.5px;
     font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+.playlist-title span {
     background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+}
+.playlist-title svg {
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--text-primary);
+    stroke: currentColor;
+    flex-shrink: 0;
 }
 
 .my-playlist-toolbar {
@@ -1089,10 +1103,24 @@ body.dark .song-item.active {
     text-transform: uppercase;
     letter-spacing: 1.5px;
     font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+.timer-modal-header .timer-title span {
     background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
+}
+.timer-modal-header .timer-title svg {
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--text-primary);
+    stroke: currentColor;
+    flex-shrink: 0;
 }
 
 .timer-modal-content {
@@ -1930,16 +1958,19 @@ body.dark .notification-message {
     font-size: 0.9rem;
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+.shop-title span {
     background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
 }
-
 .shop-title svg {
-    width: 1em;
-    height: 1em;
+    width: 1.1em;
+    height: 1.1em;
     color: var(--text-primary);
     stroke: currentColor;
     flex-shrink: 0;

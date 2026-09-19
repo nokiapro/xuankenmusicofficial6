@@ -334,26 +334,45 @@
     code = String(code || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!code) return toast('GIFT', 'Nhập mã', '#ff9800');
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
-    if (!user) return toast('GIFT', 'Cần đăng nhập', '#ff4444');
+    if (!user) return toast('GIFT', 'Cần đăng nhập username', '#ff4444');
     try {
       const db = getDb();
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
-      let ref = db.ref('giftCodes/' + code);
-      let snap = await ref.once('value');
-      if (!snap.exists() && typeof dataPath === 'function') {
-        ref = db.ref(dataPath('giftCodes') + '/' + code);
-        snap = await ref.once('value');
+      // Ưu tiên root giftCodes (admin tạo ở đây)
+      const paths = ['giftCodes/' + code];
+      if (typeof dataPath === 'function') paths.push(dataPath('giftCodes') + '/' + code);
+      let ref = null;
+      let data = null;
+      for (const path of paths) {
+        const r = db.ref(path);
+        const snap = await r.once('value');
+        if (snap.exists()) { ref = r; data = snap.val(); break; }
       }
-      const data = snap.val();
-      if (!data) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
-      if (data.usedBy && String(data.usedBy).trim()) return toast('GIFT', 'Mã đã được dùng', '#ff9800');
+      if (!data || !ref) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
+      if (data.usedBy && String(data.usedBy).trim()) return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
       const coins = Number(data.coins) || 0;
-      await ref.update({ usedBy: user, usedAt: Date.now() });
+      // Transaction: chỉ 1 người nhận được
+      const result = await ref.transaction(current => {
+        if (!current) return current;
+        if (current.usedBy && String(current.usedBy).trim()) return; // abort
+        current.usedBy = user;
+        current.usedAt = Date.now();
+        return current;
+      });
+      if (!result.committed) {
+        return toast('GIFT', 'Mã đã được dùng hoặc không ghi được (Rules)', '#ff9800');
+      }
       updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
       toast('GIFT', '+' + coins + ' xu XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
+      if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
     } catch (err) {
-      toast('GIFT', 'Lỗi: ' + (err.message || err), '#ff4444');
+      const msg = String(err.code || err.message || err);
+      if (/PERMISSION|permission/i.test(msg)) {
+        toast('GIFT', 'Rules chặn ghi giftCodes — cập nhật Firebase Rules (cho phép nhận mã)', '#ff4444');
+      } else {
+        toast('GIFT', 'Lỗi: ' + msg, '#ff4444');
+      }
     }
   }
 

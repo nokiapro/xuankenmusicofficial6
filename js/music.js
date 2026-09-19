@@ -1928,7 +1928,10 @@ if (listBtn) {
     listBtn.onclick = (e) => {
         e.stopPropagation();
         renderPlaylist();
-        if (playlistOverlay) playlistOverlay.classList.add('active');
+        if (playlistOverlay) {
+            playlistOverlay.classList.add('active');
+            refreshModalIcons(playlistOverlay);
+        }
         setTimeout(scrollToActiveTop, 150);
     };
 }
@@ -1972,6 +1975,12 @@ window.addEventListener('resize', () => {
 });
 
 let sleepTimerId = null;
+
+function refreshModalIcons(root) {
+    if (typeof lucide === 'undefined' || !root) return;
+    try { lucide.createIcons({ nodes: Array.from(root.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+}
+
 let countdownInterval = null;
 let remainSeconds = 0;
 
@@ -1998,6 +2007,9 @@ function toggleTimerModal() {
         void timerOverlay.offsetHeight;
         timerOverlay.classList.add('show');
         timerModal.classList.add('show');
+        if (typeof lucide !== 'undefined') {
+            try { lucide.createIcons({ nodes: Array.from(timerModal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+        }
     }
 }
 
@@ -3734,7 +3746,7 @@ if (myPlaylistBtn) {
     myPlaylistBtn.onclick = (e) => {
         e.stopPropagation();
         renderMyPlaylist();
-        if (myPlaylistOverlay) myPlaylistOverlay.classList.add('active');
+        if (myPlaylistOverlay) myPlaylistOverlay.classList.add('active'); refreshModalIcons(myPlaylistOverlay);
     };
 }
 if (closeMyPlaylistBtn && myPlaylistOverlay) {
