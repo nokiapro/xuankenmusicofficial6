@@ -764,6 +764,36 @@ async function fetchListenData() {
     return fetchListenDataSilent();
 }
 
+
+/** Cộng giây nghe thật (khi đang play) — lưu theo ngày */
+let _lastListenTickAt = 0;
+function recordListenSeconds(deltaSec) {
+    if (!deltaSec || deltaSec <= 0 || deltaSec > 5) return;
+    if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
+    if (typeof updateCurrentAccount !== 'function') return;
+    const day = (typeof getTodayKey === 'function') ? getTodayKey() : new Date().toISOString().slice(0, 10);
+    updateCurrentAccount(acc => {
+        if (!acc.listenTime || typeof acc.listenTime !== 'object') acc.listenTime = { total: 0, byDay: {} };
+        if (!acc.listenTime.byDay || typeof acc.listenTime.byDay !== 'object') acc.listenTime.byDay = {};
+        acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
+        acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
+    });
+    // Sync Firebase thưa (mỗi ~30s nghe)
+    if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
+    if (Date.now() - window._listenTimeSyncAt > 30000) {
+        window._listenTimeSyncAt = Date.now();
+        try {
+            const db = getDb();
+            const name = getCurrentUsername();
+            const acc = getCurrentAccount();
+            if (db && name && acc && acc.listenTime) {
+                const key = sanitizeUsernameKey(name);
+                db.ref(dataPath('users') + '/' + key + '/listenTime').set(acc.listenTime);
+            }
+        } catch (e) {}
+    }
+}
+
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     const sid = String(songId);
@@ -1639,6 +1669,19 @@ let lastProgressUiAt = 0;
 let lastTimeLabelAt = 0;
 
 audio.ontimeupdate = () => {
+    // Ghi nhận thời gian nghe thực (khi đang play)
+    try {
+        if (!audio.paused && hasUserInteracted && songs[index]) {
+            const now = Date.now();
+            if (_lastListenTickAt > 0) {
+                const d = (now - _lastListenTickAt) / 1000;
+                if (d > 0 && d < 3) recordListenSeconds(d);
+            }
+            _lastListenTickAt = now;
+        } else {
+            _lastListenTickAt = 0;
+        }
+    } catch (e) {}
     // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
     if (demoLockedSongId) return;
 
@@ -2260,7 +2303,8 @@ function ensureUserAccount(username) {
             frame: '',
             streak: 0,
             streakFreeze: 0,
-            listenedSongs: {}
+            listenedSongs: {},
+            listenTime: { total: 0, byDay: {} }
         };
         saveAllAccounts(accounts);
     } else {
@@ -2313,6 +2357,7 @@ async function fetchUserFromFirebase(username) {
                 streak: Number(data.streak) || 0,
                 streakFreeze: Number(data.streakFreeze) || 0,
                 listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
+                listenTime: (data.listenTime && typeof data.listenTime === 'object') ? data.listenTime : { total: 0, byDay: {} },
                 ownedThumbs: Array.isArray(data.ownedThumbs) ? data.ownedThumbs.map(String) : [],
                 activeThumb: data.activeThumb || '',
                 inviteBy: data.inviteBy || '',
@@ -2377,6 +2422,7 @@ async function pushUserToFirebase(username, account) {
             streak: Number(account.streak) || 0,
             streakFreeze: Number(account.streakFreeze) || 0,
             listenedSongs: account.listenedSongs || {},
+            listenTime: account.listenTime || { total: 0, byDay: {} },
             ownedThumbs: account.ownedThumbs || [],
             activeThumb: account.activeThumb || '',
             inviteBy: account.inviteBy || ''
@@ -3294,6 +3340,27 @@ function setupUsernameGate() {
 }
 
 // Gắn sự kiện cửa hàng
+
+function initShopTabs() {
+    const bar = document.querySelector('.shop-tab-bar');
+    if (!bar || bar._xkBound) return;
+    bar._xkBound = true;
+    bar.querySelectorAll('.shop-tab').forEach(tab => {
+        tab.onclick = () => {
+            const key = tab.getAttribute('data-shop-tab');
+            bar.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t === tab));
+            document.querySelectorAll('.shop-tab-panel').forEach(p => {
+                p.classList.toggle('active', p.getAttribute('data-panel') === key);
+            });
+            if (key === 'thumb' && typeof renderShopThumbs === 'function') renderShopThumbs();
+            if (typeof lucide !== 'undefined') {
+                try { lucide.createIcons({ nodes: Array.from(bar.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+            }
+        };
+    });
+}
+initShopTabs();
+
 const shopBtn = document.getElementById('shop-btn');
 if (shopBtn) {
     shopBtn.onclick = (e) => {

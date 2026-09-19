@@ -260,6 +260,18 @@
             cursor: pointer;
             flex-shrink: 0;
         }
+        input[type="datetime-local"],
+        input[type="date"],
+        input[type="time"] {
+            color-scheme: dark;
+            color: #f2f2f5 !important;
+            background: var(--bg) !important;
+        }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.85;
+            cursor: pointer;
+        }
         input[type="number"] { -moz-appearance: textfield; }
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
@@ -499,6 +511,10 @@
             min-height: 100vh;
             min-height: 100dvh;
             padding: 24px 16px;
+            max-width: none;
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
         }
         .login-box {
             width: 100%;
@@ -631,15 +647,14 @@
             .coin-input, .rank-select { max-width: 140px; }
         }
     
-        /* admin scrollbar — giống player */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
+        /* admin scrollbar — giống list bài player */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 50px; }
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #ff0040, #8c00ff);
-            border-radius: 999px;
+            background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+            border-radius: 50px;
         }
-        ::-webkit-scrollbar-thumb:hover { background: #8c00ff; }
-        * { scrollbar-width: thin; scrollbar-color: #8c00ff transparent; }
+        * { scrollbar-width: thin; scrollbar-color: #b33cea transparent; }
     </style>
 
     <script>
@@ -668,7 +683,7 @@
             <label for="admin-pass">Mật khẩu</label>
             <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
             <button class="btn btn-primary" id="admin-login-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
-            <a href="/" class="back-link">← Về player</a>
+            <a href="/" class="btn btn-ghost back-player-btn" style="width:100%;margin-top:12px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;"><i class="fa-solid fa-music"></i> Về player</a>
         </div>
     </div>
 
@@ -1700,7 +1715,7 @@
         }
 
         function showLogin() {
-            document.getElementById('login-screen').style.display = 'block';
+            document.getElementById('login-screen').style.display = 'flex';
             document.getElementById('admin-app').style.display = 'none';
             document.getElementById('login-error').style.display = 'none';
         }

@@ -234,6 +234,14 @@
                         <button type="button" class="extras-action-btn" data-x="rev-year"><i data-lucide="calendar-range"></i><span>Năm</span></button>
                     </div>
                 </div>
+                <div class="extras-section">
+                    <label class="extras-label">Thời gian đã nghe</label>
+                    <div class="extras-actions-grid extras-rank-grid">
+                        <button type="button" class="extras-action-btn" data-x="time-week"><i data-lucide="clock"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="time-month"><i data-lucide="clock-3"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="time-year"><i data-lucide="timer"></i><span>Năm</span></button>
+                    </div>
+                </div>
                 <div id="extras-result" class="extras-result"></div>
                 <div class="extras-section extras-chat-section">
                     <label class="extras-label">Chat toàn web</label>
@@ -278,15 +286,17 @@
                 </button>
             </div>
             <div class="shop-hint" id="shop-hint">Chưa sở hữu bài → chỉ nghe demo 60 giây (1 phút). Điểm danh mỗi ngày nhận xu XK để mua nhạc.</div>
-            <div class="shop-sections">
-                <div class="shop-section">
-                    <div class="shop-section-title"><i data-lucide="music"></i> Mua nhạc</div>
-                    <div class="shop-list" id="shop-list"></div>
-                </div>
-                <div class="shop-section">
-                    <div class="shop-section-title"><i data-lucide="image"></i> Progress thumb</div>
-                    <div class="shop-list" id="shop-thumb-list"></div>
-                </div>
+            <div class="shop-tab-bar">
+                <button type="button" class="shop-tab active" data-shop-tab="music" id="shop-tab-music">
+                    <i data-lucide="music"></i> Mua nhạc
+                </button>
+                <button type="button" class="shop-tab" data-shop-tab="thumb" id="shop-tab-thumb">
+                    <i data-lucide="image"></i> Mua thumb
+                </button>
+            </div>
+            <div class="shop-tab-panels">
+                <div class="shop-list shop-tab-panel active" id="shop-list" data-panel="music"></div>
+                <div class="shop-list shop-tab-panel" id="shop-thumb-list" data-panel="thumb"></div>
             </div>
         </div>
     </div>
