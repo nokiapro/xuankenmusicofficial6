@@ -338,9 +338,10 @@
     try {
       const db = getDb();
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
-      // Ưu tiên root giftCodes (admin tạo ở đây)
-      const paths = ['giftCodes/' + code];
+      // Chỉ prefix (music6/giftCodes)
+      const paths = [];
       if (typeof dataPath === 'function') paths.push(dataPath('giftCodes') + '/' + code);
+      paths.push('giftCodes/' + code); // fallback cũ
       let ref = null;
       let data = null;
       for (const path of paths) {

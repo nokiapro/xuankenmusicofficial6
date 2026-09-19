@@ -940,22 +940,28 @@ async function incrementListenCount(songId, songName, source = 'normal') {
 
         const db = getDb();
         if (db) {
-            // Thử path prefix rồi root — rules cần cho phép ghi listenCount (không cần auth)
+            // Ghi music6/songs/.../listenCount (hoặc path prefix hiện tại)
             let serverCount = listenData[sid];
             let wrote = false;
-            const paths = [dataPath('songs') + '/' + sid + '/listenCount'];
-            if (dataPath('songs') !== 'songs') paths.push('songs/' + sid + '/listenCount');
-            for (const p of paths) {
+            const p = dataPath('songs') + '/' + sid + '/listenCount';
+            try {
+                const ref = db.ref(p);
+                const result = await ref.transaction(current => (Number(current) || 0) + 1);
+                if (result && result.committed) {
+                    serverCount = Number(result.snapshot.val()) || serverCount;
+                    wrote = true;
+                }
+            } catch (e) {
+                console.warn('listenCount transaction fail', p, e && (e.code || e.message));
+                // Fallback: đọc rồi set (kém an toàn hơn nhưng vẫn cộng được)
                 try {
-                    const ref = db.ref(p);
-                    const result = await ref.transaction(current => (Number(current) || 0) + 1);
-                    if (result && result.committed) {
-                        serverCount = result.snapshot.val() || serverCount;
-                        wrote = true;
-                        break;
-                    }
-                } catch (e) {
-                    console.warn('listenCount write fail', p, e && (e.code || e.message));
+                    const snap = await db.ref(p).once('value');
+                    const next = (Number(snap.val()) || 0) + 1;
+                    await db.ref(p).set(next);
+                    serverCount = next;
+                    wrote = true;
+                } catch (e2) {
+                    console.warn('listenCount set fail', e2 && (e2.code || e2.message));
                 }
             }
             if (wrote) {
@@ -965,7 +971,8 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 updateListenStatsModal();
                 if (typeof renderPlaylist === 'function') renderPlaylist();
             } else {
-                console.warn('Không ghi được listenCount lên Firebase — kiểm tra Rules songs/$id/listenCount');
+                // Giữ số local, cảnh báo
+                showNotification('LISTEN LOCAL:', 'Chưa ghi Firebase — kiểm tra Rules', '#ff9800', 'alert-triangle');
             }
             // Firebase user.listenedSongs
             const key = sanitizeUsernameKey(user);
