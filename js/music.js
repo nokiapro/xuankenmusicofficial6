@@ -20,6 +20,17 @@ let currentSource = 'play';
 let autoRefreshInterval = null;
 /** Timeout ẩn toast notification */
 let notificationTimeout = null;
+/** Đang refresh list bài (tránh chồng request) */
+let isRefreshing = false;
+/** Chờ play sau khi load xong list */
+let pendingPlayAfterLoad = false;
+/** User đã tương tác (gesture) — cho phép autoplay */
+let hasUserInteracted = false;
+/** ID bài đang khóa demo 60s */
+let demoLockedSongId = null;
+/** Lần fetch listenCount gần nhất */
+let lastListenFetch = 0;
+const LISTEN_FETCH_INTERVAL = 15000;
 
 const audio = document.getElementById('audio-player');
 const playIcon = document.getElementById('play-icon');
