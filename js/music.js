@@ -51,7 +51,8 @@ const DEFAULT_ADMIN_SETTINGS = {
     starterCoins: 20,
     siteName: 'XuanKen Music Official',
     siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
-    sitePrefix: '',
+    // Mặc định music6 để tránh race: load page → prefix rỗng → ghi path sai trước khi sync settings
+    sitePrefix: 'music6',
     /** Bắt buộc nhập PIN khi vào player */
     requirePin: true,
     /** Cho phép tạo username mới từ màn hình đầu (tắt = chỉ user admin đã tạo) */
@@ -875,26 +876,37 @@ function recordListenSeconds(deltaSec) {
     }
 }
 
+/** Promise với timeout — tránh isUpdatingListen bị kẹt nếu Firebase treo */
+function withTimeout(promise, ms, label) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout ' + (label || ''))), ms))
+    ]);
+}
+
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     const sid = String(songId);
+    // Username KHÔNG còn bắt buộc để cộng lượt bài (giống music2).
+    // Vẫn dùng username nếu có để cộng XP / listenedSongs user.
     const user = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
     if (!user) {
-        console.warn('LISTEN skip: chưa có username');
-        return false;
+        console.warn('LISTEN: không có username — vẫn cộng lượt bài, bỏ qua XP user');
     }
 
     isUpdatingListen = true;
     try {
-        try {
-            updateCurrentAccount(acc => {
-                if (!acc.listenedSongs || typeof acc.listenedSongs !== 'object') acc.listenedSongs = {};
-                acc.listenedSongs[sid] = Date.now();
-                acc.xp = (Number(acc.xp) || 0) + 5;
-                acc.seasonXp = (Number(acc.seasonXp) || 0) + 5;
-                acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
-            });
-        } catch (e) {}
+        if (user) {
+            try {
+                updateCurrentAccount(acc => {
+                    if (!acc.listenedSongs || typeof acc.listenedSongs !== 'object') acc.listenedSongs = {};
+                    acc.listenedSongs[sid] = Date.now();
+                    acc.xp = (Number(acc.xp) || 0) + 5;
+                    acc.seasonXp = (Number(acc.seasonXp) || 0) + 5;
+                    acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
+                });
+            } catch (e) {}
+        }
 
         if (!listenData[sid]) listenData[sid] = 0;
         listenData[sid]++;
@@ -903,7 +915,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
         try { updateListenStatsModal(); } catch (e) {}
         try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
-        console.log('GHI NHẬN LƯỢT NGHE:', songName, sid, '→', listenData[sid], source);
+        console.log('GHI NHẬN LƯỢT NGHE:', songName, sid, '→', listenData[sid], source, user ? ('user=' + user) : 'no-user');
         try {
             showNotification('+1 LISTEN:', '<i class="fa-regular fa-star"></i> ' + (songName || sid) + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'headphones');
         } catch (e) {}
@@ -912,19 +924,23 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         if (db) {
             let serverCount = listenData[sid];
             let wrote = false;
-            // Thử mọi path khả dĩ (prefix / music6 / root)
+            // Luôn thử path đúng (music6) trước, rồi dataPath, rồi root
             const paths = [];
+            paths.push('music6/songs/' + sid + '/listenCount');
             try {
                 const dp = dataPath('songs') + '/' + sid + '/listenCount';
                 paths.push(dp);
             } catch (e) {}
-            paths.push('music6/songs/' + sid + '/listenCount');
             paths.push('songs/' + sid + '/listenCount');
             const uniq = [...new Set(paths)];
             for (const p of uniq) {
                 try {
                     const ref = db.ref(p);
-                    const result = await ref.transaction(current => (Number(current) || 0) + 1);
+                    const result = await withTimeout(
+                        ref.transaction(current => (Number(current) || 0) + 1),
+                        8000,
+                        'tx:' + p
+                    );
                     if (result && result.committed) {
                         serverCount = Number(result.snapshot.val()) || serverCount;
                         wrote = true;
@@ -935,9 +951,9 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                     console.warn('listenCount tx fail', p, e && (e.code || e.message));
                 }
                 try {
-                    const snap = await db.ref(p).once('value');
+                    const snap = await withTimeout(db.ref(p).once('value'), 5000, 'read:' + p);
                     const next = (Number(snap.val()) || 0) + 1;
-                    await db.ref(p).set(next);
+                    await withTimeout(db.ref(p).set(next), 5000, 'set:' + p);
                     serverCount = next;
                     wrote = true;
                     console.log('listenCount set OK', p, next);
@@ -953,18 +969,32 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 try { updateListenStatsModal(); } catch (e) {}
                 try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
             } else {
-                console.warn('listenCount: không ghi được Firebase — Rules/path');
+                console.warn('listenCount: không ghi được Firebase — Rules/path (đã lưu local)');
             }
-// Firebase user.listenedSongs
-            const key = sanitizeUsernameKey(user);
-            await db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now());
-            const acc2 = getCurrentAccount();
-            if (acc2) {
-                await db.ref(dataPath('users') + '/' + key).update({
-                    xp: Number(acc2.xp) || 0,
-                    seasonXp: Number(acc2.seasonXp) || 0,
-                    level: Number(acc2.level) || 1
-                });
+            // Firebase user.listenedSongs + XP (chỉ khi có username)
+            if (user) {
+                try {
+                    const key = sanitizeUsernameKey(user);
+                    await withTimeout(
+                        db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now()),
+                        5000,
+                        'user-listened'
+                    );
+                    const acc2 = getCurrentAccount();
+                    if (acc2) {
+                        await withTimeout(
+                            db.ref(dataPath('users') + '/' + key).update({
+                                xp: Number(acc2.xp) || 0,
+                                seasonXp: Number(acc2.seasonXp) || 0,
+                                level: Number(acc2.level) || 1
+                            }),
+                            5000,
+                            'user-xp'
+                        );
+                    }
+                } catch (ue) {
+                    console.warn('user listen/xp write fail', ue && (ue.code || ue.message));
+                }
             }
         }
         if (typeof window.onListenCounted === 'function') {
