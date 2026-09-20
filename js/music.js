@@ -14,6 +14,12 @@ let wakeLock = null;
 let isLoopingHandled = false;
 let listenInterval = null;
 let songs = [];
+/** Nguồn cộng lượt nghe: play | loop | next... */
+let currentSource = 'play';
+/** Interval tự refresh list bài từ Firebase */
+let autoRefreshInterval = null;
+/** Timeout ẩn toast notification */
+let notificationTimeout = null;
 
 const audio = document.getElementById('audio-player');
 const playIcon = document.getElementById('play-icon');

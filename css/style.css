@@ -2312,8 +2312,11 @@ body.dark .notification-message {
     font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 1.5px;
-    color: var(--text-secondary, #555);
+    color: var(--text-secondary);
     text-transform: uppercase;
+}
+body.dark .username-label {
+    color: var(--text-secondary);
 }
 
 .username-input {
@@ -2441,10 +2444,13 @@ body.dark .pin-box.filled {
 .username-pin-hint {
     margin: 6px 0 0;
     font-size: 0.68rem;
-    color: var(--text-secondary, #888);
+    color: var(--text-tertiary);
     text-align: center;
     line-height: 1.35;
     opacity: 0.9;
+}
+body.dark .username-pin-hint {
+    color: var(--text-tertiary);
 }
 .username-error {
     font-size: 0.72rem;
@@ -2476,9 +2482,17 @@ body.dark .pin-box.filled {
     transform: scale(1.03);
 }
 
+body.dark .username-start-btn {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
 .username-start-btn svg {
     width: 18px;
     height: 18px;
+    stroke: currentColor;
 }
 
 .admin-link-hint {
