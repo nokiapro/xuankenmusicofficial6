@@ -2951,3 +2951,79 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   padding: 2px 0 4px 4px;
   width: 100%;
 }
+
+
+/* ===== Huy hiệu modal ===== */
+.badges-modal.show { display: flex; }
+.badges-modal-body {
+  padding: 12px 14px 24px;
+  overflow-y: auto;
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.badge-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--card-bg, rgba(255,255,255,0.06));
+  border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+}
+.badge-card.got {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+.badge-card.locked { opacity: 0.55; }
+.badge-icon { font-size: 1.6rem; line-height: 1; flex-shrink: 0; width: 2rem; text-align: center; }
+.badge-info { flex: 1; min-width: 0; }
+.badge-name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+.badge-desc { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+.badge-got-tag, .badge-lock-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.badge-got-tag { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.badge-lock-tag { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+
+/* ===== Shop thumb lazy GIF ===== */
+.shop-thumb-preview {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  background: var(--progress-bg, rgba(255,255,255,0.08));
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.shop-thumb-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.shop-thumb-preview.is-gif .thumb-play-icon {
+  position: absolute;
+  font-size: 0.7rem;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  z-index: 1;
+}
+.shop-thumb-preview.is-gif .thumb-placeholder {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+.shop-thumb-preview.loaded .thumb-play-icon,
+.shop-thumb-preview.loaded .thumb-placeholder { display: none; }
