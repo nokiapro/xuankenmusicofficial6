@@ -1113,7 +1113,30 @@
         const SONGS_PER_PAGE = 10;
         let songsFilter = '';
 
+        /**
+         * Admin dùng Firebase App RIÊNG ("xk-admin") — Auth tách biệt với Player.
+         * Tránh: vào Admin → Auth default bị đổi thành admin → quay lại Player bị lẫn UID thành viên.
+         */
+        function getAdminApp() {
+            if (typeof firebase === 'undefined') return null;
+            try {
+                return firebase.app('xk-admin');
+            } catch (e) {
+                const cfg = window.FIREBASE_CONFIG || (typeof FIREBASE_CONFIG !== 'undefined' ? FIREBASE_CONFIG : null);
+                if (!cfg) {
+                    console.error('FIREBASE_CONFIG thiếu');
+                    return null;
+                }
+                return firebase.initializeApp(cfg, 'xk-admin');
+            }
+        }
+        function getAdminAuth() {
+            const app = getAdminApp();
+            return app ? app.auth() : null;
+        }
         function db() {
+            const app = getAdminApp();
+            if (app) return app.database();
             return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
         }
 
@@ -1240,7 +1263,7 @@
             if (em && !em.endsWith('@xuanken.user') && em.includes('@')) return true;
             // UID đang đăng nhập Admin hiện tại
             try {
-                const cur = firebase.auth().currentUser;
+                const _aa = getAdminAuth(); const cur = _aa && _aa.currentUser;
                 if (cur && (cur.uid === key || cur.uid === u.uid)) return true;
             } catch (e) {}
             return false;
@@ -1825,7 +1848,7 @@
         });
 
         function updateAdminIdentityUI() {
-            const user = firebase.auth().currentUser;
+            const _aa2 = getAdminAuth(); const user = _aa2 && _aa2.currentUser;
             const emailEl = document.getElementById('admin-identity-email');
             const idEl = document.getElementById('admin-identity');
             if (idEl) {
@@ -1923,12 +1946,12 @@
             try {
                 document.getElementById('admin-login-btn').disabled = true;
                 document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
-                const cred = await firebase.auth().signInWithEmailAndPassword(email, pass);
+                const cred = await getAdminAuth().signInWithEmailAndPassword(email, pass);
                 try {
                     await assertAdminAccess(cred.user);
                     document.getElementById('login-error').style.display = 'none';
                 } catch (accessErr) {
-                    await firebase.auth().signOut();
+                    await getAdminAuth().signOut();
                     document.getElementById('login-error').textContent = adminAccessErrorMessage(accessErr.message);
                     document.getElementById('login-error').style.display = 'block';
                 }
@@ -1956,7 +1979,7 @@
 
         document.getElementById('logout-btn').onclick = async () => {
             try {
-                await firebase.auth().signOut();
+                await getAdminAuth().signOut();
             } catch (e) {
                 console.error(e);
             }
@@ -2355,25 +2378,39 @@
         });
 
 
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (!user) {
+        (function bindAdminAuth() {
+            const auth = getAdminAuth();
+            if (!auth) {
+                console.error('Admin Auth không khởi tạo được');
                 showLogin();
                 return;
             }
+            // Persistence riêng cho app admin (không đụng player)
             try {
-                await assertAdminAccess(user);
-                showApp();
-            } catch (e) {
-                console.warn('Admin access denied:', e && e.message);
-                try { await firebase.auth().signOut(); } catch (x) {}
-                showLogin();
-                const errEl = document.getElementById('login-error');
-                if (errEl) {
-                    errEl.textContent = adminAccessErrorMessage((e && e.message) || '');
-                    errEl.style.display = 'block';
+                if (firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+                    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function () {});
                 }
-            }
-        });
+            } catch (e) {}
+            auth.onAuthStateChanged(async (user) => {
+                if (!user) {
+                    showLogin();
+                    return;
+                }
+                try {
+                    await assertAdminAccess(user);
+                    showApp();
+                } catch (e) {
+                    console.warn('Admin access denied:', e && e.message);
+                    try { await auth.signOut(); } catch (x) {}
+                    showLogin();
+                    const errEl = document.getElementById('login-error');
+                    if (errEl) {
+                        errEl.textContent = adminAccessErrorMessage((e && e.message) || '');
+                        errEl.style.display = 'block';
+                    }
+                }
+            });
+        })();
     </script>
 </body>
 </html>

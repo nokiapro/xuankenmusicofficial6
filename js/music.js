@@ -55,7 +55,24 @@ function getAuth() {
 
 function getCurrentUid() {
     const a = getAuth();
-    return (a && a.currentUser && a.currentUser.uid) ? a.currentUser.uid : '';
+    if (!a || !a.currentUser || !a.currentUser.uid) return '';
+    // Chỉ trả UID player (@xuanken.user). Phiên admin trên app default không dùng cho player.
+    const email = String(a.currentUser.email || '').toLowerCase();
+    if (email && !email.endsWith('@xuanken.user')) return '';
+    return a.currentUser.uid;
+}
+
+/** Nếu default Auth đang là email admin (do bản cũ), signOut để không lẫn UID thành viên */
+function ensurePlayerAuthOnly() {
+    try {
+        const a = getAuth();
+        if (!a || !a.currentUser) return;
+        const email = String(a.currentUser.email || '').toLowerCase();
+        if (email && !email.endsWith('@xuanken.user')) {
+            console.warn('[player] signOut phiên admin còn sót trên default Auth:', email);
+            a.signOut().catch(function () {});
+        }
+    } catch (e) {}
 }
 
 /** Email synthetic cho Firebase Auth — username + PIN = email/password */
@@ -4102,9 +4119,16 @@ updateCheckinButtonUI();
 (function bindAuthSessionRestore() {
     const auth = getAuth();
     if (!auth) return;
+    ensurePlayerAuthOnly();
     auth.onAuthStateChanged(async (user) => {
         if (!user) return;
         try {
+            // Chỉ nhận phiên PLAYER (email ảo @xuanken.user). Email admin thật → bỏ qua, không ghi đè thành viên.
+            const email = String(user.email || '').toLowerCase();
+            if (email && !email.endsWith('@xuanken.user')) {
+                console.warn('[player] Bỏ qua phiên Auth admin/email thật:', email);
+                return;
+            }
             const db = getDb();
             if (!db) return;
             const snap = await db.ref(dataPath('users') + '/' + user.uid).once('value');
