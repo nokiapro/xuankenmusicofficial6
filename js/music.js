@@ -44,7 +44,7 @@ function getCurrentUid() {
 /** Email synthetic cho Firebase Auth — username + PIN = email/password */
 function usernameToEmail(username) {
     const key = sanitizeUsernameKey(username).toLowerCase();
-    return key + '@xuanken.vn';
+    return key + '@xuanken.user';
 }
 
 function authErrorMessage(err) {
@@ -3468,19 +3468,13 @@ async function loginWithUsername(rawName, rawPin) {
         return { ok: false, message: 'Firebase Auth chưa sẵn sàng — tải lại trang' };
     }
 
-    // PIN 6 số = mật khẩu Auth (bắt buộc khi đăng nhập/đăng ký)
-    const pinTrusted = isPinTrusted(name);
-    if (!pinTrusted || !/^[0-9]{6}$/.test(pin)) {
-        if (requirePin || !pinTrusted) {
-            if (!/^[0-9]{6}$/.test(pin)) {
-                return { ok: false, message: 'PIN phải đúng 6 chữ số' };
-            }
+    // PIN 6 số = mật khẩu Firebase Auth
+    // Chỉ bỏ qua PIN khi ĐÃ có session Auth trên máy này
+    const hasAuthSession = !!(auth.currentUser);
+    if (!hasAuthSession) {
+        if (!/^[0-9]{6}$/.test(pin)) {
+            return { ok: false, message: 'PIN phải đúng 6 chữ số' };
         }
-    }
-    // Nếu trusted nhưng chưa nhập PIN lần này, không sign-in lại được nếu session mất
-    // → bắt buộc PIN khi chưa có currentUser
-    if (!auth.currentUser && !/^[0-9]{6}$/.test(pin)) {
-        return { ok: false, message: 'Nhập PIN 6 số để đăng nhập' };
     }
 
     const email = usernameToEmail(name);
@@ -3633,9 +3627,7 @@ async function loginWithUsername(rawName, rawPin) {
     setCurrentUsername(name);
     const acc = ensureUserAccount(name);
     if (acc) acc.uid = uid;
-    if (requirePin && /^[0-9]{6}$/.test(pin)) {
-        markPinTrusted(name);
-    }
+    markPinTrusted(name);
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
@@ -3651,19 +3643,16 @@ function setupUsernameGate() {
     initPinBoxes();
 
     function refreshPinVisibility() {
-        const settings = getAdminSettings();
-        const requirePin = settings.requirePin !== false;
-        const name = (input && input.value || '').trim();
-        if (!requirePin) {
-            setPinSectionVisible(false);
-            return;
-        }
-        // Cùng máy + đúng user + còn trong 7 ngày → ẩn PIN
-        const trusted = name && isPinTrusted(name);
-        setPinSectionVisible(!trusted);
+        const auth = getAuth();
+        const hasAuthSession = !!(auth && auth.currentUser);
+        // Đã có phiên Auth → ẩn PIN (chạm Bắt đầu là vào)
+        // Chưa Auth → LUÔN hiện PIN (mật khẩu đăng nhập)
+        setPinSectionVisible(!hasAuthSession);
         const hint = document.getElementById('pin-hint');
-        if (hint && !trusted) {
-            hint.textContent = 'Nhập đúng 6 chữ số · User mới = đặt PIN mới';
+        if (hint) {
+            hint.textContent = hasAuthSession
+                ? 'Đã đăng nhập · Chạm BẮT ĐẦU để nghe'
+                : 'PIN 6 số = mật khẩu · User mới = đặt PIN mới';
         }
     }
     
@@ -3694,14 +3683,21 @@ function setupUsernameGate() {
         }
         try {
             const name = input.value;
-            const needPin = getAdminSettings().requirePin !== false && !isPinTrusted(String(name || '').trim());
-            const result = await loginWithUsername(name, needPin ? getPinValue() : '');
+            const auth = getAuth();
+            const hasAuthSession = !!(auth && auth.currentUser);
+            // Luôn lấy PIN từ ô nhập khi chưa có session Auth
+            const pinVal = hasAuthSession ? '' : getPinValue();
+            const result = await loginWithUsername(name, pinVal);
             if (!result.ok) {
                 if (err) {
                     err.textContent = result.message;
                     err.style.display = 'block';
                 }
-                if (/PIN|pin|mã/i.test(result.message || '')) shakePinBoxes();
+                if (/PIN|pin|mã/i.test(result.message || '')) {
+                    setPinSectionVisible(true);
+                    shakePinBoxes();
+                    focusPinInput();
+                }
                 return;
             }
             if (err) err.style.display = 'none';
