@@ -3560,6 +3560,12 @@ async function loginWithUsername(rawName, rawPin) {
     if (!/^[\w\u00C0-\u024F\u1E00-\u1EFF .-]+$/i.test(name)) {
         return { ok: false, message: 'Username không hợp lệ' };
     }
+    // Tên dành riêng cho Admin (Tối Thượng) — không cho player đăng ký / đăng nhập
+    const reservedAdmin = ['tối thượng', 'toi thuong', 'toithuong', 'administrator', 'admin', 'xuanken admin'];
+    if (reservedAdmin.includes(name.toLowerCase().replace(/\s+/g, ' '))) {
+        return { ok: false, message: 'Username này dành riêng cho Admin (Tối Thượng)' };
+    }
+
 
     const auth = getAuth();
     if (!auth) {

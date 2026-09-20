@@ -703,7 +703,13 @@
 
     <div id="admin-app" class="wrap" style="display:none;">
         <div class="header" id="admin-header">
-            <h1>XUANKEN ADMIN</h1>
+            <div>
+                <h1>XUANKEN ADMIN</h1>
+                <div id="admin-identity" style="font-size:0.78rem;color:#fbbf24;margin-top:4px;font-weight:600;">
+                    <i class="fa-solid fa-crown"></i> Tối Thượng
+                    <span id="admin-identity-email" style="color:var(--muted);font-weight:400;margin-left:6px;"></span>
+                </div>
+            </div>
             <div class="header-actions">
                 <button class="btn btn-warn" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> <span class="btn-label">Đăng xuất</span></button>
                 <a href="/" class="btn btn-info"><i class="fa-solid fa-music"></i> <span class="btn-label">Player</span></a>
@@ -1215,13 +1221,45 @@
             refreshStats();
         }
 
+        /** Username / rank dành riêng cho admin — không hiện trong list player */
+        const RESERVED_ADMIN_NAMES = ['tối thượng', 'toi thuong', 'toithuong', 'administrator', 'admin', 'xuanken admin'];
+
+        function isReservedAdminName(name) {
+            const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            return RESERVED_ADMIN_NAMES.includes(n);
+        }
+
+        function isAdminOnlyProfile(u, key) {
+            if (!u) return false;
+            const name = String(u.username || key || '').trim();
+            if (isReservedAdminName(name)) return true;
+            if (String(u.rank || '').toLowerCase() === 'toi_thuong') return true;
+            if (u.isAdmin === true || u.adminOnly === true) return true;
+            // Email thật (không phải @xuanken.user) = tài khoản Admin Auth, không phải player
+            const em = String(u.email || u.loginEmail || '').trim().toLowerCase();
+            if (em && !em.endsWith('@xuanken.user') && em.includes('@')) return true;
+            // UID đang đăng nhập Admin hiện tại
+            try {
+                const cur = firebase.auth().currentUser;
+                if (cur && (cur.uid === key || cur.uid === u.uid)) return true;
+            } catch (e) {}
+            return false;
+        }
+
         async function loadUsers() {
             const snap = await db().ref(dataPath('users')).once('value');
             const obj = snap.val() || {};
             usersCache = {};
+            let skippedAdmin = 0;
             Object.keys(obj).forEach(k => {
                 const u = obj[k] || {};
+                if (isAdminOnlyProfile(u, k)) {
+                    skippedAdmin++;
+                    return; // không lẫn admin vào list player
+                }
                 const name = u.username || k;
+                // Tránh đè nếu trùng username (giữ bản có username rõ)
+                if (usersCache[name] && usersCache[name].uid && !u.username) return;
                 usersCache[name] = {
                     key: k, // uid (Firebase Auth)
                     uid: u.uid || k,
@@ -1233,6 +1271,7 @@
                     banned: !!u.banned
                 };
             });
+            if (skippedAdmin) console.log('[admin] Ẩn', skippedAdmin, 'profile admin khỏi list player');
             renderUsers(document.getElementById('user-search').value);
             refreshStats();
         }
@@ -1785,9 +1824,25 @@
             };
         });
 
+        function updateAdminIdentityUI() {
+            const user = firebase.auth().currentUser;
+            const emailEl = document.getElementById('admin-identity-email');
+            const idEl = document.getElementById('admin-identity');
+            if (idEl) {
+                idEl.innerHTML = '<i class="fa-solid fa-crown"></i> Tối Thượng'
+                    + (user && user.email
+                        ? ' <span id="admin-identity-email" style="color:var(--muted);font-weight:400;margin-left:6px;">(' + escapeHtml(user.email) + ')</span>'
+                        : '');
+            }
+            if (emailEl && user && user.email) {
+                emailEl.textContent = '(' + user.email + ')';
+            }
+        }
+
         async function showApp() {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('admin-app').style.display = 'block';
+            updateAdminIdentityUI();
             try {
                 await loadSettings();
                 await Promise.all([loadSongs(), loadUsers()]);
