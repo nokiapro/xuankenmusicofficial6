@@ -703,11 +703,21 @@
       giftBtn.onclick = () => redeemGiftCode(($('gift-code-input') || {}).value);
     }
 
-    function showResult(html) {
+    let lastResultKey = null;
+
+    function showResult(html, key) {
       const box = $('extras-result');
       if (!box) return;
+      // Click cùng nút lần nữa → ẩn đi
+      if (key && lastResultKey === key && box.classList.contains('show')) {
+        box.classList.remove('show');
+        box.innerHTML = '';
+        lastResultKey = null;
+        return;
+      }
       box.innerHTML = html;
       box.classList.add('show');
+      lastResultKey = key || null;
     }
 
     function topSongsByPeriod(period) {
@@ -721,7 +731,7 @@
       else top.forEach((s, i) => {
         html += (i + 1) + '. ' + escapeHtml(s.name || s.id) + ' — <b>' + (s.listenCount || 0) + '</b><br/>';
       });
-      showResult(html);
+      showResult(html, 'top-' + period);
     }
 
     function userReview(period) {
@@ -740,7 +750,7 @@
       if (period === 'year') {
         html += '• Rank: <b>' + (acc.rank || 'member') + '</b>';
       }
-      showResult(html);
+      showResult(html, 'rev-' + period);
     }
 
     panel.querySelectorAll('[data-x]').forEach(btn => {
@@ -762,7 +772,8 @@
           showResult(
             '<b>Thời gian nghe (' + label + ')</b><br/>' +
             '• Giai đoạn: <b>' + formatListenDuration(sec) + '</b><br/>' +
-            '• Tổng mọi thời điểm: <b>' + formatListenDuration(total) + '</b>'
+            '• Tổng mọi thời điểm: <b>' + formatListenDuration(total) + '</b>',
+            x
           );
         }
 

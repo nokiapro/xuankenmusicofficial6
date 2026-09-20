@@ -439,12 +439,12 @@ async function checkForUpdates() {
             
             if (addedSongs.length > 0) {
                 addedSongs.forEach(song => {
-                    const title = song.name || song.id;
+                    const sid = song.id || '';
                     const wasScheduled = song.publishAt && Date.parse(song.publishAt) <= Date.now();
                     const head = wasScheduled ? 'ADMIN ĐÃ ĐĂNG BÀI MỚI:' : 'BÀI HÁT MỚI:';
                     showNotification(
                         head,
-                        `<i class="fa-regular fa-star"></i> ${title} <i class="fa-regular fa-star"></i>`,
+                        `<i class="fa-regular fa-star"></i> ${sid} <i class="fa-regular fa-star"></i>`,
                         '#4ade80',
                         'sparkles'
                     );
@@ -932,7 +932,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         try {
             showNotification(
                 '+1 LISTEN:',
-                '<i class="fa-regular fa-star"></i> ' + (songName || sid) + ' <i class="fa-regular fa-star"></i>',
+                '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
                 '#4ade80',
                 'headphones'
             );
