@@ -688,10 +688,14 @@
         <div class="login-box">
             <h1>ADMIN XUANKEN</h1>
             <div class="error" id="login-error">Email hoặc mật khẩu không đúng</div>
-            <label for="admin-email">Email admin</label>
-            <input type="email" id="admin-email" placeholder="admin@xuanken.com" autocomplete="username">
+            <label for="admin-email">Email admin (khác tài khoản player)</label>
+            <input type="email" id="admin-email" placeholder="admin@gmail.com" autocomplete="username">
             <label for="admin-pass">Mật khẩu</label>
             <input type="password" id="admin-pass" placeholder="Nhập mật khẩu..." autocomplete="current-password">
+            <p class="muted" style="margin:0 0 12px;font-size:0.72rem;line-height:1.45;color:var(--muted);">
+                Tài khoản Admin là <strong>email thật</strong> tạo trên Firebase Console → Authentication.<br>
+                Tài khoản player (username + PIN) dùng email ảo <code>@xuanken.user</code> — <strong>không vào được Admin</strong>.
+            </p>
             <button class="btn btn-primary" id="admin-login-btn"><i class="fa-solid fa-right-to-bracket"></i> Đăng nhập</button>
             <a href="/" class="btn btn-ghost back-player-btn" style="width:100%;margin-top:12px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;"><i class="fa-solid fa-music"></i> Về player</a>
         </div>
@@ -874,6 +878,25 @@
                 </p>
                 <div class="row-actions form-actions">
                     <button type="button" class="btn btn-primary" id="save-security-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Email được phép vào Admin</h2>
+                <p class="muted" style="margin:0 0 10px;font-size:0.75rem;line-height:1.45;">
+                    Tách biệt với tài khoản player. Chỉ email thật (Gmail, …) tạo trên Firebase Console mới vào Admin.
+                    Tài khoản player (<code>@xuanken.user</code>) luôn bị chặn.<br>
+                    Để trống danh sách = mọi email thật đều vào được Admin (tiện lúc mới setup).
+                    Khi đã có danh sách → chỉ những email trong list mới vào được.
+                </p>
+                <div class="form-grid">
+                    <div class="full">
+                        <label>Danh sách email admin (mỗi dòng 1 email)</label>
+                        <textarea id="set-admin-emails" rows="4" placeholder="admin@gmail.com&#10;ban@example.com" style="width:100%;min-height:90px;resize:vertical;"></textarea>
+                    </div>
+                </div>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-admin-emails-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu danh sách admin</button>
                 </div>
             </div>
 
@@ -1148,6 +1171,18 @@
             document.getElementById('set-site-name').value = settingsCache.siteName || '';
             document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
             document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
+            // Load admin email allowlist (riêng path settings/adminEmails)
+            try {
+                const ae = await db().ref('settings/adminEmails').once('value');
+                const val = ae.val();
+                let list = [];
+                if (Array.isArray(val)) list = val;
+                else if (val && typeof val === 'object') list = Object.keys(val);
+                const ta = document.getElementById('set-admin-emails');
+                if (ta) ta.value = list.map(x => String(x || '').trim()).filter(Boolean).join('\n');
+            } catch (e) {
+                console.warn('load adminEmails', e);
+            }
             applyBranding();
         }
 
@@ -1768,6 +1803,55 @@
             document.getElementById('login-error').style.display = 'none';
         }
 
+        /** Email player = username@xuanken.user — không được vào Admin */
+        function isPlayerSyntheticEmail(email) {
+            const e = String(email || '').trim().toLowerCase();
+            return e.endsWith('@xuanken.user');
+        }
+
+        /** Danh sách email admin cho phép (settings/adminEmails). Rỗng = mọi email THẬT (không phải @xuanken.user). */
+        async function loadAdminEmailAllowlist() {
+            try {
+                const snap = await db().ref('settings/adminEmails').once('value');
+                const val = snap.val();
+                if (Array.isArray(val)) {
+                    return val.map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+                }
+                if (val && typeof val === 'object') {
+                    return Object.keys(val).map(k => String(k || '').trim().toLowerCase()).filter(Boolean);
+                }
+            } catch (e) {
+                console.warn('loadAdminEmailAllowlist', e);
+            }
+            return [];
+        }
+
+        async function assertAdminAccess(user) {
+            if (!user || !user.email) {
+                throw new Error('NO_EMAIL');
+            }
+            const email = String(user.email).trim().toLowerCase();
+            if (isPlayerSyntheticEmail(email)) {
+                throw new Error('PLAYER_ACCOUNT');
+            }
+            const allow = await loadAdminEmailAllowlist();
+            if (allow.length > 0 && !allow.includes(email)) {
+                throw new Error('NOT_IN_ALLOWLIST');
+            }
+            return true;
+        }
+
+        function adminAccessErrorMessage(code) {
+            if (code === 'PLAYER_ACCOUNT') {
+                return 'Đây là tài khoản player (username + PIN). Admin phải dùng email thật khác, tạo trên Firebase Console.';
+            }
+            if (code === 'NOT_IN_ALLOWLIST') {
+                return 'Email này chưa được cấp quyền Admin. Thêm vào settings/adminEmails trên Firebase.';
+            }
+            if (code === 'NO_EMAIL') return 'Tài khoản không có email';
+            return 'Không có quyền Admin';
+        }
+
         document.getElementById('admin-login-btn').onclick = async () => {
             const email = document.getElementById('admin-email').value.trim();
             const pass = document.getElementById('admin-pass').value;
@@ -1776,17 +1860,28 @@
                 document.getElementById('login-error').style.display = 'block';
                 return;
             }
+            if (isPlayerSyntheticEmail(email)) {
+                document.getElementById('login-error').textContent = 'Không dùng tài khoản player (@xuanken.user). Hãy dùng email admin thật.';
+                document.getElementById('login-error').style.display = 'block';
+                return;
+            }
             try {
                 document.getElementById('admin-login-btn').disabled = true;
                 document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
-                await firebase.auth().signInWithEmailAndPassword(email, pass);
-                document.getElementById('login-error').style.display = 'none';
-                // onAuthStateChanged sẽ gọi showApp
+                const cred = await firebase.auth().signInWithEmailAndPassword(email, pass);
+                try {
+                    await assertAdminAccess(cred.user);
+                    document.getElementById('login-error').style.display = 'none';
+                } catch (accessErr) {
+                    await firebase.auth().signOut();
+                    document.getElementById('login-error').textContent = adminAccessErrorMessage(accessErr.message);
+                    document.getElementById('login-error').style.display = 'block';
+                }
             } catch (err) {
                 console.error(err);
                 let msg = 'Email hoặc mật khẩu không đúng';
-                if (err.code === 'auth/user-not-found') msg = 'Tài khoản không tồn tại';
-                if (err.code === 'auth/wrong-password') msg = 'Sai mật khẩu';
+                if (err.code === 'auth/user-not-found') msg = 'Tài khoản không tồn tại — tạo email admin trên Firebase Console → Authentication';
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = 'Sai mật khẩu';
                 if (err.code === 'auth/invalid-email') msg = 'Email không hợp lệ';
                 if (err.code === 'auth/too-many-requests') msg = 'Thử lại sau (quá nhiều lần sai)';
                 document.getElementById('login-error').textContent = msg;
@@ -2104,6 +2199,27 @@
             maxRegistrations: Math.max(0, parseInt(document.getElementById('set-max-registrations').value, 10) || 0),
             registrationCount: Math.max(0, parseInt(document.getElementById('set-registration-count').value, 10) || 0)
         });
+        const saveAdminEmailsBtn = document.getElementById('save-admin-emails-btn');
+        if (saveAdminEmailsBtn) saveAdminEmailsBtn.onclick = async () => {
+            const ta = document.getElementById('set-admin-emails');
+            const raw = (ta && ta.value || '').split(/[\n,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+            // Loại email player ảo
+            const list = [];
+            const seen = {};
+            raw.forEach(e => {
+                if (e.endsWith('@xuanken.user')) return;
+                if (!e.includes('@')) return;
+                if (seen[e]) return;
+                seen[e] = true;
+                list.push(e);
+            });
+            try {
+                await db().ref('settings/adminEmails').set(list);
+                toast(list.length ? ('Đã lưu ' + list.length + ' email admin') : 'Đã xóa danh sách (mọi email thật đều vào được Admin)');
+            } catch (e) {
+                toast('Lỗi lưu adminEmails: ' + (e.code || e.message || e));
+            }
+        };
         const saveFlash = document.getElementById('save-flash-btn');
         if (saveFlash) saveFlash.onclick = async () => {
             const fu = document.getElementById('set-flash-until') && document.getElementById('set-flash-until').value;
@@ -2184,11 +2300,23 @@
         });
 
 
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                showApp();
-            } else {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (!user) {
                 showLogin();
+                return;
+            }
+            try {
+                await assertAdminAccess(user);
+                showApp();
+            } catch (e) {
+                console.warn('Admin access denied:', e && e.message);
+                try { await firebase.auth().signOut(); } catch (x) {}
+                showLogin();
+                const errEl = document.getElementById('login-error');
+                if (errEl) {
+                    errEl.textContent = adminAccessErrorMessage((e && e.message) || '');
+                    errEl.style.display = 'block';
+                }
             }
         });
     </script>
