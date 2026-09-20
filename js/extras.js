@@ -806,13 +806,13 @@
       const path = (typeof dataPath === 'function' ? dataPath('chat') : 'chat');
       db.ref(path).limitToLast(40).on('value', snap => {
         const val = snap.val() || {};
-        const items = Object.keys(val).map(k => ({ k, ...val[k] })).sort((a, b) => (a.t || 0) - (b.t || 0));
+        const items = Object.keys(val).map(k => ({ k, ...val[k] })).sort((a, b) => (a.at || a.t || 0) - (b.at || b.t || 0));
         box.innerHTML = items.map(m => {
           const rank = (m.rank || 'member').toLowerCase();
           const badge = '<span class="chat-badge ' + escapeHtml(rank) + '">' + escapeHtml(rank) + '</span>';
           let text = escapeHtml(m.text || '');
           text = text.replace(/@([\w\u00C0-\u024F\u1E00-\u1EFF.-]+)/gi, '<span class="chat-mention">@$1</span>');
-          const ts = Number(m.t) || 0;
+          const ts = Number(m.at || m.t) || 0;
           let timeStr = '';
           if (ts) {
             const d = new Date(ts);
@@ -889,7 +889,7 @@
             const dur = (parts[2] || '1h').toLowerCase();
             let payload;
             if (dur === 'forever' || dur === 'vĩnh' || dur === 'vinhvien') {
-              payload = { forever: true, by: user, at: Date.now() };
+              payload = { until: 9999999999999, forever: true, by: user, at: Date.now() };
             } else {
               const hours = parseFloat(dur) || (dur.endsWith('h') ? parseFloat(dur) : 1);
               const h = Number.isFinite(hours) && hours > 0 ? hours : 1;
@@ -916,11 +916,13 @@
       const db = getDb();
       if (!db) return;
       const path = (typeof dataPath === 'function' ? dataPath('chat') : 'chat');
+      const now = Date.now();
       await db.ref(path).push({
-        u: user,
-        rank: rank,
+        u: String(user || '').slice(0, 39),
         text: text.slice(0, 300),
-        t: Date.now()
+        at: now,
+        t: now,
+        rank: String(rank || 'member').slice(0, 31)
       });
       if (input) input.value = '';
     } catch (err) {
