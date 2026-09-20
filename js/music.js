@@ -2658,13 +2658,30 @@ async function fetchUserByUid(uid, usernameHint) {
         const snap = await db.ref(dataPath('users') + '/' + id).once('value');
         const data = snap.val();
         if (!data) return null;
-        const name = String(usernameHint || data.username || '').trim();
+        // Ưu tiên username trên Firebase — tránh localStorage gán nhầm tên khác vào uid này
+        const remoteName = String(data.username || '').trim();
+        const hint = String(usernameHint || '').trim();
+        const name = remoteName || hint;
         if (!name) return null;
+        if (remoteName && hint && remoteName.toLowerCase() !== hint.toLowerCase()) {
+            console.warn('[sync] username lệch: local="' + hint + '" firebase="' + remoteName + '" → dùng Firebase');
+        }
         const accounts = getAllAccounts();
+        // Xóa bản local cũ gắn sai uid / sai tên cho cùng uid
+        Object.keys(accounts).forEach(k => {
+            const a = accounts[k];
+            if (!a) return;
+            if (String(a.uid || '') === id && k !== name) {
+                delete accounts[k];
+            }
+        });
         accounts[name] = mapUserProfile(data, name);
         accounts[name].uid = id;
-        // Remote là nguồn sự thật khi load — không giữ owned local cũ
         saveAllAccounts(accounts);
+        // Đồng bộ current username theo Firebase
+        if (getCurrentUsername() !== name) {
+            setCurrentUsername(name);
+        }
         _profileSyncedFromRemote = true;
         startUserProfileListener(id);
         return accounts[name];
@@ -2735,10 +2752,15 @@ function buildUserPayload(uid, name, account, includeCoins) {
 async function pushUserToFirebase(username, account, options) {
     const name = String(username || '').trim();
     if (!name || !account) return false;
-    const uid = account.uid || getCurrentUid();
+    // Auth UID là nguồn chuẩn — không dùng account.uid cũ trong localStorage (dễ lẫn PC)
+    const uid = getCurrentUid() || account.uid || '';
     if (!uid) {
         console.warn('pushUser: chưa có uid (chưa Auth)');
         return false;
+    }
+    if (account.uid && account.uid !== uid) {
+        console.warn('[sync] account.uid lệch Auth, sửa:', account.uid, '→', uid);
+        account.uid = uid;
     }
     // owned dùng transaction UNION trên server → local thiếu cũng không xóa bài mobile đã mua
     // coins dùng transaction theo delta → an toàn đa thiết bị
@@ -2808,7 +2830,21 @@ const pushUserToSheet = pushUserToFirebase;
 function getCurrentAccount() {
     const name = getCurrentUsername();
     if (!name) return null;
-    return ensureUserAccount(name);
+    const acc = ensureUserAccount(name);
+    const authUid = getCurrentUid();
+    // Sửa uid local nếu lệch phiên Auth hiện tại
+    if (acc && authUid && acc.uid && acc.uid !== authUid) {
+        console.warn('[sync] getCurrentAccount uid lệch, sửa local:', acc.uid, '→', authUid);
+        acc.uid = authUid;
+        const accounts = getAllAccounts();
+        if (accounts[name]) {
+            accounts[name].uid = authUid;
+            saveAllAccounts(accounts);
+        }
+    } else if (acc && authUid && !acc.uid) {
+        acc.uid = authUid;
+    }
+    return acc;
 }
 
 function updateCurrentAccount(mutator) {
@@ -3632,6 +3668,33 @@ function clearPinTrust() {
     } catch (e) {}
 }
 
+/** Xóa session local (username + accounts cache) — giữ theme. Dùng khi UID bị lẫn. */
+function clearLocalUserSession() {
+    try {
+        localStorage.removeItem(storageKey(STORAGE_CURRENT_USER));
+        localStorage.removeItem(storageKey(STORAGE_ACCOUNTS));
+        localStorage.removeItem(storageKey(STORAGE_PIN_TRUST));
+        _profileSyncedFromRemote = false;
+        _pendingOwnedAdds = Object.create(null);
+        stopUserProfileListener();
+    } catch (e) {}
+}
+
+/** Nếu local user/uid lệch Auth → xóa cache local và kéo lại từ Firebase */
+async function reconcileLocalWithAuth() {
+    const authUid = getCurrentUid();
+    if (!authUid) return false;
+    const name = getCurrentUsername();
+    const accounts = getAllAccounts();
+    const acc = name ? accounts[name] : null;
+    const badUid = acc && acc.uid && acc.uid !== authUid;
+    const missing = !name;
+    if (!badUid && !missing && _profileSyncedFromRemote) return true;
+    console.log('[sync] reconcile local ↔ Auth uid=', authUid);
+    await fetchUserByUid(authUid, name || '');
+    return true;
+}
+
 function setPinSectionVisible(show) {
     const boxes = document.getElementById('pin-boxes');
     const hint = document.getElementById('pin-hint');
@@ -3838,8 +3901,19 @@ async function loginWithUsername(rawName, rawPin) {
     }
 
     setCurrentUsername(name);
-    const acc = ensureUserAccount(name);
-    if (acc) acc.uid = uid;
+    const accounts = getAllAccounts();
+    // Dọn local: xóa entry khác đang trỏ cùng uid (tránh lẫn)
+    Object.keys(accounts).forEach(k => {
+        if (k !== name && accounts[k] && String(accounts[k].uid || '') === String(uid)) {
+            delete accounts[k];
+        }
+    });
+    if (!accounts[name]) {
+        accounts[name] = { coins: 0, owned: [], lastCheckin: '', createdAt: Date.now() };
+    }
+    accounts[name].uid = uid;
+    saveAllAccounts(accounts);
+    const acc = accounts[name];
     markPinTrusted(name);
     startUserProfileListener(uid);
     updateUsernameBadge();
@@ -3872,11 +3946,18 @@ function setupUsernameGate() {
     
     if (existing && input) {
         input.value = existing;
-        fetchUserFromSheet(existing).then(() => {
+        // Ưu tiên Auth uid → profile Firebase (tránh localStorage cứng đầu trên PC)
+        const authUid = getCurrentUid();
+        const loader = authUid
+            ? fetchUserByUid(authUid, existing)
+            : fetchUserFromSheet(existing);
+        loader.then(() => {
+            const real = getCurrentUsername();
+            if (real && input) input.value = real;
             updateUsernameBadge();
             updateShopBalanceUI();
             updateCheckinButtonUI();
-                });
+        }).catch(() => {});
         updateUsernameBadge();
     }
     refreshPinVisibility();
@@ -4034,8 +4115,12 @@ updateCheckinButtonUI();
                 return;
             }
             const name = String(data.username).trim();
+            const localName = getCurrentUsername();
+            if (localName && localName !== name) {
+                console.warn('[sync] localStorage user="' + localName + '" ≠ Auth profile="' + name + '" → ép theo Firebase');
+            }
             setCurrentUsername(name);
-            await fetchUserByUid(user.uid, name); // đã gọi startUserProfileListener bên trong
+            await fetchUserByUid(user.uid, name); // Firebase = nguồn đúng
             markPinTrusted(name);
             updateUsernameBadge();
             updateShopBalanceUI();
@@ -4060,13 +4145,14 @@ updateCheckinButtonUI();
 /** Khi mở lại tab / app (PC ↔ mobile) thì kéo lại dữ liệu mới nhất từ Firebase */
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    const uid = getCurrentUid();
-    const name = getCurrentUsername();
-    if (!uid || !name) return;
-    fetchUserByUid(uid, name).then(() => {
+    reconcileLocalWithAuth().then(() => {
         updateShopBalanceUI();
         if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
         if (typeof updateCheckinButtonUI === 'function') updateCheckinButtonUI();
+        try {
+            const modal = document.getElementById('shop-modal');
+            if (modal && modal.classList.contains('show') && typeof renderShopList === 'function') renderShopList();
+        } catch (e) {}
     }).catch(() => {});
 });
 
@@ -4153,6 +4239,8 @@ window.openShopModal = openShopModal;
 window.renderShopThumbs = renderShopThumbs;
 window.fetchProgressThumbs = fetchProgressThumbs;
 window.getCurrentUsername = getCurrentUsername;
+window.clearLocalUserSession = clearLocalUserSession;
+window.reconcileLocalWithAuth = reconcileLocalWithAuth;
 // Expose for extras.js
 Object.defineProperty(window, 'songs', { get: () => songs });
 Object.defineProperty(window, 'index', { get: () => index });

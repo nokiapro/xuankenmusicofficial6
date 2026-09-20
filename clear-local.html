@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Xóa localStorage — XuanKen Music</title>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
   <style>
     :root { color-scheme: dark; }
     body {
@@ -38,13 +41,13 @@
   <div class="box">
     <h1>Xóa cache local (PC / Mobile)</h1>
     <p>
-      Trang này xóa <strong>localStorage</strong> của XuanKen Music trên <em>trình duyệt hiện tại</em>
-      (xu, tài khoản, PIN trust, theme…). Chạy trên <strong>cả PC và điện thoại</strong> sau khi reset Firebase.
+      Xóa <strong>localStorage</strong> + đăng xuất Firebase Auth trên trình duyệt này.
+      Dùng khi PC bị <em>lẫn UID / username</em> (ẩn danh thì OK, trình duyệt thường thì lệch).
     </p>
     <p style="color:#ff9800;font-size:0.82rem;">
-      Không xóa dữ liệu trên Firebase. Chỉ xóa dữ liệu lưu trong máy bạn.
+      Sau khi xóa: mở lại trang chủ → đăng nhập username + PIN một lần.
     </p>
-    <button id="clear-btn" type="button">XÓA TOÀN BỘ LOCALSTORAGE SITE NÀY</button>
+    <button id="clear-btn" type="button">XÓA CACHE + ĐĂNG XUẤT</button>
     <button id="back-btn" class="btn-secondary" type="button">Về trang chủ</button>
     <pre id="log"></pre>
   </div>
@@ -55,47 +58,32 @@
       var back = document.getElementById('back-btn');
       back.onclick = function () { location.href = 'index.html'; };
 
-      btn.onclick = function () {
-        if (!confirm('Xóa toàn bộ localStorage của site này trên máy/trình duyệt hiện tại?')) return;
+      btn.onclick = async function () {
+        if (!confirm('Xóa localStorage + đăng xuất Auth trên máy này?')) return;
         var keys = [];
         try {
-          for (var i = 0; i < localStorage.length; i++) {
-            keys.push(localStorage.key(i));
-          }
+          for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
         } catch (e) {}
-
-        // Xóa mọi key liên quan xuanken / music6 / prefix site
         var removed = [];
-        var patterns = [
-          /^music6_/i,
-          /^xuanken/i,
-          /xuanken/i,
-          /_accounts$/i,
-          /_current_user$/i,
-          /admin_settings/i,
-          /song_prices/i,
-          /pin_trust/i,
-          /listens/i,
-          /theme/i,
-          /profiles/i
-        ];
-
-        // Factory reset local: xóa toàn bộ localStorage origin này
         keys.forEach(function (k) {
           if (!k) return;
-          try {
-            localStorage.removeItem(k);
-            removed.push(k);
-          } catch (e) {}
+          try { localStorage.removeItem(k); removed.push(k); } catch (e) {}
         });
-
-        // sessionStorage cũng xóa
         try { sessionStorage.clear(); } catch (e) {}
-
+        var authMsg = '';
+        try {
+          if (typeof firebase !== 'undefined' && firebase.auth) {
+            await firebase.auth().signOut();
+            authMsg = '\n✓ Đã signOut Firebase Auth';
+          } else {
+            authMsg = '\n· Firebase Auth chưa load (vẫn đã xóa localStorage)';
+          }
+        } catch (e) {
+          authMsg = '\n· signOut lỗi: ' + (e.message || e);
+        }
         logEl.style.display = 'block';
-        logEl.innerHTML = '<span class="ok">Đã xóa ' + removed.length + ' key localStorage</span>\n' +
-          removed.map(function (k) { return '· ' + k; }).join('\n') +
-          '\n\n<span class="ok">Xong. Hãy hard-refresh trang chủ (Ctrl+F5) hoặc đóng tab rồi mở lại.</span>';
+        logEl.innerHTML = '<span class="ok">Đã xóa ' + removed.length + ' key localStorage</span>' + authMsg
+          + '\n\n<span class="ok">Xong. Mở trang chủ → đăng nhập lại username + PIN.</span>';
         btn.disabled = true;
         btn.textContent = 'Đã xóa xong';
       };
