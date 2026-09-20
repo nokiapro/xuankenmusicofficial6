@@ -27,9 +27,37 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-// Dữ liệu trên Firebase Realtime Database (js/firebase-config.js)
+// Dữ liệu trên Firebase Realtime Database + Auth (js/firebase-config.js)
 function getDb() {
     return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
+}
+
+function getAuth() {
+    return window.fbAuth || (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
+}
+
+function getCurrentUid() {
+    const a = getAuth();
+    return (a && a.currentUser && a.currentUser.uid) ? a.currentUser.uid : '';
+}
+
+/** Email synthetic cho Firebase Auth — username + PIN = email/password */
+function usernameToEmail(username) {
+    const key = sanitizeUsernameKey(username).toLowerCase();
+    return key + '@xuanken.vn';
+}
+
+function authErrorMessage(err) {
+    const code = (err && err.code) || '';
+    if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        return 'Sai username hoặc PIN';
+    }
+    if (code === 'auth/email-already-in-use') return 'Username đã được đăng ký';
+    if (code === 'auth/weak-password') return 'PIN phải đủ 6 chữ số';
+    if (code === 'auth/too-many-requests') return 'Thử quá nhiều lần — đợi vài phút';
+    if (code === 'auth/network-request-failed') return 'Lỗi mạng — kiểm tra kết nối';
+    if (code === 'auth/operation-not-allowed') return 'Chưa bật Email/Password trên Firebase Console';
+    return (err && (err.message || err.code)) || 'Đăng nhập thất bại';
 }
 
 // ===== Storage keys & multi-site prefix helpers (định nghĩa sớm) =====
@@ -51,12 +79,16 @@ const DEFAULT_ADMIN_SETTINGS = {
     starterCoins: 20,
     siteName: 'XuanKen Music Official',
     siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
-    // Mặc định music6 để tránh race: load page → prefix rỗng → ghi path sai trước khi sync settings
+    // Chỉ dùng cho localStorage (vd music6_xuanken_accounts) — Firebase luôn ở root
     sitePrefix: 'music6',
     /** Bắt buộc nhập PIN khi vào player */
     requirePin: true,
-    /** Cho phép tạo username mới từ màn hình đầu (tắt = chỉ user admin đã tạo) */
+    /** Cho phép tạo username mới từ màn hình đầu */
     allowRegister: true,
+    /** Số lần đăng ký tối đa (0 = không giới hạn) */
+    maxRegistrations: 0,
+    /** Đã đăng ký bao nhiêu tài khoản (tự tăng khi đăng ký mới) */
+    registrationCount: 0,
     siteBanner: '',
     flashSalePercent: 0,
     flashSaleUntil: '',
@@ -80,17 +112,16 @@ function saveAdminSettings(settings) {
 /**
  * Key localStorage theo sitePrefix (vd music6_xuanken_accounts).
  * Settings (STORAGE_ADMIN_SETTINGS) cố ý KHÔNG prefix — chứa sitePrefix để các key khác biết dùng prefix nào.
- * Mỗi web set sitePrefix khác nhau → localStorage tách biệt, không đè lên nhau.
+ * sitePrefix CHỈ ảnh hưởng localStorage, KHÔNG ảnh hưởng Firebase (Firebase luôn root).
  */
 function storageKey(base) {
     const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
     return p ? `${p}_${base}` : base;
 }
 
-/** Đường dẫn Firebase theo prefix (settings luôn ở root) */
+/** Đường dẫn Firebase — luôn root (songs, users, prices...). sitePrefix không còn dùng cho Firebase. */
 function dataPath(key) {
-    const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
-    return p ? `${p}/${key}` : key;
+    return String(key || '').replace(/^\/+|\/+$/g, '');
 }
 
 function applyBranding() {
@@ -304,27 +335,8 @@ let preloadAudioEl = null;
 async function fetchSongsFromFirebase() {
     const db = getDb();
     if (!db) throw new Error('Firebase chưa sẵn sàng');
-    const prefix = String((getAdminSettings().sitePrefix || '')).trim();
-    const path = dataPath('songs');
-    try {
-        const snap = await db.ref(path).once('value');
-        const arr = songsObjectToArray(snap.val());
-        // Nếu có prefix nhưng path đó trống / không có quyền → fallback root (tránh site "chết")
-        if (prefix && arr.length === 0) {
-            console.warn(`[songs] Prefix "${prefix}" không có dữ liệu, fallback sang root /songs`);
-            const snapRoot = await db.ref('songs').once('value');
-            return songsObjectToArray(snapRoot.val());
-        }
-        return arr;
-    } catch (e) {
-        const msg = (e && (e.message || e.code)) || String(e);
-        if (prefix && /permission|PERMISSION_DENIED|permission_denied/i.test(msg)) {
-            console.warn(`[songs] Prefix "${prefix}" bị chặn quyền, fallback sang root /songs`, e);
-            const snapRoot = await db.ref('songs').once('value');
-            return songsObjectToArray(snapRoot.val());
-        }
-        throw e;
-    }
+    const snap = await db.ref(dataPath('songs')).once('value');
+    return songsObjectToArray(snap.val());
 }
 
 async function checkForUpdates() {
@@ -486,13 +498,7 @@ function startAutoRefresh(intervalSeconds = 60) {
 async function fetchSongsRawFromFirebase() {
     const db = getDb();
     if (!db) return [];
-    const path = dataPath('songs');
-    let snap;
-    try {
-        snap = await db.ref(path).once('value');
-    } catch (e) {
-        snap = await db.ref('songs').once('value');
-    }
+    const snap = await db.ref(dataPath('songs')).once('value');
     const obj = snap.val() || {};
     return Object.keys(obj).map(id => {
         const s = obj[id] || {};
@@ -868,9 +874,9 @@ function recordListenSeconds(deltaSec) {
             const db = getDb();
             const name = getCurrentUsername();
             const acc = getCurrentAccount();
-            if (db && name && acc && acc.listenTime) {
-                const key = sanitizeUsernameKey(name);
-                db.ref(dataPath('users') + '/' + key + '/listenTime').set(acc.listenTime);
+            if (db && acc && acc.listenTime) {
+                const uid = getCurrentUid() || acc.uid || '';
+                if (uid) db.ref(dataPath('users') + '/' + uid + '/listenTime').set(acc.listenTime);
             }
         } catch (e) {}
     }
@@ -884,18 +890,40 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
+/**
+ * Cộng 1 lượt nghe cho bài.
+ * - Toast + local cập nhật ngay (không đợi Firebase)
+ * - Firebase ghi root: songs/{id}/listenCount
+ * - Username không bắt buộc; có user thì cộng XP / listenedSongs
+ */
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     const sid = String(songId);
-    // Username KHÔNG còn bắt buộc để cộng lượt bài (giống music2).
-    // Vẫn dùng username nếu có để cộng XP / listenedSongs user.
     const user = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
-    if (!user) {
-        console.warn('LISTEN: không có username — vẫn cộng lượt bài, bỏ qua XP user');
-    }
 
     isUpdatingListen = true;
     try {
+        // 1) Local + UI ngay lập tức
+        if (!listenData[sid]) listenData[sid] = 0;
+        listenData[sid]++;
+        const songIndex = songs.findIndex(s => String(s.id) === sid);
+        if (songIndex !== -1) songs[songIndex].listenCount = listenData[sid];
+        try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
+        try { updateListenStatsModal(); } catch (e) {}
+        try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
+
+        try {
+            showNotification(
+                '+1 LISTEN:',
+                '<i class="fa-regular fa-star"></i> ' + (songName || sid) + ' <i class="fa-regular fa-star"></i>',
+                '#4ade80',
+                'headphones'
+            );
+        } catch (e) {
+            console.warn('toast listen fail', e);
+        }
+        console.log('GHI NHẬN LƯỢT NGHE:', songName, sid, '→', listenData[sid], source, user || '(no-user)');
+
         if (user) {
             try {
                 updateCurrentAccount(acc => {
@@ -908,58 +936,34 @@ async function incrementListenCount(songId, songName, source = 'normal') {
             } catch (e) {}
         }
 
-        if (!listenData[sid]) listenData[sid] = 0;
-        listenData[sid]++;
-        const songIndex = songs.findIndex(s => String(s.id) === sid);
-        if (songIndex !== -1) songs[songIndex].listenCount = listenData[sid];
-        try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
-        try { updateListenStatsModal(); } catch (e) {}
-        try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
-        console.log('GHI NHẬN LƯỢT NGHE:', songName, sid, '→', listenData[sid], source, user ? ('user=' + user) : 'no-user');
-        try {
-            showNotification('+1 LISTEN:', '<i class="fa-regular fa-star"></i> ' + (songName || sid) + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'headphones');
-        } catch (e) {}
-
+        // 2) Firebase root: songs/{id}/listenCount
         const db = getDb();
         if (db) {
+            const path = dataPath('songs') + '/' + sid + '/listenCount';
             let serverCount = listenData[sid];
             let wrote = false;
-            // Luôn thử path đúng (music6) trước, rồi dataPath, rồi root
-            const paths = [];
-            paths.push('music6/songs/' + sid + '/listenCount');
             try {
-                const dp = dataPath('songs') + '/' + sid + '/listenCount';
-                paths.push(dp);
-            } catch (e) {}
-            paths.push('songs/' + sid + '/listenCount');
-            const uniq = [...new Set(paths)];
-            for (const p of uniq) {
-                try {
-                    const ref = db.ref(p);
-                    const result = await withTimeout(
-                        ref.transaction(current => (Number(current) || 0) + 1),
-                        8000,
-                        'tx:' + p
-                    );
-                    if (result && result.committed) {
-                        serverCount = Number(result.snapshot.val()) || serverCount;
-                        wrote = true;
-                        console.log('listenCount OK', p, serverCount);
-                        break;
-                    }
-                } catch (e) {
-                    console.warn('listenCount tx fail', p, e && (e.code || e.message));
+                const result = await withTimeout(
+                    db.ref(path).transaction(current => (Number(current) || 0) + 1),
+                    8000,
+                    'listenCount-tx'
+                );
+                if (result && result.committed) {
+                    serverCount = Number(result.snapshot.val()) || serverCount;
+                    wrote = true;
                 }
+            } catch (e) {
+                console.warn('listenCount tx fail', e && (e.code || e.message));
+            }
+            if (!wrote) {
                 try {
-                    const snap = await withTimeout(db.ref(p).once('value'), 5000, 'read:' + p);
+                    const snap = await withTimeout(db.ref(path).once('value'), 5000, 'listenCount-read');
                     const next = (Number(snap.val()) || 0) + 1;
-                    await withTimeout(db.ref(p).set(next), 5000, 'set:' + p);
+                    await withTimeout(db.ref(path).set(next), 5000, 'listenCount-set');
                     serverCount = next;
                     wrote = true;
-                    console.log('listenCount set OK', p, next);
-                    break;
                 } catch (e2) {
-                    console.warn('listenCount set fail', p, e2 && (e2.code || e2.message));
+                    console.warn('listenCount set fail', e2 && (e2.code || e2.message));
                 }
             }
             if (wrote) {
@@ -969,21 +973,22 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 try { updateListenStatsModal(); } catch (e) {}
                 try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
             } else {
-                console.warn('listenCount: không ghi được Firebase — Rules/path (đã lưu local)');
+                console.warn('listenCount: Firebase chưa ghi được — đã lưu local + toast');
             }
-            // Firebase user.listenedSongs + XP (chỉ khi có username)
-            if (user) {
+
+            // User XP / listenedSongs — path theo uid (Firebase Auth)
+            const uid = getCurrentUid() || (getCurrentAccount() && getCurrentAccount().uid) || '';
+            if (uid) {
                 try {
-                    const key = sanitizeUsernameKey(user);
                     await withTimeout(
-                        db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now()),
+                        db.ref(dataPath('users') + '/' + uid + '/listenedSongs/' + sid).set(Date.now()),
                         5000,
                         'user-listened'
                     );
                     const acc2 = getCurrentAccount();
                     if (acc2) {
                         await withTimeout(
-                            db.ref(dataPath('users') + '/' + key).update({
+                            db.ref(dataPath('users') + '/' + uid).update({
                                 xp: Number(acc2.xp) || 0,
                                 seasonXp: Number(acc2.seasonXp) || 0,
                                 level: Number(acc2.level) || 1
@@ -997,6 +1002,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 }
             }
         }
+
         if (typeof window.onListenCounted === 'function') {
             try { window.onListenCounted(sid); } catch (e) {}
         }
@@ -1802,15 +1808,20 @@ let lastTimeLabelAt = 0;
 function tryRecordListenCount() {
     try {
         if (!songs || !songs[index]) return;
-        if (hasRecordedCurrentSong || isUpdatingListen) return;
+        if (hasRecordedCurrentSong) return;
+        if (isUpdatingListen) return;
         if (demoLockedSongId) return;
-        // Đang phát hoặc đã tua qua 5s
         const cur = (typeof audio !== 'undefined' && audio) ? (Number(audio.currentTime) || 0) : 0;
         if (cur < 5) return;
         if (!hasUserInteracted) hasUserInteracted = true;
         hasRecordedCurrentSong = true;
         const song = songs[index];
-        incrementListenCount(song.id, song.name, currentSource || 'play');
+        // Fire-and-forget; nếu fail thì cho retry lần sau
+        Promise.resolve(incrementListenCount(song.id, song.name, currentSource || 'play'))
+            .then(ok => {
+                if (!ok) hasRecordedCurrentSong = false;
+            })
+            .catch(() => { hasRecordedCurrentSong = false; });
     } catch (e) {
         console.warn('tryRecordListenCount', e);
         hasRecordedCurrentSong = false;
@@ -2494,68 +2505,80 @@ function sanitizeUsernameKey(name) {
     return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
 }
 
-async function fetchUserFromFirebase(username) {
-    const name = String(username || '').trim();
-    if (!name) return null;
-    const key = sanitizeUsernameKey(name);
+/** Map profile Firebase → object local */
+function mapUserProfile(data, name) {
+    const d = data || {};
+    return {
+        uid: d.uid || '',
+        coins: d.coins | 0,
+        owned: Array.isArray(d.owned) ? d.owned.map(String) : (d.owned ? String(d.owned).split(',').filter(Boolean) : []),
+        favorites: Array.isArray(d.favorites) ? d.favorites.map(String) : [],
+        likes: Array.isArray(d.likes) ? d.likes.map(String) : [],
+        dislikes: Array.isArray(d.dislikes) ? d.dislikes.map(String) : [],
+        myPlaylist: Array.isArray(d.myPlaylist) ? d.myPlaylist.map(String) : [],
+        rentals: (d.rentals && typeof d.rentals === 'object') ? d.rentals : {},
+        lastCheckin: d.lastCheckin || '',
+        createdAt: d.createdAt || Date.now(),
+        rank: d.rank || 'member',
+        banned: !!d.banned,
+        banReason: d.banReason || '',
+        xp: Number(d.xp) || 0,
+        level: Number(d.level) || 1,
+        seasonXp: Number(d.seasonXp) || 0,
+        achievements: Array.isArray(d.achievements) ? d.achievements.map(String) : [],
+        frame: d.frame || '',
+        streak: Number(d.streak) || 0,
+        streakFreeze: Number(d.streakFreeze) || 0,
+        listenedSongs: (d.listenedSongs && typeof d.listenedSongs === 'object') ? d.listenedSongs : {},
+        listenTime: (d.listenTime && typeof d.listenTime === 'object') ? d.listenTime : { total: 0, byDay: {} },
+        ownedThumbs: Array.isArray(d.ownedThumbs) ? d.ownedThumbs.map(String) : [],
+        activeThumb: d.activeThumb || '',
+        inviteBy: d.inviteBy || '',
+        profiles: Array.isArray(d.profiles) ? d.profiles : []
+    };
+}
+
+/** Lấy profile theo uid (Firebase Auth) */
+async function fetchUserByUid(uid, usernameHint) {
+    const id = String(uid || '').trim();
+    if (!id) return null;
     try {
         const db = getDb();
         if (!db) throw new Error('No DB');
-        const snap = await db.ref(dataPath('users') + '/' + key).once('value');
+        const snap = await db.ref(dataPath('users') + '/' + id).once('value');
         const data = snap.val();
+        if (!data) return null;
+        const name = String(usernameHint || data.username || '').trim();
+        if (!name) return null;
         const accounts = getAllAccounts();
-        if (data) {
-            accounts[name] = {
-                coins: data.coins | 0,
-                owned: Array.isArray(data.owned) ? data.owned.map(String) : (data.owned ? String(data.owned).split(',').filter(Boolean) : []),
-                favorites: Array.isArray(data.favorites) ? data.favorites.map(String) : [],
-                likes: Array.isArray(data.likes) ? data.likes.map(String) : [],
-                dislikes: Array.isArray(data.dislikes) ? data.dislikes.map(String) : [],
-                myPlaylist: Array.isArray(data.myPlaylist) ? data.myPlaylist.map(String) : [],
-                rentals: (data.rentals && typeof data.rentals === 'object') ? data.rentals : {},
-                lastCheckin: data.lastCheckin || '',
-                createdAt: data.createdAt || Date.now(),
-                rank: data.rank || 'member',
-                pin: data.pin != null ? String(data.pin) : '',
-                banned: !!data.banned,
-                banReason: data.banReason || '',
-                xp: Number(data.xp) || 0,
-                level: Number(data.level) || 1,
-                seasonXp: Number(data.seasonXp) || 0,
-                achievements: Array.isArray(data.achievements) ? data.achievements.map(String) : [],
-                frame: data.frame || '',
-                streak: Number(data.streak) || 0,
-                streakFreeze: Number(data.streakFreeze) || 0,
-                listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
-                listenTime: (data.listenTime && typeof data.listenTime === 'object') ? data.listenTime : { total: 0, byDay: {} },
-                ownedThumbs: Array.isArray(data.ownedThumbs) ? data.ownedThumbs.map(String) : [],
-                activeThumb: data.activeThumb || '',
-                inviteBy: data.inviteBy || '',
-                profiles: Array.isArray(data.profiles) ? data.profiles : []
-            };
-            saveAllAccounts(accounts);
-            return accounts[name];
-        }
-        // User mới — tạo trên Firebase
-        const settings = getAdminSettings();
-        const neu = {
-            username: name,
-            coins: settings.starterCoins,
-            owned: [],
-            favorites: [],
-            likes: [],
-            dislikes: [],
-            myPlaylist: [],
-            rentals: {},
-            lastCheckin: '',
-            createdAt: Date.now(),
-            rank: 'member',
-            pin: ''
-        };
-        await db.ref(dataPath('users') + '/' + key).set(neu);
-        accounts[name] = { coins: neu.coins, owned: [], lastCheckin: '', createdAt: neu.createdAt, rank: 'member' };
+        accounts[name] = mapUserProfile(data, name);
+        accounts[name].uid = id;
         saveAllAccounts(accounts);
         return accounts[name];
+    } catch (e) {
+        console.warn('fetchUserByUid', e);
+        return null;
+    }
+}
+
+async function fetchUserFromFirebase(username) {
+    const name = String(username || '').trim();
+    if (!name) return null;
+    const uid = getCurrentUid();
+    if (uid) {
+        const byUid = await fetchUserByUid(uid, name);
+        if (byUid) return byUid;
+    }
+    // Lookup username → uid
+    try {
+        const db = getDb();
+        if (!db) throw new Error('No DB');
+        const key = sanitizeUsernameKey(name);
+        const mapSnap = await db.ref(dataPath('usernames') + '/' + key).once('value');
+        const map = mapSnap.val();
+        if (map && map.uid) {
+            return await fetchUserByUid(map.uid, name);
+        }
     } catch (e) {
         console.warn('Lấy user Firebase thất bại, dùng local:', e);
     }
@@ -2565,11 +2588,16 @@ async function fetchUserFromFirebase(username) {
 async function pushUserToFirebase(username, account) {
     const name = String(username || '').trim();
     if (!name || !account) return false;
-    const key = sanitizeUsernameKey(name);
+    const uid = account.uid || getCurrentUid();
+    if (!uid) {
+        console.warn('pushUser: chưa có uid (chưa Auth)');
+        return false;
+    }
     try {
         const db = getDb();
         if (!db) return false;
-        await db.ref(dataPath('users') + '/' + key).set({
+        const payload = {
+            uid: uid,
             username: name,
             coins: account.coins | 0,
             owned: account.owned || [],
@@ -2581,7 +2609,6 @@ async function pushUserToFirebase(username, account) {
             lastCheckin: account.lastCheckin || '',
             createdAt: account.createdAt || Date.now(),
             rank: account.rank || 'member',
-            pin: account.pin != null ? String(account.pin) : '',
             banned: !!account.banned,
             banReason: account.banReason || '',
             xp: Number(account.xp) || 0,
@@ -2596,7 +2623,10 @@ async function pushUserToFirebase(username, account) {
             ownedThumbs: account.ownedThumbs || [],
             activeThumb: account.activeThumb || '',
             inviteBy: account.inviteBy || ''
-        });
+        };
+        await db.ref(dataPath('users') + '/' + uid).set(payload);
+        const key = sanitizeUsernameKey(name);
+        await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
         return true;
     } catch (e) {
         console.warn('Lưu user Firebase thất bại:', e);
@@ -3416,10 +3446,12 @@ function setPinSectionVisible(show) {
 
 async function loginWithUsername(rawName, rawPin) {
     const name = String(rawName || '').trim().replace(/\s+/g, ' ');
-    const pin = String(rawPin || '').trim();
+    let pin = String(rawPin || '').trim();
     const settings = getAdminSettings();
     const requirePin = settings.requirePin !== false;
     const allowRegister = settings.allowRegister !== false;
+    const maxReg = Math.max(0, Number(settings.maxRegistrations) || 0);
+    const regCount = Math.max(0, Number(settings.registrationCount) || 0);
 
     if (!name || name.length < 2) {
         return { ok: false, message: 'Username tối thiểu 2 ký tự' };
@@ -3430,89 +3462,162 @@ async function loginWithUsername(rawName, rawPin) {
     if (!/^[\w\u00C0-\u024F\u1E00-\u1EFF .-]+$/i.test(name)) {
         return { ok: false, message: 'Username không hợp lệ' };
     }
-    // Đã xác nhận PIN trên máy này (< 7 ngày) → bỏ qua nhập PIN
-    const pinTrusted = isPinTrusted(name);
-    if (requirePin && !pinTrusted) {
-        if (!/^[0-9]{6}$/.test(pin)) {
-            return { ok: false, message: 'PIN phải đúng 6 chữ số' };
-        }
+
+    const auth = getAuth();
+    if (!auth) {
+        return { ok: false, message: 'Firebase Auth chưa sẵn sàng — tải lại trang' };
     }
 
-    // Chỉ đọc user — không tự tạo trong bước kiểm tra
+    // PIN 6 số = mật khẩu Auth (bắt buộc khi đăng nhập/đăng ký)
+    const pinTrusted = isPinTrusted(name);
+    if (!pinTrusted || !/^[0-9]{6}$/.test(pin)) {
+        if (requirePin || !pinTrusted) {
+            if (!/^[0-9]{6}$/.test(pin)) {
+                return { ok: false, message: 'PIN phải đúng 6 chữ số' };
+            }
+        }
+    }
+    // Nếu trusted nhưng chưa nhập PIN lần này, không sign-in lại được nếu session mất
+    // → bắt buộc PIN khi chưa có currentUser
+    if (!auth.currentUser && !/^[0-9]{6}$/.test(pin)) {
+        return { ok: false, message: 'Nhập PIN 6 số để đăng nhập' };
+    }
+
+    const email = usernameToEmail(name);
     const key = sanitizeUsernameKey(name);
-    let remote = null;
-    let dbOk = false;
+    const db = getDb();
+
+    // Kiểm tra username đã map uid chưa
+    let existingUid = null;
     try {
-        const db = getDb();
         if (db) {
-            const snap = await db.ref(dataPath('users') + '/' + key).once('value');
-            remote = snap.val();
-            dbOk = true;
+            const mapSnap = await db.ref(dataPath('usernames') + '/' + key).once('value');
+            const map = mapSnap.val();
+            if (map && map.uid) existingUid = map.uid;
         }
     } catch (e) {
-        console.warn('Kiểm tra user Firebase lỗi:', e);
+        console.warn('lookup username', e);
     }
 
-    if (remote) {
-        if (remote.banned) {
-            return { ok: false, message: 'Tài khoản đã bị khóa' + (remote.banReason ? (': ' + remote.banReason) : '') };
-        }
-        const savedPin = remote.pin != null ? String(remote.pin) : '';
-        if (!pinTrusted) {
-            if (savedPin) {
-                if (pin !== savedPin) {
-                    return { ok: false, message: 'Sai mã PIN' };
-                }
-            } else if (requirePin) {
-                // User cũ chưa có PIN → lần này đặt PIN mới
-                if (!/^[0-9]{6}$/.test(pin)) {
-                    return { ok: false, message: 'Tài khoản chưa có PIN — hãy đặt PIN 6 số mới' };
+    let cred = null;
+    let isNew = false;
+
+    try {
+        if (existingUid || !allowRegister) {
+            // Đăng nhập user đã có
+            if (!/^[0-9]{6}$/.test(pin) && auth.currentUser) {
+                // Session còn, trusted
+                cred = { user: auth.currentUser };
+            } else {
+                cred = await auth.signInWithEmailAndPassword(email, pin);
+            }
+        } else {
+            // Thử đăng nhập trước; nếu không có tài khoản → đăng ký
+            try {
+                cred = await auth.signInWithEmailAndPassword(email, pin);
+            } catch (signErr) {
+                const code = signErr && signErr.code;
+                if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-email') {
+                    if (!allowRegister) {
+                        return { ok: false, message: 'Username chưa được đăng ký — liên hệ admin' };
+                    }
+                    if (maxReg > 0 && regCount >= maxReg) {
+                        return { ok: false, message: 'Đã hết lượt đăng ký (' + regCount + '/' + maxReg + ')' };
+                    }
+                    if (!/^[0-9]{6}$/.test(pin)) {
+                        return { ok: false, message: 'Đăng ký mới cần đặt PIN đúng 6 số' };
+                    }
+                    // Tạo Auth account
+                    cred = await auth.createUserWithEmailAndPassword(email, pin);
+                    isNew = true;
+                } else {
+                    return { ok: false, message: authErrorMessage(signErr) };
                 }
             }
         }
-        // Đồng bộ local + cập nhật PIN nếu trước đó trống
-        await fetchUserFromSheet(name);
-        const acc = ensureUserAccount(name);
-        if (requirePin && pin && (!acc.pin || acc.pin === '')) {
-            acc.pin = pin;
-            const accounts = getAllAccounts();
-            if (accounts[name]) accounts[name].pin = pin;
-            saveAllAccounts(accounts);
-            await pushUserToSheet(name, accounts[name] || acc);
+    } catch (err) {
+        // Sai mật khẩu khi login
+        return { ok: false, message: authErrorMessage(err) };
+    }
+
+    const uid = cred && cred.user ? cred.user.uid : getCurrentUid();
+    if (!uid) {
+        return { ok: false, message: 'Không lấy được phiên đăng nhập' };
+    }
+
+    // Profile + ban check
+    let profile = null;
+    try {
+        if (db) {
+            const snap = await db.ref(dataPath('users') + '/' + uid).once('value');
+            profile = snap.val();
         }
+    } catch (e) {}
+
+    if (profile && profile.banned) {
+        try { await auth.signOut(); } catch (e) {}
+        return { ok: false, message: 'Tài khoản đã bị khóa' + (profile.banReason ? (': ' + profile.banReason) : '') };
+    }
+
+    if (isNew || !profile) {
+        const neu = {
+            uid: uid,
+            username: name,
+            coins: settings.starterCoins,
+            owned: [],
+            favorites: [],
+            likes: [],
+            dislikes: [],
+            myPlaylist: [],
+            rentals: {},
+            lastCheckin: '',
+            createdAt: Date.now(),
+            rank: 'member',
+            xp: 0,
+            level: 1,
+            seasonXp: 0,
+            listenedSongs: {},
+            listenTime: { total: 0, byDay: {} }
+        };
+        try {
+            if (db) {
+                await db.ref(dataPath('users') + '/' + uid).set(neu);
+                await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
+                if (isNew) {
+                    const t = await db.ref('settings/registrationCount').transaction(c => (Number(c) || 0) + 1);
+                    if (t && t.committed) {
+                        const next = Number(t.snapshot.val()) || (regCount + 1);
+                        saveAdminSettings({ ...getAdminSettings(), registrationCount: next });
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Tạo profile lỗi', e);
+        }
+        const accounts = getAllAccounts();
+        accounts[name] = mapUserProfile(neu, name);
+        accounts[name].uid = uid;
+        saveAllAccounts(accounts);
     } else {
-        // User chưa tồn tại
-        if (!allowRegister) {
-            return { ok: false, message: 'Username chưa được đăng ký — liên hệ admin' };
-        }
-        if (requirePin && !/^[0-9]{6}$/.test(pin)) {
-            return { ok: false, message: 'Đăng ký mới cần đặt PIN đúng 6 số' };
-        }
-        // Tạo user mới (fetchUserFromFirebase sẽ create)
-        await fetchUserFromSheet(name);
-        const acc = ensureUserAccount(name);
-        if (pin) {
-            acc.pin = pin;
-            const accounts = getAllAccounts();
-            if (accounts[name]) accounts[name].pin = pin;
-            saveAllAccounts(accounts);
-            await pushUserToSheet(name, accounts[name] || acc);
-        } else {
-            await pushUserToSheet(name, acc);
-        }
+        await fetchUserByUid(uid, name);
+        // Đảm bảo map username
+        try {
+            if (db) {
+                await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
+            }
+        } catch (e) {}
     }
 
     setCurrentUsername(name);
-    // Nhớ máy này đã xác nhận PIN (7 ngày) — thiết bị khác vẫn phải nhập
-    if (requirePin) {
-        if (pinTrusted || /^[0-9]{6}$/.test(pin)) {
-            markPinTrusted(name);
-        }
+    const acc = ensureUserAccount(name);
+    if (acc) acc.uid = uid;
+    if (requirePin && /^[0-9]{6}$/.test(pin)) {
+        markPinTrusted(name);
     }
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
-    return { ok: true, username: name };
+    return { ok: true, username: name, uid: uid, isNew: isNew };
 }
 
 function setupUsernameGate() {
@@ -3679,6 +3784,46 @@ setupUsernameGate();
 updateUsernameBadge();
 updateShopBalanceUI();
 updateCheckinButtonUI();
+
+/** Khôi phục phiên Firebase Auth — đã login thì bỏ qua form PIN */
+(function bindAuthSessionRestore() {
+    const auth = getAuth();
+    if (!auth) return;
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) return;
+        try {
+            const db = getDb();
+            if (!db) return;
+            const snap = await db.ref(dataPath('users') + '/' + user.uid).once('value');
+            const data = snap.val();
+            if (!data || !data.username) return;
+            if (data.banned) {
+                try { await auth.signOut(); } catch (e) {}
+                return;
+            }
+            const name = String(data.username).trim();
+            setCurrentUsername(name);
+            await fetchUserByUid(user.uid, name);
+            markPinTrusted(name);
+            updateUsernameBadge();
+            updateShopBalanceUI();
+            updateCheckinButtonUI();
+            // Auto vào player nếu đang ở màn hình gate
+            const hint = document.getElementById('interaction-hint');
+            const player = document.getElementById('player-container');
+            if (hint && player && player.style.display === 'none') {
+                // Không auto-play (cần gesture) — chỉ điền username & ẩn PIN
+                const input = document.getElementById('username-input');
+                if (input) input.value = name;
+                setPinSectionVisible(false);
+                const hintEl = document.getElementById('pin-hint');
+                if (hintEl) hintEl.textContent = 'Đã đăng nhập · Chạm BẮT ĐẦU để nghe';
+            }
+        } catch (e) {
+            console.warn('auth session restore', e);
+        }
+    });
+})();
 
 // Settings / prices / songs được load ở cuối file (sau khi define đủ hàm)
 

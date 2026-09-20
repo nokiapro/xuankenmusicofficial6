@@ -814,7 +814,7 @@
                                 <th>Username</th>
                                 <th>Hạng</th>
                                 <th>Xu XK</th>
-                                <th>PIN</th>
+                                <th>UID</th>
                                 <th>Bài sở hữu</th>
                                 <th>Điểm danh</th>
                                 <th>Thao tác</th>
@@ -849,20 +849,28 @@
             </div>
 
             <div class="card">
-                <h2>Bảo mật đăng nhập</h2>
+                <h2>Bảo mật đăng nhập (Firebase Auth)</h2>
                 <div class="form-grid">
                     <div class="full check-row">
                         <input type="checkbox" id="set-require-pin" checked>
-                        <label for="set-require-pin">Bắt buộc PIN 6 số khi vào player (chống vào nhờ username)</label>
+                        <label for="set-require-pin">Bắt buộc PIN 6 số khi vào player (PIN = mật khẩu Auth)</label>
                     </div>
                     <div class="full check-row" style="background:rgba(96,165,250,0.08);border-color:rgba(96,165,250,0.25);">
                         <input type="checkbox" id="set-allow-register" checked>
                         <label for="set-allow-register" style="color:var(--info)!important;">Cho phép đăng ký username mới từ màn hình đầu</label>
                     </div>
+                    <div>
+                        <label>Giới hạn số lần đăng ký (0 = không giới hạn)</label>
+                        <input type="number" id="set-max-registrations" min="0" step="1" placeholder="0">
+                    </div>
+                    <div>
+                        <label>Đã đăng ký (tự tăng)</label>
+                        <input type="number" id="set-registration-count" min="0" step="1" placeholder="0">
+                    </div>
                 </div>
                 <p class="muted" style="margin:8px 0 0;font-size:0.72rem;">
-                    Tắt “Cho phép đăng ký” → chỉ username đã có trên Firebase mới đăng nhập được.
-                    Admin đặt / xoá PIN từng user ở tab Người dùng.
+                    Username + PIN dùng Firebase Auth (Email/Password). Tắt đăng ký → chỉ tài khoản đã tạo mới vào được.
+                    Đặt max &gt; 0 để giới hạn tổng số tài khoản mới (vd: 50). Có thể reset bộ đếm thủ công.
                 </p>
                 <div class="row-actions form-actions">
                     <button type="button" class="btn btn-primary" id="save-security-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
@@ -952,7 +960,7 @@
             <div class="card">
                 <h2>Công cụ</h2>
                 <div class="row-actions form-actions" style="border:none;padding-top:0;margin-top:0;">
-                    <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn"><i class="fa-solid fa-key"></i> Xóa PIN toàn bộ user</button>
+                    <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn" title="PIN do Firebase Auth quản lý — không xóa được từ client"><i class="fa-solid fa-key"></i> PIN = Auth (không xóa được)</button>
                     <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
                 </div>
                 <div id="tools-progress-wrap" style="display:none;margin-top:12px;">
@@ -979,11 +987,10 @@
                         <input type="url" id="set-site-icon" placeholder="https://.../icon.png">
                     </div>
                     <div style="grid-column:1/-1;">
-                        <label>Prefix dữ liệu (để tách nhiều web trên cùng Firebase)</label>
-                        <input type="text" id="set-site-prefix" placeholder="vd: music6, site1... (để trống = root)">
+                        <label>Prefix localStorage (tách cache giữa các web trên cùng trình duyệt)</label>
+                        <input type="text" id="set-site-prefix" placeholder="vd: music6, site1... (để trống = không prefix)">
                         <p class="muted" style="margin-top:6px;font-size:0.72rem;">
-                            Khi có prefix, bài hát &amp; user lưu dưới <code>prefix/songs</code>, <code>prefix/users</code>...
-                            Settings luôn ở root <code>settings</code>.
+                            Chỉ ảnh hưởng localStorage (<code>prefix_xuanken_accounts</code>…). Firebase luôn ở root: <code>songs</code>, <code>users</code>, <code>settings</code>.
                         </p>
                     </div>
                 </div>
@@ -1026,6 +1033,8 @@
             sitePrefix: 'music6',
             requirePin: true,
             allowRegister: true,
+            maxRegistrations: 0,
+            registrationCount: 0,
             siteBanner: '',
             flashSalePercent: 0,
             flashSaleUntil: '',
@@ -1045,10 +1054,9 @@
             return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
         }
 
-        /** Đường dẫn Firebase theo prefix (settings luôn ở root) */
+        /** Đường dẫn Firebase — luôn root. sitePrefix chỉ dùng localStorage phía client. */
         function dataPath(key) {
-            const p = String(settingsCache.sitePrefix || '').trim().replace(/^\/+|\/+$/g, '');
-            return p ? `${p}/${key}` : key;
+            return String(key || '').replace(/^\/+|\/+$/g, '');
         }
 
         function applyBranding() {
@@ -1087,6 +1095,10 @@
             document.getElementById('set-starter').value = settingsCache.starterCoins;
             document.getElementById('set-require-pin').checked = settingsCache.requirePin !== false;
             document.getElementById('set-allow-register').checked = settingsCache.allowRegister !== false;
+            const maxRegEl = document.getElementById('set-max-registrations');
+            if (maxRegEl) maxRegEl.value = Math.max(0, Number(settingsCache.maxRegistrations) || 0);
+            const regCountEl = document.getElementById('set-registration-count');
+            if (regCountEl) regCountEl.value = Math.max(0, Number(settingsCache.registrationCount) || 0);
             if (document.getElementById('set-site-banner')) document.getElementById('set-site-banner').value = settingsCache.siteBanner || '';
             if (document.getElementById('set-flash-pct')) document.getElementById('set-flash-pct').value = settingsCache.flashSalePercent || 0;
             if (document.getElementById('set-invite-reward')) document.getElementById('set-invite-reward').value = settingsCache.inviteReward || 20;
@@ -1139,16 +1151,16 @@
             const obj = snap.val() || {};
             usersCache = {};
             Object.keys(obj).forEach(k => {
-                const u = obj[k];
+                const u = obj[k] || {};
                 const name = u.username || k;
                 usersCache[name] = {
-                    key: k,
+                    key: k, // uid (Firebase Auth)
+                    uid: u.uid || k,
                     coins: u.coins | 0,
                     owned: Array.isArray(u.owned) ? u.owned : [],
                     lastCheckin: u.lastCheckin || '',
                     createdAt: u.createdAt || 0,
                     rank: u.rank || 'member',
-                    pin: u.pin != null ? String(u.pin) : '',
                     banned: !!u.banned
                 };
             });
@@ -1352,7 +1364,7 @@
                         </select>
                     </td>
                     <td data-label="Xu XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
-                    <td data-label="PIN"><input type="text" value="${escapeHtml(a.pin || '')}" data-pin-user="${escapeHtml(name)}" class="coin-input" placeholder="6 số..." maxlength="6" inputmode="numeric" pattern="[0-9]*" style="max-width:100px;font-family:monospace;letter-spacing:2px;"></td>
+                    <td data-label="UID"><code style="font-size:0.65rem;opacity:0.75">${escapeHtml(String(a.uid || a.key || '').slice(0, 12))}…</code></td>
                     <td data-label="Sở hữu">${(a.owned || []).length}</td>
                     <td data-label="Điểm danh">${escapeHtml(a.lastCheckin || '—')}</td>
                     <td data-label="Thao tác">
@@ -1373,18 +1385,11 @@
                     const rankSel = tbody.querySelector('.rank-select[data-rank-user="' + name.replace(/"/g, '') + '"]');
                     const coins = Math.max(0, parseInt(input.value, 10) || 0);
                     const rank = (rankSel && rankSel.value) || 'member';
-                    const pinInput = tbody.querySelector('[data-pin-user="' + name.replace(/"/g, '') + '"]');
-                    const pin = pinInput ? String(pinInput.value || '').trim() : (usersCache[name].pin || '');
-                    if (pin && !/^[0-9]{6}$/.test(pin)) {
-                        toast('PIN phải đúng 6 chữ số (hoặc để trống để xoá PIN)');
-                        return;
-                    }
                     const key = usersCache[name].key || sanitizeKey(name);
-                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank, pin: pin || '' });
+                    await db().ref(dataPath('users') + '/' + key).update({ coins, rank });
                     usersCache[name].coins = coins;
                     usersCache[name].rank = rank;
-                    usersCache[name].pin = pin || '';
-                    toast('Đã lưu ' + name + (pin ? ' · có PIN' : ' · không PIN') + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
+                    toast('Đã lưu ' + name + (rank !== 'member' ? ' · ' + rank.toUpperCase() : ''));
                     refreshStats();
                 };
             });
@@ -1403,9 +1408,12 @@
             tbody.querySelectorAll('[data-del-user]').forEach(btn => {
                 btn.onclick = async () => {
                     const name = btn.getAttribute('data-del-user');
-                    if (!confirm('Xóa user "' + name + '"?')) return;
+                    if (!confirm('Xóa profile "' + name + '"?\n(Auth account trên Firebase Console vẫn còn — xóa thêm ở Authentication nếu cần)')) return;
                     const key = usersCache[name].key || sanitizeKey(name);
                     await db().ref(dataPath('users') + '/' + key).remove();
+                    try {
+                        await db().ref(dataPath('usernames') + '/' + sanitizeKey(name)).remove();
+                    } catch (e) {}
                     delete usersCache[name];
                     toast('Đã xóa ' + name);
                     renderUsers(document.getElementById('user-search').value);
@@ -1545,65 +1553,49 @@
             }
         };
 
+        // Migrate data cũ music6/ → root (songs, users, prices, giftCodes, chat, reactions)
         const migrateBtnEl = document.getElementById('migrate-prefix-btn');
-        if (migrateBtnEl) migrateBtnEl.onclick = async () => {
-            const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
-            if (!prefix) {
-                toast('Nhập prefix trước (vd: music6)');
-                return;
-            }
-            if (!confirm(`Migrate songs + users từ ROOT → "${prefix}/..." ?\n\n• Không xóa data root\n• Ghi đè data dưới ${prefix}/ nếu đã có\n• Cần Firebase Rules cho phép path này`)) return;
+        if (migrateBtnEl) {
+            migrateBtnEl.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate music6/ → root';
+            migrateBtnEl.onclick = async () => {
+                if (!confirm('Migrate dữ liệu từ music6/ → ROOT?\n\n• Copy songs, users, prices, giftCodes, chat, reactions\n• Không xóa music6/\n• Ghi đè root nếu đã có key trùng\n• Cần Rules cho phép đọc music6/ và ghi root')) return;
 
-            const btn = document.getElementById('migrate-prefix-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang migrate...';
-            try {
-                // 1) Đọc root
-                const [songsSnap, usersSnap, pricesSnap] = await Promise.all([
-                    db().ref('songs').once('value'),
-                    db().ref('users').once('value'),
-                    db().ref('prices').once('value')
-                ]);
-                const songsVal = songsSnap.val() || {};
-                const usersVal = usersSnap.val() || {};
-                const pricesVal = pricesSnap.val();
-
-                const songCount = Object.keys(songsVal).length;
-                const userCount = Object.keys(usersVal).length;
-                if (songCount === 0 && userCount === 0) {
-                    toast('Root không có songs/users để migrate');
-                    return;
+                const btn = document.getElementById('migrate-prefix-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang migrate...';
+                try {
+                    const keys = ['songs', 'users', 'prices', 'giftCodes', 'chat', 'reactions'];
+                    let total = 0;
+                    for (const k of keys) {
+                        const snap = await db().ref('music6/' + k).once('value');
+                        const val = snap.val();
+                        if (val == null) continue;
+                        await db().ref(k).set(val);
+                        const n = (typeof val === 'object') ? Object.keys(val).length : 1;
+                        total += n;
+                        console.log('Migrated music6/' + k + ' → /' + k, n);
+                    }
+                    if (total === 0) {
+                        toast('music6/ không có dữ liệu để migrate');
+                    } else {
+                        await loadSongs();
+                        await loadUsers();
+                        toast('Đã migrate music6/ → root (' + total + ' mục)');
+                    }
+                } catch (e) {
+                    console.error('Migrate failed', e);
+                    const msg = (e && (e.code || e.message)) || String(e);
+                    if (/permission|PERMISSION_DENIED/i.test(msg)) {
+                        toast('PERMISSION_DENIED — mở Rules đọc music6/ + ghi root');
+                    } else {
+                        toast('Migrate lỗi: ' + msg);
+                    }
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate music6/ → root';
                 }
-
-                // 2) Ghi sang prefix
-                await db().ref(prefix + '/songs').set(songsVal);
-                await db().ref(prefix + '/users').set(usersVal);
-                if (pricesVal && typeof pricesVal === 'object') {
-                    await db().ref(prefix + '/prices').set(pricesVal);
-                }
-
-                // 3) Bật prefix trong settings
-                settingsCache.sitePrefix = prefix;
-                document.getElementById('set-site-prefix').value = prefix;
-                await db().ref('settings').update({ sitePrefix: prefix });
-
-                applyBranding();
-                await loadSongs();
-                await loadUsers();
-                toast(`Đã migrate ${songCount} bài + ${userCount} user → ${prefix}/`);
-            } catch (e) {
-                console.error('Migrate failed', e);
-                const msg = (e && (e.code || e.message)) || String(e);
-                if (/permission|PERMISSION_DENIED/i.test(msg)) {
-                    toast('PERMISSION_DENIED — cập nhật Firebase Rules cho path ' + prefix + ' trước');
-                } else {
-                    toast('Migrate lỗi: ' + msg);
-                }
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate root → prefix';
-            }
-        };
+            };
+        }
 
         function exportSongsJson() {
             // Không xuất listenCount — import sau không đụng lượt nghe
@@ -1791,7 +1783,6 @@
         
         // Gift codes
         function giftCodesPath() {
-            // Chỉ dùng prefix (music6) — không ghi root nữa
             return dataPath('giftCodes');
         }
         async function loadGiftCodes() {
@@ -1850,29 +1841,12 @@
                 loadGiftCodes();
             } catch (err) {
                 console.error(err);
-                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — path ' + giftCodesPath() + ' · kiểm tra prefix music6 + Rules');
+                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — path ' + giftCodesPath() + ' · kiểm tra Rules root');
             }
         };
         const bulkPin = document.getElementById('bulk-reset-pin-btn');
-        if (bulkPin) bulkPin.onclick = async () => {
-            if (!confirm('Xóa PIN của TẤT CẢ user? Họ sẽ đặt PIN mới lần vào sau.')) return;
-            const snap = await db().ref(dataPath('users')).once('value');
-            const obj = snap.val() || {};
-            const keys = Object.keys(obj);
-            bulkPin.disabled = true;
-            let n = 0;
-            for (let i = 0; i < keys.length; i++) {
-                const k = keys[i];
-                setToolsProgress(true, (i / Math.max(1, keys.length)) * 100, 'Xóa PIN: ' + k);
-                await db().ref(dataPath('users') + '/' + k + '/pin').set('');
-                n++;
-                setToolsProgress(true, ((i + 1) / Math.max(1, keys.length)) * 100, 'Đã xóa ' + (i + 1) + '/' + keys.length);
-            }
-            setToolsProgress(true, 100, 'Hoàn tất');
-            bulkPin.disabled = false;
-            toast('Đã xóa PIN ' + n + ' user');
-            await loadUsers();
-            setTimeout(() => setToolsProgress(false, 0, ''), 2000);
+        if (bulkPin) bulkPin.onclick = () => {
+            toast('PIN là mật khẩu Firebase Auth — reset trong Firebase Console → Authentication');
         };
         function probeAudioUrl(url, timeoutMs) {
             return new Promise((resolve) => {
@@ -1971,7 +1945,9 @@
         const saveSec = document.getElementById('save-security-btn');
         if (saveSec) saveSec.onclick = () => saveSettingsPartial({
             requirePin: !!document.getElementById('set-require-pin').checked,
-            allowRegister: !!document.getElementById('set-allow-register').checked
+            allowRegister: !!document.getElementById('set-allow-register').checked,
+            maxRegistrations: Math.max(0, parseInt(document.getElementById('set-max-registrations').value, 10) || 0),
+            registrationCount: Math.max(0, parseInt(document.getElementById('set-registration-count').value, 10) || 0)
         });
         const saveFlash = document.getElementById('save-flash-btn');
         if (saveFlash) saveFlash.onclick = async () => {

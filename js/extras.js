@@ -140,8 +140,9 @@
       if (!db) return;
       const acc = getAcc();
       if (!acc) return;
-      const key = typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(name) : name;
-      await db.ref((typeof dataPath === 'function' ? dataPath('users') : 'users') + '/' + key).update({
+      const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || (acc && acc.uid) || '';
+      if (!uid) return;
+      await db.ref((typeof dataPath === 'function' ? dataPath('users') : 'users') + '/' + uid).update({
         xp: Number(acc.xp) || 0,
         level: Number(acc.level) || 1,
         seasonXp: Number(acc.seasonXp) || 0,
@@ -338,17 +339,10 @@
     try {
       const db = getDb();
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
-      // Chỉ prefix (music6/giftCodes)
-      const paths = [];
-      if (typeof dataPath === 'function') paths.push(dataPath('giftCodes') + '/' + code);
-      paths.push('giftCodes/' + code); // fallback cũ
-      let ref = null;
-      let data = null;
-      for (const path of paths) {
-        const r = db.ref(path);
-        const snap = await r.once('value');
-        if (snap.exists()) { ref = r; data = snap.val(); break; }
-      }
+      const path = (typeof dataPath === 'function' ? dataPath('giftCodes') : 'giftCodes') + '/' + code;
+      const ref = db.ref(path);
+      const snap = await ref.once('value');
+      const data = snap.val();
       if (!data || !ref) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
       const coins = Number(data.coins) || 0;
       const maxUses = data.maxUses == null ? 1 : Number(data.maxUses); // -1 = vĩnh viễn
@@ -406,15 +400,19 @@
     try {
       const db = getDb();
       if (!db) return;
-      const key = sanitizeUsernameKey(code);
-      const inv = await db.ref(dataPath('users') + '/' + key).once('value');
+      const ukey = sanitizeUsernameKey(code);
+      const mapSnap = await db.ref(dataPath('usernames') + '/' + ukey).once('value');
+      const map = mapSnap.val();
+      const invUid = map && map.uid;
+      if (!invUid) return toast('INVITE', 'Username mời không tồn tại', '#ff9800');
+      const inv = await db.ref(dataPath('users') + '/' + invUid).once('value');
       if (!inv.exists()) return toast('INVITE', 'Username mời không tồn tại', '#ff9800');
       updateCurrentAccount(a => {
         a.inviteBy = code;
         a.coins = (a.coins | 0) + reward;
       });
       const invCoins = (inv.val().coins | 0) + reward;
-      await db.ref(dataPath('users') + '/' + key).update({ coins: invCoins });
+      await db.ref(dataPath('users') + '/' + invUid).update({ coins: invCoins });
       unlockAchievement('inviter');
       toast('INVITE', 'Cả hai +' + reward + ' xu', '#4ade80');
     } catch (e) {}

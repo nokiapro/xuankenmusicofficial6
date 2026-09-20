@@ -15,9 +15,20 @@ if (typeof firebase !== 'undefined') {
         firebase.initializeApp(FIREBASE_CONFIG);
     }
     window.fbDB = firebase.database();
+    try {
+        window.fbAuth = firebase.auth();
+        // Giữ phiên đăng nhập trên trình duyệt
+        if (firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+            window.fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function () {});
+        }
+    } catch (e) {
+        console.error('Firebase Auth init lỗi', e);
+        window.fbAuth = null;
+    }
 } else {
     console.error('Firebase SDK chưa load');
     window.fbDB = null;
+    window.fbAuth = null;
 }
 
 window.FIREBASE_CONFIG = FIREBASE_CONFIG;
