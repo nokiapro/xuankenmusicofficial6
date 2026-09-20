@@ -129,70 +129,6 @@ function refreshLucideIcons(container = document) {
 let listenData = {};
 let isUpdatingListen = false;
 let hasRecordedCurrentSong = false;
-let sessionPlayAccum = 0; // giây nghe thật của bài hiện tại
-let sessionPlayLastTs = 0;
-
-/** Phiên trình duyệt: tiến độ nghe + bài đã cộng (sessionStorage) */
-const LISTEN_SESSION_KEY = 'xk_listen_session_v1';
-function loadListenSession() {
-    try {
-        const raw = sessionStorage.getItem(LISTEN_SESSION_KEY);
-        if (!raw) return { progress: {}, counted: {} };
-        const o = JSON.parse(raw);
-        return {
-            progress: (o && o.progress && typeof o.progress === 'object') ? o.progress : {},
-            counted: (o && o.counted && typeof o.counted === 'object') ? o.counted : {}
-        };
-    } catch (e) {
-        return { progress: {}, counted: {} };
-    }
-}
-function saveListenSession(data) {
-    try {
-        sessionStorage.setItem(LISTEN_SESSION_KEY, JSON.stringify(data || { progress: {}, counted: {} }));
-    } catch (e) {}
-}
-function isSongCountedThisVisit(sid) {
-    const s = loadListenSession();
-    return !!(s.counted && s.counted[String(sid)]);
-}
-function markSongCountedThisVisit(sid) {
-    const s = loadListenSession();
-    s.counted[String(sid)] = Date.now();
-    delete s.progress[String(sid)];
-    saveListenSession(s);
-}
-function saveSongListenProgress(sid, sec) {
-    const s = loadListenSession();
-    if (s.counted[String(sid)]) return;
-    s.progress[String(sid)] = Math.max(0, Number(sec) || 0);
-    saveListenSession(s);
-}
-function getSongListenProgress(sid) {
-    const s = loadListenSession();
-    if (s.counted[String(sid)]) return -1; // đã cộng trong phiên
-    return Number(s.progress[String(sid)]) || 0;
-}
-
-let currentSource = 'normal';
-let notificationTimeout = null;
-let isLoadingSongs = true;
-
-let autoRefreshInterval = null;
-let isRefreshing = false;
-let lastDataHash = null;
-
-let pendingListenUpdate = false;
-let lastListenFetch = 0;
-const LISTEN_FETCH_INTERVAL = 60000;
-
-let hasUserInteracted = false;
-
-let isDataLoading = false;
-let pendingPlayAfterLoad = false;
-
-/** Bài đang bị khóa sau khi hết demo 60s — không auto next/random cho đến khi mua hoặc đổi bài */
-let demoLockedSongId = null;
 
 function showPlayerLoading() {
     let loadingDiv = document.getElementById('player-loading');
@@ -662,12 +598,6 @@ async function loadSongsFromFirebase() {
             
             startAutoRefresh(60);
             
-            // Có username → tiếp tục đúng bài + phút đã lưu
-            if (getCurrentUsername()) {
-                playbackRestored = false;
-                restorePlaybackState();
-            }
-            
             if (pendingPlayAfterLoad) {
                 pendingPlayAfterLoad = false;
                 startPlayback();
@@ -914,35 +844,6 @@ async function fetchListenData() {
     return fetchListenDataSilent();
 }
 
-
-/** Cộng giây nghe thật (khi đang play) — lưu theo ngày */
-let _lastListenTickAt = 0;
-function recordListenSeconds(deltaSec) {
-    if (!deltaSec || deltaSec <= 0 || deltaSec > 5) return;
-    if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
-    if (typeof updateCurrentAccount !== 'function') return;
-    const day = (typeof getTodayKey === 'function') ? getTodayKey() : new Date().toISOString().slice(0, 10);
-    updateCurrentAccount(acc => {
-        if (!acc.listenTime || typeof acc.listenTime !== 'object') acc.listenTime = { total: 0, byDay: {} };
-        if (!acc.listenTime.byDay || typeof acc.listenTime.byDay !== 'object') acc.listenTime.byDay = {};
-        acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
-        acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
-    });
-    // Sync Firebase thưa (mỗi ~30s nghe)
-    if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
-    if (Date.now() - window._listenTimeSyncAt > 30000) {
-        window._listenTimeSyncAt = Date.now();
-        try {
-            const db = getDb();
-            const name = getCurrentUsername();
-            const acc = getCurrentAccount();
-            if (db && name && acc && acc.listenTime) {
-                const key = sanitizeUsernameKey(name);
-                db.ref(dataPath('users') + '/' + key + '/listenTime').set(acc.listenTime);
-            }
-        } catch (e) {}
-    }
-}
 
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
@@ -1467,17 +1368,7 @@ async function loadSong(i) {
     updateMediaSession();
     if (playlistOverlay.classList.contains('active')) setTimeout(scrollToActiveTop, 100);
     
-    // Phiên web: đã cộng bài này khi thoát → không cộng lại; chưa đủ 5s → giữ tiến độ
-    const sidLoad = song && song.id != null ? String(song.id) : '';
-    if (sidLoad && isSongCountedThisVisit(sidLoad)) {
-        hasRecordedCurrentSong = true;
-        sessionPlayAccum = 99;
-    } else {
-        hasRecordedCurrentSong = false;
-        const prev = sidLoad ? getSongListenProgress(sidLoad) : 0;
-        sessionPlayAccum = prev > 0 ? prev : 0;
-    }
-    sessionPlayLastTs = 0;
+    hasRecordedCurrentSong = false;
     demoLockedSongId = null; // đổi bài → bỏ khóa demo
     isChanging = false;
 }
@@ -1652,21 +1543,7 @@ async function startPlayback() {
         return;
     }
 
-    // Ưu tiên: tiếp tục đúng bài + đúng phút đã lưu, rồi phát luôn
-    try {
-        const resumed = await restorePlaybackState({ autoplay: true, force: true });
-        if (resumed) {
-            setTimeout(() => {
-                updateCurrentSongHighlightAndScroll();
-                updateListenStatsModal();
-            }, 100);
-            return;
-        }
-    } catch (e) {
-        console.warn('restore on start:', e);
-    }
-
-    // Không có lịch sử → phát bài hiện tại từ đầu
+    // Phát bài hiện tại từ đầu (không khôi phục vị trí đã lưu)
     if (songs[index]) {
         const needLoad = !audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index]));
         const playFn = () => {
@@ -1846,19 +1723,6 @@ let lastProgressUiAt = 0;
 let lastTimeLabelAt = 0;
 
 audio.ontimeupdate = () => {
-    // Ghi nhận thời gian nghe thực (khi đang play)
-    try {
-        if (!audio.paused && hasUserInteracted && songs[index]) {
-            const now = Date.now();
-            if (_lastListenTickAt > 0) {
-                const d = (now - _lastListenTickAt) / 1000;
-                if (d > 0 && d < 3) recordListenSeconds(d);
-            }
-            _lastListenTickAt = now;
-        } else {
-            _lastListenTickAt = 0;
-        }
-    } catch (e) {}
     // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
     if (demoLockedSongId) return;
 
@@ -1900,43 +1764,17 @@ audio.ontimeupdate = () => {
         return;
     }
     
-    // Cộng lượt: ≥5s nghe thật trong phiên; thoát <5s giữ tiến độ; đã cộng rồi (thoát 1–3 phút) không cộng lại
-    try {
-        if (!audio.paused && hasUserInteracted && !isChanging && songs[index]) {
-            const sid = String(songs[index].id);
-            if (isSongCountedThisVisit(sid)) {
-                hasRecordedCurrentSong = true;
-                sessionPlayLastTs = 0;
-            } else {
-                const now = Date.now();
-                if (sessionPlayLastTs > 0) {
-                    const d = (now - sessionPlayLastTs) / 1000;
-                    if (d > 0 && d < 2.5) sessionPlayAccum += d;
-                }
-                sessionPlayLastTs = now;
-                // Lưu tiến độ (thoát lúc 3s → vào lại còn cộng được)
-                if (sessionPlayAccum > 0 && sessionPlayAccum < 5) {
-                    saveSongListenProgress(sid, sessionPlayAccum);
-                }
-                const need = (dur && isFinite(dur) && dur > 0 && dur < 5) ? Math.max(2, dur * 0.5) : 5;
-                if (sessionPlayAccum >= need && !hasRecordedCurrentSong && !isUpdatingListen) {
-                    hasRecordedCurrentSong = true;
-                    markSongCountedThisVisit(sid);
-                    incrementListenCount(songs[index].id, songs[index].name, currentSource || 'play');
-                }
-            }
-        } else {
-            sessionPlayLastTs = 0;
-        }
-    } catch (e) {}
+    // Cộng lượt: currentTime ≥ 5s trong lượt phát hiện tại (không lưu thiết bị / phiên)
+    if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && songs[index] && hasUserInteracted) {
+        hasRecordedCurrentSong = true;
+        incrementListenCount(songs[index].id, songs[index].name, currentSource || 'play');
+    }
     
     if (isRepeatOne && dur && (dur - cur) <= 0.15 && !isLoopingHandled && dur > 0) {
         if (demoLockedSongId) return;
         isLoopingHandled = true;
         if (hasRecordedCurrentSong) {
             hasRecordedCurrentSong = false;
-            sessionPlayAccum = 0;
-            sessionPlayLastTs = 0;
             currentSource = 'loop';
         }
         // Dùng ended/loop native nếu có thể — tránh seek cứng giữa ontimeupdate
@@ -1967,8 +1805,6 @@ audio.onended = () => {
             isLoopingHandled = true;
             if (hasRecordedCurrentSong) {
                 hasRecordedCurrentSong = false;
-                sessionPlayAccum = 0;
-                sessionPlayLastTs = 0;
                 currentSource = 'loop';
             }
             // Không audio.load() lại — load lại gây giật/ngắt quãng rõ
@@ -2412,23 +2248,6 @@ window.addEventListener('beforeunload', () => {
 
 window.adjustLyricFontSize = adjustLyricFontSize;
 
-// Lưu tiến độ nghe khi thoát tab / ẩn trang
-window.addEventListener('pagehide', () => {
-    try {
-        if (songs[index] && !hasRecordedCurrentSong && sessionPlayAccum > 0) {
-            saveSongListenProgress(String(songs[index].id), sessionPlayAccum);
-        }
-    } catch (e) {}
-});
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        try {
-            if (songs[index] && !hasRecordedCurrentSong && sessionPlayAccum > 0) {
-                saveSongListenProgress(String(songs[index].id), sessionPlayAccum);
-            }
-        } catch (e) {}
-    }
-});
 
 window.selectSongFromList = selectSongFromList;
 
@@ -2540,7 +2359,6 @@ function ensureUserAccount(username) {
             streak: 0,
             streakFreeze: 0,
             listenedSongs: {},
-            listenTime: { total: 0, byDay: {} }
         };
         saveAllAccounts(accounts);
     } else {
@@ -2593,7 +2411,6 @@ async function fetchUserFromFirebase(username) {
                 streak: Number(data.streak) || 0,
                 streakFreeze: Number(data.streakFreeze) || 0,
                 listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
-                listenTime: (data.listenTime && typeof data.listenTime === 'object') ? data.listenTime : { total: 0, byDay: {} },
                 ownedThumbs: Array.isArray(data.ownedThumbs) ? data.ownedThumbs.map(String) : [],
                 activeThumb: data.activeThumb || '',
                 inviteBy: data.inviteBy || '',
@@ -2658,7 +2475,6 @@ async function pushUserToFirebase(username, account) {
             streak: Number(account.streak) || 0,
             streakFreeze: Number(account.streakFreeze) || 0,
             listenedSongs: account.listenedSongs || {},
-            listenTime: account.listenTime || { total: 0, byDay: {} },
             ownedThumbs: account.ownedThumbs || [],
             activeThumb: account.activeThumb || '',
             inviteBy: account.inviteBy || ''
@@ -3578,7 +3394,6 @@ async function loginWithUsername(rawName, rawPin) {
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
-    startPlaybackSyncListener();
     return { ok: true, username: name };
 }
 
@@ -3613,8 +3428,7 @@ function setupUsernameGate() {
             updateUsernameBadge();
             updateShopBalanceUI();
             updateCheckinButtonUI();
-            startPlaybackSyncListener();
-        });
+                });
         updateUsernameBadge();
     }
     refreshPinVisibility();
@@ -3798,168 +3612,14 @@ const DEVICE_ID = (() => {
 })();
 let syncApplying = false;
 let lastSyncPush = 0;
-let playbackRestored = false;
+// ===== Playback position save/restore: ĐÃ TẮT theo yêu cầu =====
+async function restorePlaybackState() { return false; }
+function startPlaybackSyncListener() {}
+function pushPlaybackSync() {}
+function savePlaybackOnLeave() {}
 
-function getLocalPlaybackKey() {
-    const name = getCurrentUsername();
-    if (!name) return null;
-    return storageKey('xuanken_playback_' + sanitizeUsernameKey(name));
-}
-
-function savePlaybackLocal(data) {
-    const k = getLocalPlaybackKey();
-    if (!k || !data) return;
-    try { localStorage.setItem(k, JSON.stringify(data)); } catch (e) {}
-}
-
-function loadPlaybackLocal() {
-    const k = getLocalPlaybackKey();
-    if (!k) return null;
-    try {
-        const raw = localStorage.getItem(k);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
-}
-
-/** Lưu vị trí đang nghe (local + Firebase) — gọi khi pause / thoát / định kỳ */
-function pushPlaybackSync(force) {
-    const name = getCurrentUsername();
-    if (!name || !songs[index] || syncApplying) return;
-    const now = Date.now();
-    if (!force && now - lastSyncPush < 2000) return;
-    lastSyncPush = now;
-    const data = {
-        songId: String(songs[index].id),
-        position: Math.floor(audio.currentTime || 0),
-        isPlaying: !audio.paused,
-        deviceId: DEVICE_ID,
-        updatedAt: now
-    };
-    savePlaybackLocal(data);
-    const db = getDb();
-    if (!db) return;
-    const key = sanitizeUsernameKey(name);
-    try {
-        db.ref(dataPath('users') + '/' + key + '/playback').set(data);
-    } catch (e) {}
-}
-
-async function fetchPlaybackFromFirebase() {
-    const name = getCurrentUsername();
-    const db = getDb();
-    if (!name || !db) return loadPlaybackLocal();
-    try {
-        const snap = await db.ref(dataPath('users') + '/' + sanitizeUsernameKey(name) + '/playback').once('value');
-        const data = snap.val();
-        if (data && data.songId) {
-            savePlaybackLocal(data);
-            return data;
-        }
-    } catch (e) {}
-    return loadPlaybackLocal();
-}
-
-/**
- * Khôi phục bài + phút đã lưu.
- * opts.autoplay = true: phát luôn (gọi khi user bấm "Bắt đầu" — đã có gesture).
- * opts.force = true: cho phép restore lại dù đã restore trước đó.
- * Trả về true nếu đã restore được bài đã lưu.
- */
-async function restorePlaybackState(opts = {}) {
-    const autoplay = !!opts.autoplay;
-    const force = !!opts.force;
-    if (playbackRestored && !force && !autoplay) return false;
-    if (!songs.length || !getCurrentUsername()) return false;
-
-    const data = await fetchPlaybackFromFirebase();
-    if (!data || !data.songId) {
-        playbackRestored = true;
-        return false;
-    }
-    const songIdx = songs.findIndex(s => String(s.id) === String(data.songId));
-    if (songIdx < 0) {
-        playbackRestored = true;
-        return false;
-    }
-    const pos = Math.max(0, Number(data.position) || 0);
-    syncApplying = true;
-    playbackRestored = true;
-    try {
-        // Đang phát đúng bài rồi → không loadSong lại (tránh giật)
-        const alreadyThis = songIdx === index && audio.src &&
-            isSameAudioSrc(audio.src, getPlayableAudio(songs[songIdx]));
-        if (!alreadyThis) {
-            await loadSong(songIdx);
-        }
-        const applySeek = () => {
-            try {
-                if (audio.duration && pos >= audio.duration - 1) {
-                    audio.currentTime = 0;
-                } else {
-                    audio.currentTime = Math.min(pos, Math.max(0, (audio.duration || pos) - 0.25));
-                }
-            } catch (e) {}
-        };
-        if (audio.readyState >= 1) applySeek();
-        else {
-            await new Promise(resolve => {
-                const onMeta = () => { applySeek(); resolve(); };
-                audio.addEventListener('loadedmetadata', onMeta, { once: true });
-                // fallback nếu metadata chậm
-                setTimeout(() => { applySeek(); resolve(); }, 1500);
-            });
-        }
-
-        console.log('RESUME:', data.songId, 'tại', pos, 's', autoplay ? '(autoplay)' : '');
-        if (autoplay) {
-            // User vừa bấm "Bắt đầu" → đây là user gesture, được phép play
-            try {
-                await audio.play();
-            } catch (e) {
-                console.log('RESUME play:', e);
-                // Thử lại sau seek
-                setTimeout(() => audio.play().catch(() => {}), 200);
-            }
-        } else {
-            audio.pause();
-        }
-        return true;
-    } finally {
-        setTimeout(() => { syncApplying = false; }, 600);
-    }
-}
-
-function startPlaybackSyncListener() {
-    // Chỉ preload vị trí (không auto-play) khi đã có username + danh sách bài
-    playbackRestored = false;
-    const tryRestore = () => {
-        if (songs.length) restorePlaybackState({ autoplay: false });
-        else setTimeout(tryRestore, 800);
-    };
-    tryRestore();
-}
-
-// Lưu định kỳ khi đang phát
-setInterval(() => {
-    if (!audio.paused && hasUserInteracted && !syncApplying) pushPlaybackSync(false);
-}, 5000);
-
-// Lưu ngay khi pause / đổi bài xong
-audio.addEventListener('pause', () => { if (!syncApplying) pushPlaybackSync(true); });
 audio.addEventListener('play', () => {
-    if (!syncApplying) pushPlaybackSync(true);
     preloadNextSong();
-});
-audio.addEventListener('ended', () => { if (!syncApplying) pushPlaybackSync(true); });
-
-// Thoát tab / tắt màn hình / đóng app → lưu vị trí
-function savePlaybackOnLeave() {
-    if (!syncApplying && songs[index] && hasUserInteracted) pushPlaybackSync(true);
-}
-window.addEventListener('pagehide', savePlaybackOnLeave);
-window.addEventListener('beforeunload', savePlaybackOnLeave);
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') savePlaybackOnLeave();
 });
 
 // My playlist button
