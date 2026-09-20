@@ -1942,6 +1942,22 @@
         });
 
 
+        function applySiteBranding() {
+            try {
+                const name = (settingsCache && settingsCache.siteName) || 'XuanKen Admin';
+                document.title = name + ' — Admin';
+                const icon = settingsCache && settingsCache.siteIcon;
+                if (icon) {
+                    let link = document.querySelector("link[rel*='icon']");
+                    if (!link) {
+                        link = document.createElement('link');
+                        link.rel = 'icon';
+                        document.head.appendChild(link);
+                    }
+                    link.href = icon;
+                }
+            } catch (e) {}
+        }
         async function saveSettingsPartial(fields) {
             try {
                 await db().ref('settings').update(fields);
