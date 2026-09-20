@@ -150,6 +150,7 @@
         streak: Number(acc.streak) || 0,
         streakFreeze: Number(acc.streakFreeze) || 0,
         listenedSongs: acc.listenedSongs || {},
+        listenTime: acc.listenTime || { total: 0, byDay: {} },
       });
     } catch (e) {}
   }
@@ -621,6 +622,44 @@
 
 
 
+  
+  function formatListenDuration(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return h + ' giờ ' + m + ' phút ' + s + ' giây';
+    if (m > 0) return m + ' phút ' + s + ' giây';
+    return s + ' giây';
+  }
+
+  function sumListenTime(period) {
+    const acc = getAcc();
+    if (!acc || !acc.listenTime) return 0;
+    const byDay = (acc.listenTime.byDay && typeof acc.listenTime.byDay === 'object') ? acc.listenTime.byDay : {};
+    const now = new Date();
+    let sum = 0;
+    Object.keys(byDay).forEach(k => {
+      const parts = String(k).split('-');
+      if (parts.length < 3) return;
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (Number.isNaN(d.getTime())) return;
+      if (period === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+        if (d >= weekAgo) sum += Number(byDay[k]) || 0;
+      } else if (period === 'month') {
+        if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
+          sum += Number(byDay[k]) || 0;
+        }
+      } else if (period === 'year') {
+        if (d.getFullYear() === now.getFullYear()) {
+          sum += Number(byDay[k]) || 0;
+        }
+      }
+    });
+    return sum;
+  }
+
   function ensureExtrasUi() {
     const panel = $('extras-modal');
     if (!panel) return;
@@ -717,6 +756,17 @@
         if (x === 'rev-week') userReview('week');
         if (x === 'rev-month') userReview('month');
         if (x === 'rev-year') userReview('year');
+        if (x === 'time-week' || x === 'time-month' || x === 'time-year') {
+          const period = x.replace('time-', '');
+          const label = period === 'week' ? '7 ngày gần nhất' : period === 'month' ? 'tháng này' : 'năm nay';
+          const sec = sumListenTime(period);
+          const total = (getAcc() && getAcc().listenTime && getAcc().listenTime.total) || 0;
+          showResult(
+            '<b>Thời gian nghe (' + label + ')</b><br/>' +
+            '• Giai đoạn: <b>' + formatListenDuration(sec) + '</b><br/>' +
+            '• Tổng mọi thời điểm: <b>' + formatListenDuration(total) + '</b>'
+          );
+        }
 
       };
     });

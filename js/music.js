@@ -845,71 +845,117 @@ async function fetchListenData() {
 }
 
 
+
+/** Cộng giây nghe thật theo ngày (thống kê tuần/tháng/năm) */
+let _lastListenTickAt = 0;
+function recordListenSeconds(deltaSec) {
+    if (!deltaSec || deltaSec <= 0 || deltaSec > 5) return;
+    if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
+    if (typeof updateCurrentAccount !== 'function') return;
+    const day = (typeof getTodayKey === 'function') ? getTodayKey() : new Date().toISOString().slice(0, 10);
+    updateCurrentAccount(acc => {
+        if (!acc.listenTime || typeof acc.listenTime !== 'object') acc.listenTime = { total: 0, byDay: {} };
+        if (!acc.listenTime.byDay || typeof acc.listenTime.byDay !== 'object') acc.listenTime.byDay = {};
+        acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
+        acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
+    });
+    // Sync Firebase thưa (~30s)
+    if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
+    if (Date.now() - window._listenTimeSyncAt > 30000) {
+        window._listenTimeSyncAt = Date.now();
+        try {
+            const db = getDb();
+            const name = getCurrentUsername();
+            const acc = getCurrentAccount();
+            if (db && name && acc && acc.listenTime) {
+                const key = sanitizeUsernameKey(name);
+                db.ref(dataPath('users') + '/' + key + '/listenTime').set(acc.listenTime);
+            }
+        } catch (e) {}
+    }
+}
+
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     const sid = String(songId);
     const user = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
-    // Bắt buộc có username (tránh spam ảo khi chưa đăng nhập)
-    if (!user) return false;
+    if (!user) {
+        console.warn('LISTEN skip: chưa có username');
+        return false;
+    }
 
     isUpdatingListen = true;
     try {
-        // XP mỗi lần nghe đủ 5s (không khóa theo bài đã nghe)
-        updateCurrentAccount(acc => {
-            if (!acc.listenedSongs || typeof acc.listenedSongs !== 'object') acc.listenedSongs = {};
-            acc.listenedSongs[sid] = Date.now(); // chỉ lưu lần nghe gần nhất (thống kê)
-            acc.xp = (Number(acc.xp) || 0) + 5;
-            acc.seasonXp = (Number(acc.seasonXp) || 0) + 5;
-            const lvl = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
-            acc.level = lvl;
-        });
+        try {
+            updateCurrentAccount(acc => {
+                if (!acc.listenedSongs || typeof acc.listenedSongs !== 'object') acc.listenedSongs = {};
+                acc.listenedSongs[sid] = Date.now();
+                acc.xp = (Number(acc.xp) || 0) + 5;
+                acc.seasonXp = (Number(acc.seasonXp) || 0) + 5;
+                acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
+            });
+        } catch (e) {}
 
         if (!listenData[sid]) listenData[sid] = 0;
         listenData[sid]++;
         const songIndex = songs.findIndex(s => String(s.id) === sid);
         if (songIndex !== -1) songs[songIndex].listenCount = listenData[sid];
-        localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
-        updateListenStatsModal();
-        console.log(`GHI NHẬN LƯỢT NGHE: ${songName} (${sid}) → ${listenData[sid]} [${source}]`);
-        showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${sid} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
+        try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
+        try { updateListenStatsModal(); } catch (e) {}
+        try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
+        console.log('GHI NHẬN LƯỢT NGHE:', songName, sid, '→', listenData[sid], source);
+        try {
+            showNotification('+1 LISTEN:', '<i class="fa-regular fa-star"></i> ' + (songName || sid) + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'headphones');
+        } catch (e) {}
 
         const db = getDb();
         if (db) {
-            // Ghi music6/songs/.../listenCount (hoặc path prefix hiện tại)
             let serverCount = listenData[sid];
             let wrote = false;
-            const p = dataPath('songs') + '/' + sid + '/listenCount';
+            // Thử mọi path khả dĩ (prefix / music6 / root)
+            const paths = [];
             try {
-                const ref = db.ref(p);
-                const result = await ref.transaction(current => (Number(current) || 0) + 1);
-                if (result && result.committed) {
-                    serverCount = Number(result.snapshot.val()) || serverCount;
-                    wrote = true;
+                const dp = dataPath('songs') + '/' + sid + '/listenCount';
+                paths.push(dp);
+            } catch (e) {}
+            paths.push('music6/songs/' + sid + '/listenCount');
+            paths.push('songs/' + sid + '/listenCount');
+            const uniq = [...new Set(paths)];
+            for (const p of uniq) {
+                try {
+                    const ref = db.ref(p);
+                    const result = await ref.transaction(current => (Number(current) || 0) + 1);
+                    if (result && result.committed) {
+                        serverCount = Number(result.snapshot.val()) || serverCount;
+                        wrote = true;
+                        console.log('listenCount OK', p, serverCount);
+                        break;
+                    }
+                } catch (e) {
+                    console.warn('listenCount tx fail', p, e && (e.code || e.message));
                 }
-            } catch (e) {
-                console.warn('listenCount transaction fail', p, e && (e.code || e.message));
-                // Fallback: đọc rồi set (kém an toàn hơn nhưng vẫn cộng được)
                 try {
                     const snap = await db.ref(p).once('value');
                     const next = (Number(snap.val()) || 0) + 1;
                     await db.ref(p).set(next);
                     serverCount = next;
                     wrote = true;
+                    console.log('listenCount set OK', p, next);
+                    break;
                 } catch (e2) {
-                    console.warn('listenCount set fail', e2 && (e2.code || e2.message));
+                    console.warn('listenCount set fail', p, e2 && (e2.code || e2.message));
                 }
             }
             if (wrote) {
                 listenData[sid] = serverCount;
                 if (songIndex !== -1) songs[songIndex].listenCount = serverCount;
-                localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData));
-                updateListenStatsModal();
-                if (typeof renderPlaylist === 'function') renderPlaylist();
+                try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
+                try { updateListenStatsModal(); } catch (e) {}
+                try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
             } else {
-                // Giữ số local, cảnh báo
-                showNotification('LISTEN LOCAL:', 'Chưa ghi Firebase — kiểm tra Rules', '#ff9800', 'alert-triangle');
+                console.warn('listenCount: không ghi được Firebase — Rules/path');
             }
-            // Firebase user.listenedSongs
+// Firebase user.listenedSongs
             const key = sanitizeUsernameKey(user);
             await db.ref(dataPath('users') + '/' + key + '/listenedSongs/' + sid).set(Date.now());
             const acc2 = getCurrentAccount();
@@ -1722,7 +1768,49 @@ if (progressThumb) {
 let lastProgressUiAt = 0;
 let lastTimeLabelAt = 0;
 
+
+function tryRecordListenCount() {
+    try {
+        if (!songs || !songs[index]) return;
+        if (hasRecordedCurrentSong || isUpdatingListen) return;
+        if (demoLockedSongId) return;
+        // Đang phát hoặc đã tua qua 5s
+        const cur = (typeof audio !== 'undefined' && audio) ? (Number(audio.currentTime) || 0) : 0;
+        if (cur < 5) return;
+        if (!hasUserInteracted) hasUserInteracted = true;
+        hasRecordedCurrentSong = true;
+        const song = songs[index];
+        incrementListenCount(song.id, song.name, currentSource || 'play');
+    } catch (e) {
+        console.warn('tryRecordListenCount', e);
+        hasRecordedCurrentSong = false;
+    }
+}
+
+// Dự phòng: mỗi giây kiểm tra (timeupdate đôi khi không chạy đủ trên mobile)
+setInterval(() => {
+    try {
+        if (typeof audio === 'undefined' || !audio) return;
+        if (audio.paused) return;
+        tryRecordListenCount();
+    } catch (e) {}
+}, 1000);
+
 audio.ontimeupdate = () => {
+    // Cộng thời gian nghe thật (thống kê)
+    try {
+        if (!audio.paused && hasUserInteracted && songs[index]) {
+            const now = Date.now();
+            if (_lastListenTickAt > 0) {
+                const d = (now - _lastListenTickAt) / 1000;
+                if (d > 0 && d < 3) recordListenSeconds(d);
+            }
+            _lastListenTickAt = now;
+        } else {
+            _lastListenTickAt = 0;
+        }
+    } catch (e) {}
+
     // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
     if (demoLockedSongId) return;
 
@@ -1764,11 +1852,8 @@ audio.ontimeupdate = () => {
         return;
     }
     
-    // Cộng lượt: currentTime ≥ 5s trong lượt phát hiện tại (không lưu thiết bị / phiên)
-    if (cur >= 5 && !hasRecordedCurrentSong && !isUpdatingListen && !isChanging && songs[index] && hasUserInteracted) {
-        hasRecordedCurrentSong = true;
-        incrementListenCount(songs[index].id, songs[index].name, currentSource || 'play');
-    }
+    // Cộng lượt: currentTime ≥ 5s
+    tryRecordListenCount();
     
     if (isRepeatOne && dur && (dur - cur) <= 0.15 && !isLoopingHandled && dur > 0) {
         if (demoLockedSongId) return;
@@ -2359,6 +2444,7 @@ function ensureUserAccount(username) {
             streak: 0,
             streakFreeze: 0,
             listenedSongs: {},
+            listenTime: { total: 0, byDay: {} },
         };
         saveAllAccounts(accounts);
     } else {
@@ -2411,6 +2497,7 @@ async function fetchUserFromFirebase(username) {
                 streak: Number(data.streak) || 0,
                 streakFreeze: Number(data.streakFreeze) || 0,
                 listenedSongs: (data.listenedSongs && typeof data.listenedSongs === 'object') ? data.listenedSongs : {},
+                listenTime: (data.listenTime && typeof data.listenTime === 'object') ? data.listenTime : { total: 0, byDay: {} },
                 ownedThumbs: Array.isArray(data.ownedThumbs) ? data.ownedThumbs.map(String) : [],
                 activeThumb: data.activeThumb || '',
                 inviteBy: data.inviteBy || '',
@@ -2475,6 +2562,7 @@ async function pushUserToFirebase(username, account) {
             streak: Number(account.streak) || 0,
             streakFreeze: Number(account.streakFreeze) || 0,
             listenedSongs: account.listenedSongs || {},
+            listenTime: account.listenTime || { total: 0, byDay: {} },
             ownedThumbs: account.ownedThumbs || [],
             activeThumb: account.activeThumb || '',
             inviteBy: account.inviteBy || ''
@@ -3619,6 +3707,7 @@ function pushPlaybackSync() {}
 function savePlaybackOnLeave() {}
 
 audio.addEventListener('play', () => {
+    hasUserInteracted = true;
     preloadNextSong();
 });
 
