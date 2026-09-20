@@ -2580,9 +2580,25 @@ function startUserProfileListener(uid) {
         const accounts = getAllAccounts();
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
-        // Chỉ ghi đè local nếu dữ liệu remote khác (tránh loop vô ích)
         const prev = accounts[name];
         const prevCoins = prev ? (prev.coins | 0) : null;
+        // Giữ owned local nếu đang mua (tránh race: coins ghi trước, owned ghi sau → mất "ĐÃ MUA")
+        if (prev && Array.isArray(prev.owned) && prev.owned.length) {
+            const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
+            const localOwned = prev.owned.map(String);
+            // Union: remote là nguồn chính, thêm id local chưa có trên remote (vừa mua)
+            mapped.owned = [...new Set([...remoteOwned, ...localOwned])];
+        }
+        // Tương tự rentals
+        if (prev && prev.rentals && typeof prev.rentals === 'object') {
+            mapped.rentals = Object.assign({}, mapped.rentals || {}, prev.rentals);
+            // Ưu tiên expiry xa hơn
+            Object.keys(prev.rentals).forEach(sid => {
+                const a = Number(prev.rentals[sid]) || 0;
+                const b = Number((mapped.rentals || {})[sid]) || 0;
+                mapped.rentals[sid] = Math.max(a, b);
+            });
+        }
         accounts[name] = mapped;
         saveAllAccounts(accounts);
         if (getCurrentUsername() === name) {
@@ -2590,6 +2606,13 @@ function startUserProfileListener(uid) {
             if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
             if (typeof updateCheckinButtonUI === 'function') updateCheckinButtonUI();
             if (typeof applyActiveProgressThumb === 'function') applyActiveProgressThumb();
+            // Cập nhật list cửa hàng ngay khi profile đổi (ĐÃ MUA / xu)
+            try {
+                const modal = document.getElementById('shop-modal');
+                if (modal && modal.classList.contains('show') && typeof renderShopList === 'function') {
+                    renderShopList();
+                }
+            } catch (e) {}
         }
         if (prevCoins != null && prevCoins !== (mapped.coins | 0)) {
             console.log('[sync] coins cập nhật từ Firebase:', prevCoins, '→', mapped.coins | 0);
@@ -2693,8 +2716,11 @@ async function pushUserToFirebase(username, account, options) {
     try {
         const db = getDb();
         if (!db) return false;
-        // Nếu có delta coins → dùng transaction để 2 thiết bị không ghi đè nhau
+        // Nếu có delta coins → ghi owned/profile TRƯỚC, rồi transaction coins
+        // (tránh listener nhận profile cũ mất bài vừa mua)
         if (typeof opts.coinsDelta === 'number' && opts.coinsDelta !== 0) {
+            const payload = buildUserPayload(uid, name, account, false);
+            await db.ref(dataPath('users') + '/' + uid).update(payload);
             const coinsRef = db.ref(dataPath('users') + '/' + uid + '/coins');
             const tx = await coinsRef.transaction((current) => {
                 const cur = Number(current);
@@ -2703,19 +2729,19 @@ async function pushUserToFirebase(username, account, options) {
             });
             if (tx.committed) {
                 account.coins = Number(tx.snapshot.val()) || 0;
-                // Cập nhật local theo kết quả transaction (nguồn sự thật)
                 const accounts = getAllAccounts();
                 if (accounts[name]) {
                     accounts[name].coins = account.coins;
+                    // Giữ owned local (vừa mua)
+                    if (Array.isArray(account.owned)) {
+                        accounts[name].owned = [...new Set(account.owned.map(String))];
+                    }
                     saveAllAccounts(accounts);
                 }
                 if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
             }
-            // Đẩy các field còn lại (không đụng coins)
-            const payload = buildUserPayload(uid, name, account, false);
-            await db.ref(dataPath('users') + '/' + uid).update(payload);
         } else {
-            // Không đổi coins → không ghi field coins (tránh ghi đè số xu mới hơn từ thiết bị khác)
+            // Không đổi coins → không ghi field coins
             const payload = buildUserPayload(uid, name, account, false);
             await db.ref(dataPath('users') + '/' + uid).update(payload);
         }
@@ -3044,6 +3070,27 @@ function doDailyCheckin() {
     return true;
 }
 
+/** Ép UI 1 item cửa hàng sang trạng thái ĐÃ MUA ngay (không đợi sync) */
+function markShopItemOwnedUI(songId) {
+    const id = String(songId);
+    const list = document.getElementById('shop-list');
+    if (!list) return;
+    const item = list.querySelector('.shop-item[data-song-id="' + id.replace(/"/g, '') + '"]');
+    if (!item) return;
+    item.classList.add('owned');
+    const nameEl = item.querySelector('.shop-item-name');
+    if (nameEl) {
+        const demo = nameEl.querySelector('.demo-badge');
+        if (demo) demo.remove();
+    }
+    const priceEl = item.querySelector('.shop-item-price');
+    if (priceEl) priceEl.remove();
+    const actions = item.querySelector('.shop-item-actions-col');
+    if (actions) {
+        actions.innerHTML = '<span class="shop-owned-badge">ĐÃ MUA</span>';
+    }
+}
+
 function buySong(songId) {
     if (!getCurrentUsername()) {
         showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
@@ -3070,8 +3117,16 @@ function buySong(songId) {
         acc.owned.push(String(songId));
         acc.owned = [...new Set(acc.owned)];
     });
-    showNotification('MUA THÀNH CÔNG:', String(songId), '#4ade80', 'shopping-bag');
+    // Toast: 2 ngôi sao 2 bên ID
+    showNotification(
+        'MUA THÀNH CÔNG:',
+        '<i class="fa-solid fa-star"></i> ' + String(songId) + ' <i class="fa-solid fa-star"></i>',
+        '#4ade80',
+        'shopping-bag'
+    );
+    // Cập nhật UI ngay — badge ĐÃ MUA
     renderShopList();
+    markShopItemOwnedUI(songId);
     if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
     updateUsernameBadge();
@@ -3195,7 +3250,7 @@ function renderShopList(highlightSongId) {
         const rented = isSongRented(id);
         const rentP = getRentPrice(s);
         let action = '';
-        if (owned && loadOwnedSongs().includes(id)) {
+        if (loadOwnedSongs().includes(id)) {
             action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
         } else if (rented) {
             action = `<span class="shop-owned-badge shop-rent-countdown" data-rent-exp="${getRentExpiry(id)}">THUÊ …</span>
@@ -3204,10 +3259,11 @@ function renderShopList(highlightSongId) {
             action = `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
                 <button type="button" class="shop-buy-btn shop-rent-btn" data-rent-id="${id}">THUÊ 24H ${rentP} XK</button>`;
         }
-        const priceLabel = (owned && loadOwnedSongs().includes(id)) ? '' : `<div class="shop-item-price">Mua ${price} XK · Thuê ${rentP} XK/24h</div>`;
-        return `<div class="shop-item ${owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
+        const permanentlyOwned = loadOwnedSongs().includes(id);
+        const priceLabel = permanentlyOwned ? '' : `<div class="shop-item-price">Mua ${price} XK · Thuê ${rentP} XK/24h</div>`;
+        return `<div class="shop-item ${permanentlyOwned || owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
             <div class="shop-item-info">
-                <div class="shop-item-name">${name}${owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
+                <div class="shop-item-name">${name}${permanentlyOwned || owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
                 <div class="shop-item-artist">${artist}</div>
                 ${priceLabel}
             </div>
