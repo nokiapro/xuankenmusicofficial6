@@ -2555,8 +2555,36 @@ function mapUserProfile(data, name) {
     };
 }
 
-/** Realtime sync profile user giữa các thiết bị (PC / mobile) */
+/** Realtime sync profile user giữa các thiết bị (PC / mobile)
+ * Firebase = nguồn sự thật. Local chỉ optimistic UI tạm thời.
+ */
 let _userProfileUnsub = null;
+/** Bài vừa mua trên máy này, chưa chắc đã có trên server — giữ UI ĐÃ MUA */
+let _pendingOwnedAdds = Object.create(null); // { songId: timestamp }
+let _profileSyncedFromRemote = false;
+const PENDING_OWNED_MS = 30000;
+
+function markPendingOwned(songId) {
+    _pendingOwnedAdds[String(songId)] = Date.now();
+}
+
+function consumePendingOwned(remoteOwned) {
+    const remote = new Set((remoteOwned || []).map(String));
+    const now = Date.now();
+    const keep = [];
+    Object.keys(_pendingOwnedAdds).forEach(id => {
+        if (remote.has(id)) {
+            delete _pendingOwnedAdds[id];
+            return;
+        }
+        if (now - (_pendingOwnedAdds[id] || 0) > PENDING_OWNED_MS) {
+            delete _pendingOwnedAdds[id];
+            return;
+        }
+        keep.push(id);
+    });
+    return keep;
+}
 
 function stopUserProfileListener() {
     if (typeof _userProfileUnsub === 'function') {
@@ -2580,33 +2608,31 @@ function startUserProfileListener(uid) {
         const accounts = getAllAccounts();
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
+        // Firebase owned là nguồn chính + bài pending vừa mua trên máy này
+        const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
+        const pending = consumePendingOwned(remoteOwned);
+        mapped.owned = [...new Set([...remoteOwned, ...pending])];
+        // Rentals: lấy max expiry (remote + local còn hạn)
         const prev = accounts[name];
-        const prevCoins = prev ? (prev.coins | 0) : null;
-        // Giữ owned local nếu đang mua (tránh race: coins ghi trước, owned ghi sau → mất "ĐÃ MUA")
-        if (prev && Array.isArray(prev.owned) && prev.owned.length) {
-            const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
-            const localOwned = prev.owned.map(String);
-            // Union: remote là nguồn chính, thêm id local chưa có trên remote (vừa mua)
-            mapped.owned = [...new Set([...remoteOwned, ...localOwned])];
-        }
-        // Tương tự rentals
         if (prev && prev.rentals && typeof prev.rentals === 'object') {
-            mapped.rentals = Object.assign({}, mapped.rentals || {}, prev.rentals);
-            // Ưu tiên expiry xa hơn
+            const merged = Object.assign({}, mapped.rentals || {});
             Object.keys(prev.rentals).forEach(sid => {
                 const a = Number(prev.rentals[sid]) || 0;
-                const b = Number((mapped.rentals || {})[sid]) || 0;
-                mapped.rentals[sid] = Math.max(a, b);
+                const b = Number(merged[sid]) || 0;
+                const m = Math.max(a, b);
+                if (m > Date.now()) merged[sid] = m;
             });
+            mapped.rentals = merged;
         }
+        const prevCoins = prev ? (prev.coins | 0) : null;
         accounts[name] = mapped;
         saveAllAccounts(accounts);
+        _profileSyncedFromRemote = true;
         if (getCurrentUsername() === name) {
             updateShopBalanceUI();
             if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
             if (typeof updateCheckinButtonUI === 'function') updateCheckinButtonUI();
             if (typeof applyActiveProgressThumb === 'function') applyActiveProgressThumb();
-            // Cập nhật list cửa hàng ngay khi profile đổi (ĐÃ MUA / xu)
             try {
                 const modal = document.getElementById('shop-modal');
                 if (modal && modal.classList.contains('show') && typeof renderShopList === 'function') {
@@ -2615,7 +2641,7 @@ function startUserProfileListener(uid) {
             } catch (e) {}
         }
         if (prevCoins != null && prevCoins !== (mapped.coins | 0)) {
-            console.log('[sync] coins cập nhật từ Firebase:', prevCoins, '→', mapped.coins | 0);
+            console.log('[sync] coins từ Firebase:', prevCoins, '→', mapped.coins | 0);
         }
     };
     ref.on('value', handler);
@@ -2637,7 +2663,9 @@ async function fetchUserByUid(uid, usernameHint) {
         const accounts = getAllAccounts();
         accounts[name] = mapUserProfile(data, name);
         accounts[name].uid = id;
+        // Remote là nguồn sự thật khi load — không giữ owned local cũ
         saveAllAccounts(accounts);
+        _profileSyncedFromRemote = true;
         startUserProfileListener(id);
         return accounts[name];
     } catch (e) {
@@ -2712,15 +2740,41 @@ async function pushUserToFirebase(username, account, options) {
         console.warn('pushUser: chưa có uid (chưa Auth)');
         return false;
     }
+    // owned dùng transaction UNION trên server → local thiếu cũng không xóa bài mobile đã mua
+    // coins dùng transaction theo delta → an toàn đa thiết bị
     const opts = options || {};
     try {
         const db = getDb();
         if (!db) return false;
-        // Nếu có delta coins → ghi owned/profile TRƯỚC, rồi transaction coins
-        // (tránh listener nhận profile cũ mất bài vừa mua)
+
+        // 1) owned: LUÔN merge (union) trên server — không bao giờ thay bằng mảng local thiếu
+        if (opts.ownedChanged && Array.isArray(account.owned)) {
+            const localOwned = account.owned.map(String);
+            const ownedRef = db.ref(dataPath('users') + '/' + uid + '/owned');
+            const txOwned = await ownedRef.transaction((current) => {
+                const remote = Array.isArray(current) ? current.map(String) : [];
+                return [...new Set([...remote, ...localOwned])];
+            });
+            if (txOwned.committed) {
+                const merged = Array.isArray(txOwned.snapshot.val())
+                    ? txOwned.snapshot.val().map(String)
+                    : localOwned;
+                account.owned = merged;
+                const accounts = getAllAccounts();
+                if (accounts[name]) {
+                    accounts[name].owned = merged;
+                    saveAllAccounts(accounts);
+                }
+            }
+        }
+
+        // 2) Các field khác (không gồm coins / owned — owned đã xử lý)
+        const payload = buildUserPayload(uid, name, account, false);
+        delete payload.owned; // owned xử lý bằng transaction ở trên
+        await db.ref(dataPath('users') + '/' + uid).update(payload);
+
+        // 3) coins: transaction theo delta
         if (typeof opts.coinsDelta === 'number' && opts.coinsDelta !== 0) {
-            const payload = buildUserPayload(uid, name, account, false);
-            await db.ref(dataPath('users') + '/' + uid).update(payload);
             const coinsRef = db.ref(dataPath('users') + '/' + uid + '/coins');
             const tx = await coinsRef.transaction((current) => {
                 const cur = Number(current);
@@ -2732,19 +2786,12 @@ async function pushUserToFirebase(username, account, options) {
                 const accounts = getAllAccounts();
                 if (accounts[name]) {
                     accounts[name].coins = account.coins;
-                    // Giữ owned local (vừa mua)
-                    if (Array.isArray(account.owned)) {
-                        accounts[name].owned = [...new Set(account.owned.map(String))];
-                    }
                     saveAllAccounts(accounts);
                 }
                 if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
             }
-        } else {
-            // Không đổi coins → không ghi field coins
-            const payload = buildUserPayload(uid, name, account, false);
-            await db.ref(dataPath('users') + '/' + uid).update(payload);
         }
+
         const key = sanitizeUsernameKey(name);
         await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
         return true;
@@ -2773,12 +2820,17 @@ function updateCurrentAccount(mutator) {
         accounts[name] = { coins: settings.starterCoins, owned: [], lastCheckin: '', createdAt: Date.now() };
     }
     const beforeCoins = accounts[name].coins | 0;
+    const beforeOwned = JSON.stringify((accounts[name].owned || []).map(String).sort());
     mutator(accounts[name]);
     const afterCoins = accounts[name].coins | 0;
+    const afterOwned = JSON.stringify((accounts[name].owned || []).map(String).sort());
     const coinsDelta = afterCoins - beforeCoins;
+    const ownedChanged = beforeOwned !== afterOwned;
     saveAllAccounts(accounts);
-    // coinsDelta giúp Firebase transaction cộng/trừ an toàn giữa PC và mobile
-    pushUserToFirebase(name, accounts[name], { coinsDelta: coinsDelta });
+    pushUserToFirebase(name, accounts[name], {
+        coinsDelta: coinsDelta,
+        ownedChanged: ownedChanged
+    });
     return accounts[name];
 }
 
@@ -3117,6 +3169,7 @@ function buySong(songId) {
         acc.owned.push(String(songId));
         acc.owned = [...new Set(acc.owned)];
     });
+    markPendingOwned(songId);
     // Toast: 2 ngôi sao 2 bên ID
     showNotification(
         'MUA THÀNH CÔNG:',
