@@ -975,6 +975,40 @@
                 <pre id="dead-link-report" style="margin-top:8px;font-size:0.7rem;max-height:160px;overflow:auto;display:none;"></pre>
             </div>
 
+            <div class="card" style="border-color:rgba(255,68,68,0.45);background:rgba(255,68,68,0.06);">
+                <h2 style="color:#ff6b6b;"><i class="fa-solid fa-skull-crossbones"></i> Vùng nguy hiểm — Reset toàn bộ</h2>
+                <p class="muted" style="margin:0 0 12px;font-size:0.78rem;line-height:1.5;">
+                    Xóa sạch dữ liệu Realtime Database: <strong>users, usernames, songs, prices, giftCodes, legacyUsers, chat, reactions</strong>
+                    và reset bộ đếm đăng ký. <strong>Không xóa được tài khoản Firebase Authentication</strong>
+                    (email/PIN) — bạn phải xóa thủ công trong Firebase Console → Authentication.
+                    Sau khi reset, mở trang <code>clear-local.html</code> trên <strong>cả PC và điện thoại</strong> để xóa localStorage.
+                </p>
+                <div class="form-grid" style="margin-bottom:10px;">
+                    <div class="full check-row">
+                        <input type="checkbox" id="factory-wipe-songs" checked>
+                        <label for="factory-wipe-songs">Xóa toàn bộ bài hát (songs)</label>
+                    </div>
+                    <div class="full check-row">
+                        <input type="checkbox" id="factory-wipe-users" checked>
+                        <label for="factory-wipe-users">Xóa toàn bộ user / xu / owned (users + usernames + legacyUsers)</label>
+                    </div>
+                    <div class="full check-row">
+                        <input type="checkbox" id="factory-wipe-extras" checked>
+                        <label for="factory-wipe-extras">Xóa prices, giftCodes, chat, reactions, progressThumbs, broadcast</label>
+                    </div>
+                    <div class="full check-row">
+                        <input type="checkbox" id="factory-reset-settings" checked>
+                        <label for="factory-reset-settings">Reset registrationCount = 0 (giữ siteName / icon / giá mặc định)</label>
+                    </div>
+                </div>
+                <label style="font-size:0.75rem;color:var(--muted);">Gõ <strong style="color:#ff6b6b;">RESET</strong> để xác nhận</label>
+                <input type="text" id="factory-confirm-input" placeholder="RESET" autocomplete="off" style="margin-top:6px;border-color:rgba(255,68,68,0.4);">
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-danger" id="factory-reset-btn"><i class="fa-solid fa-bomb"></i> RESET TOÀN BỘ FIREBASE</button>
+                </div>
+                <pre id="factory-reset-log" style="margin-top:10px;font-size:0.7rem;max-height:180px;overflow:auto;display:none;white-space:pre-wrap;"></pre>
+            </div>
+
             <div class="card">
                 <h2>Thương hiệu &amp; đa web</h2>
                 <div class="form-grid">
@@ -1847,6 +1881,127 @@
         const bulkPin = document.getElementById('bulk-reset-pin-btn');
         if (bulkPin) bulkPin.onclick = () => {
             toast('PIN là mật khẩu Firebase Auth — reset trong Firebase Console → Authentication');
+        };
+
+        // ===== FACTORY RESET (xóa sạch RTDB) =====
+        const factoryBtn = document.getElementById('factory-reset-btn');
+        if (factoryBtn) factoryBtn.onclick = async () => {
+            const confirmEl = document.getElementById('factory-confirm-input');
+            const logEl = document.getElementById('factory-reset-log');
+            const typed = (confirmEl && confirmEl.value || '').trim();
+            if (typed !== 'RESET') {
+                toast('Gõ đúng chữ RESET để xác nhận');
+                if (confirmEl) confirmEl.focus();
+                return;
+            }
+            const wipeSongs = !!(document.getElementById('factory-wipe-songs') || {}).checked;
+            const wipeUsers = !!(document.getElementById('factory-wipe-users') || {}).checked;
+            const wipeExtras = !!(document.getElementById('factory-wipe-extras') || {}).checked;
+            const resetSettings = !!(document.getElementById('factory-reset-settings') || {}).checked;
+            if (!wipeSongs && !wipeUsers && !wipeExtras && !resetSettings) {
+                toast('Chọn ít nhất 1 mục để xóa');
+                return;
+            }
+            const summary = [
+                wipeSongs ? 'songs' : null,
+                wipeUsers ? 'users+usernames+legacyUsers' : null,
+                wipeExtras ? 'prices+giftCodes+chat+reactions+thumbs+broadcast' : null,
+                resetSettings ? 'registrationCount=0' : null
+            ].filter(Boolean).join(', ');
+            if (!confirm('CẢNH BÁO: Xóa vĩnh viễn dữ liệu Firebase?\n\nSẽ xóa: ' + summary + '\n\nKhông thể hoàn tác. Tiếp tục?')) return;
+            if (!confirm('Xác nhận lần 2: bạn chắc chắn muốn RESET TOÀN BỘ?')) return;
+
+            factoryBtn.disabled = true;
+            const lines = [];
+            const log = (msg) => {
+                lines.push(msg);
+                if (logEl) {
+                    logEl.style.display = 'block';
+                    logEl.textContent = lines.join('\n');
+                }
+            };
+            log('Bắt đầu factory reset...');
+            setToolsProgress(true, 5, 'Đang xóa...');
+
+            const safeRemove = async (path, label) => {
+                try {
+                    await db().ref(path).remove();
+                    log('✓ Đã xóa: ' + label + ' (' + path + ')');
+                    return true;
+                } catch (e) {
+                    log('✗ Lỗi xóa ' + label + ': ' + (e.code || e.message || e));
+                    return false;
+                }
+            };
+
+            try {
+                let step = 0;
+                const total = 10;
+                const tick = (label) => {
+                    step++;
+                    setToolsProgress(true, (step / total) * 100, label);
+                };
+
+                if (wipeUsers) {
+                    tick('Xóa users...');
+                    await safeRemove(dataPath('users'), 'users');
+                    tick('Xóa usernames...');
+                    await safeRemove(dataPath('usernames'), 'usernames');
+                    tick('Xóa legacyUsers...');
+                    await safeRemove('legacyUsers', 'legacyUsers');
+                    // path cũ music6/users nếu còn
+                    await safeRemove('music6/users', 'music6/users (legacy)');
+                    usersCache = {};
+                }
+                if (wipeSongs) {
+                    tick('Xóa songs...');
+                    await safeRemove(dataPath('songs'), 'songs');
+                    await safeRemove('music6/songs', 'music6/songs (legacy)');
+                    songsCache = [];
+                }
+                if (wipeExtras) {
+                    tick('Xóa prices / giftCodes / chat...');
+                    await safeRemove(dataPath('prices'), 'prices');
+                    await safeRemove(dataPath('giftCodes'), 'giftCodes');
+                    await safeRemove('chat', 'chat');
+                    await safeRemove('reactions', 'reactions');
+                    await safeRemove('settings/progressThumbs', 'progressThumbs');
+                    await safeRemove('settings/broadcast', 'broadcast');
+                    await safeRemove('settings/chatMutes', 'chatMutes');
+                    await safeRemove('music6/prices', 'music6/prices');
+                    await safeRemove('music6/giftCodes', 'music6/giftCodes');
+                }
+                if (resetSettings) {
+                    tick('Reset registrationCount...');
+                    try {
+                        await db().ref('settings/registrationCount').set(0);
+                        if (settingsCache) settingsCache.registrationCount = 0;
+                        const el = document.getElementById('set-registration-count');
+                        if (el) el.value = '0';
+                        log('✓ registrationCount = 0');
+                    } catch (e) {
+                        log('✗ Lỗi reset settings: ' + (e.code || e.message || e));
+                    }
+                }
+
+                setToolsProgress(true, 100, 'Hoàn tất');
+                log('');
+                log('=== XONG ===');
+                log('Bước tiếp theo (bắt buộc):');
+                log('1. Firebase Console → Authentication → xóa các user (trừ admin nếu cần)');
+                log('2. Mở clear-local.html trên PC và trên điện thoại để xóa localStorage');
+                log('3. Hard refresh trang player (Ctrl+F5)');
+                toast('Đã reset Firebase RTDB');
+                try { renderSongs(''); } catch (e) {}
+                try { renderUsers(''); } catch (e) {}
+                try { refreshStats(); } catch (e) {}
+            } catch (err) {
+                log('LỖI: ' + (err.code || err.message || err));
+                toast('Reset lỗi: ' + (err.message || err));
+            } finally {
+                factoryBtn.disabled = false;
+                setTimeout(() => setToolsProgress(false, 0, ''), 2500);
+            }
         };
         function probeAudioUrl(url, timeoutMs) {
             return new Promise((resolve) => {
