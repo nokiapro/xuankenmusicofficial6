@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "profiles": {
+    "u7693d2e4": {
+      "updatedAt": 1789904702109,
+      "label": "xua***",
+      "favorites": [],
+      "currentPath": "thumb",
+      "viewMode": "list",
+      "playback": null,
+      "devices": {
+        "dev_mxi7psgxmu3l56i3": {
+          "name": "Windows Chrome",
+          "lastSeen": 1789904702109
+        }
+      }
+    }
+  },
+  "updatedAt": 1789904702109
+}
