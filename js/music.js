@@ -3560,24 +3560,46 @@ async function loginWithUsername(rawName, rawPin) {
     }
 
     if (isNew || !profile) {
+        // Khôi phục data user cũ (legacyUsers hoặc music6/users) theo username
+        let legacy = null;
+        try {
+            if (db) {
+                const legSnap = await db.ref('legacyUsers/' + key).once('value');
+                legacy = legSnap.val();
+                if (!legacy) {
+                    const m6Snap = await db.ref('music6/users/' + key).once('value');
+                    legacy = m6Snap.val();
+                }
+            }
+        } catch (e) {}
+
         const neu = {
             uid: uid,
             username: name,
-            coins: settings.starterCoins,
-            owned: [],
-            favorites: [],
-            likes: [],
-            dislikes: [],
-            myPlaylist: [],
-            rentals: {},
-            lastCheckin: '',
-            createdAt: Date.now(),
-            rank: 'member',
-            xp: 0,
-            level: 1,
-            seasonXp: 0,
-            listenedSongs: {},
-            listenTime: { total: 0, byDay: {} }
+            coins: legacy && legacy.coins != null ? (legacy.coins | 0) : settings.starterCoins,
+            owned: legacy && Array.isArray(legacy.owned) ? legacy.owned.map(String) : [],
+            favorites: legacy && Array.isArray(legacy.favorites) ? legacy.favorites.map(String) : [],
+            likes: legacy && Array.isArray(legacy.likes) ? legacy.likes.map(String) : [],
+            dislikes: legacy && Array.isArray(legacy.dislikes) ? legacy.dislikes.map(String) : [],
+            myPlaylist: legacy && Array.isArray(legacy.myPlaylist) ? legacy.myPlaylist.map(String) : [],
+            rentals: (legacy && legacy.rentals && typeof legacy.rentals === 'object') ? legacy.rentals : {},
+            lastCheckin: (legacy && legacy.lastCheckin) || '',
+            createdAt: (legacy && legacy.createdAt) || Date.now(),
+            rank: (legacy && legacy.rank) || 'member',
+            xp: legacy ? (Number(legacy.xp) || 0) : 0,
+            level: legacy ? (Number(legacy.level) || 1) : 1,
+            seasonXp: legacy ? (Number(legacy.seasonXp) || 0) : 0,
+            listenedSongs: (legacy && legacy.listenedSongs && typeof legacy.listenedSongs === 'object') ? legacy.listenedSongs : {},
+            listenTime: (legacy && legacy.listenTime && typeof legacy.listenTime === 'object') ? legacy.listenTime : { total: 0, byDay: {} },
+            achievements: legacy && Array.isArray(legacy.achievements) ? legacy.achievements : [],
+            frame: (legacy && legacy.frame) || '',
+            streak: legacy ? (Number(legacy.streak) || 0) : 0,
+            streakFreeze: legacy ? (Number(legacy.streakFreeze) || 0) : 0,
+            ownedThumbs: legacy && Array.isArray(legacy.ownedThumbs) ? legacy.ownedThumbs.map(String) : [],
+            activeThumb: (legacy && legacy.activeThumb) || '',
+            inviteBy: (legacy && legacy.inviteBy) || '',
+            banned: !!(legacy && legacy.banned),
+            banReason: (legacy && legacy.banReason) || ''
         };
         try {
             if (db) {
