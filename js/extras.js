@@ -9,16 +9,43 @@
   'use strict';
 
   const ACHIEVEMENTS = {
-    first_listen: { name: 'Lần nghe đầu', desc: 'Nghe 1 bài qua 5 giây', xp: 0 },
-    listens_10: { name: 'Tai nghe bền', desc: 'Đã tính 10 lượt nghe (bài khác nhau)', hidden: false },
-    listens_50: { name: 'Nghiện nhạc', desc: '50 bài đã nghe', hidden: false },
-    checkin_7: { name: 'Tuần đầy đủ', desc: 'Streak 7 ngày', hidden: false },
-    night_owl: { name: 'Cú đêm', desc: 'Nghe trong 0h–4h', hidden: true },
-    collector: { name: 'Nhà sưu tập', desc: 'Sở hữu 5 bài', hidden: false },
-    level_5: { name: 'Level 5', desc: 'Đạt level 5', hidden: false },
-    level_10: { name: 'Level 10', desc: 'Đạt level 10', hidden: false },
-    inviter: { name: 'Người dẫn đường', desc: 'Mời 1 bạn thành công', hidden: false },
-    secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', hidden: true }
+    first_listen: { name: 'Lần nghe đầu', desc: 'Nghe 1 bài qua 5 giây', icon: '🎧' },
+    listens_10: { name: 'Tai nghe bền', desc: '10 bài đã nghe', icon: '📻' },
+    listens_25: { name: 'Fan cứng', desc: '25 bài đã nghe', icon: '💿' },
+    listens_50: { name: 'Nghiện nhạc', desc: '50 bài đã nghe', icon: '🔥' },
+    listens_100: { name: 'Huyền thoại nghe', desc: '100 bài đã nghe', icon: '👑' },
+    listens_200: { name: 'Không ngủ', desc: '200 bài đã nghe', icon: '🌌' },
+    checkin_3: { name: 'Bắt đầu đều', desc: 'Streak 3 ngày', icon: '📅' },
+    checkin_7: { name: 'Tuần đầy đủ', desc: 'Streak 7 ngày', icon: '🗓️' },
+    checkin_14: { name: 'Hai tuần kiên trì', desc: 'Streak 14 ngày', icon: '💪' },
+    checkin_30: { name: 'Tháng chuyên cần', desc: 'Streak 30 ngày', icon: '🏆' },
+    night_owl: { name: 'Cú đêm', desc: 'Nghe trong 0h–4h', icon: '🦉', hidden: true },
+    early_bird: { name: 'Chim sớm', desc: 'Nghe trong 5h–7h', icon: '🐦', hidden: true },
+    collector: { name: 'Nhà sưu tập', desc: 'Sở hữu 5 bài', icon: '📦' },
+    collector_10: { name: 'Kho nhạc', desc: 'Sở hữu 10 bài', icon: '🗂️' },
+    collector_25: { name: 'Thư viện sống', desc: 'Sở hữu 25 bài', icon: '📚' },
+    collector_50: { name: 'Đại gia nhạc', desc: 'Sở hữu 50 bài', icon: '💎' },
+    first_buy: { name: 'Giao dịch đầu', desc: 'Mua bài đầu tiên', icon: '🛒' },
+    renter: { name: 'Thuê bao', desc: 'Thuê 1 bài 24h', icon: '⏳' },
+    level_5: { name: 'Level 5', desc: 'Đạt level 5', icon: '⭐' },
+    level_10: { name: 'Level 10', desc: 'Đạt level 10', icon: '🌟' },
+    level_20: { name: 'Level 20', desc: 'Đạt level 20', icon: '✨' },
+    level_50: { name: 'Level 50', desc: 'Đạt level 50', icon: '💫' },
+    inviter: { name: 'Người dẫn đường', desc: 'Mời 1 bạn thành công', icon: '🤝' },
+    inviter_5: { name: 'Networker', desc: 'Mời 5 bạn', icon: '🌐' },
+    gift_first: { name: 'Quà đầu tay', desc: 'Đổi gift code lần đầu', icon: '🎁' },
+    chat_first: { name: 'Lên tiếng', desc: 'Gửi tin chat đầu tiên', icon: '💬' },
+    thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: '🎨' },
+    playlist_5: { name: 'DJ nghiệp dư', desc: '5 bài trong playlist', icon: '🎵' },
+    playlist_20: { name: 'DJ chính hiệu', desc: '20 bài trong playlist', icon: '🎚️' },
+    fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích', icon: '❤️' },
+    like_20: { name: 'Like máy', desc: 'Like 20 bài', icon: '👍' },
+    secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', icon: '🔮', hidden: true },
+    marathon: { name: 'Marathon', desc: 'Nghe ≥ 60 phút trong phiên', icon: '🏃' },
+    rich: { name: 'Túi đầy', desc: 'Có ≥ 500 XK', icon: '💰' },
+    richer: { name: 'Đại gia XK', desc: 'Có ≥ 2000 XK', icon: '🏦' },
+    vip_rank: { name: 'VIP', desc: 'Đạt hạng VIP', icon: '🥇' },
+    super_vip_rank: { name: 'SUPER VIP', desc: 'Đạt hạng SUPER VIP', icon: '👑' }
   };
 
   const FRAMES = [
@@ -112,7 +139,7 @@
       acc.achievements.push(id);
       got = true;
     });
-    if (got) toast('HUY HIỆU', def.name + (def.hidden ? ' ✨' : ''), '#fbbf24');
+    if (got) toast('Huy hiệu:', (def.icon ? def.icon + ' ' : '') + def.name + (def.hidden ? ' ✨' : ''), '#fbbf24');
     syncUserPartial();
   }
 
@@ -120,17 +147,89 @@
     const acc = getAcc();
     if (!acc) return;
     const listened = acc.listenedSongs ? Object.keys(acc.listenedSongs).length : 0;
+    const owned = (acc.owned || []).length;
+    const streak = acc.streak || 0;
+    const level = acc.level || 1;
+    const coins = acc.coins | 0;
+    const favs = (acc.favorites || []).length;
+    const likes = (acc.likes || []).length;
+    const pl = (acc.myPlaylist || []).length;
+    const thumbs = (acc.ownedThumbs || []).length;
+    const rank = String(acc.rank || 'member').toLowerCase();
     if (listened >= 1) unlockAchievement('first_listen');
     if (listened >= 10) unlockAchievement('listens_10');
+    if (listened >= 25) unlockAchievement('listens_25');
     if (listened >= 50) unlockAchievement('listens_50');
-    if ((acc.streak || 0) >= 7) unlockAchievement('checkin_7');
-    if ((acc.owned || []).length >= 5) unlockAchievement('collector');
-    if ((acc.level || 1) >= 5) unlockAchievement('level_5');
-    if ((acc.level || 1) >= 10) unlockAchievement('level_10');
+    if (listened >= 100) unlockAchievement('listens_100');
+    if (listened >= 200) unlockAchievement('listens_200');
+    if (streak >= 3) unlockAchievement('checkin_3');
+    if (streak >= 7) unlockAchievement('checkin_7');
+    if (streak >= 14) unlockAchievement('checkin_14');
+    if (streak >= 30) unlockAchievement('checkin_30');
+    if (owned >= 1) unlockAchievement('first_buy');
+    if (owned >= 5) unlockAchievement('collector');
+    if (owned >= 10) unlockAchievement('collector_10');
+    if (owned >= 25) unlockAchievement('collector_25');
+    if (owned >= 50) unlockAchievement('collector_50');
+    if (level >= 5) unlockAchievement('level_5');
+    if (level >= 10) unlockAchievement('level_10');
+    if (level >= 20) unlockAchievement('level_20');
+    if (level >= 50) unlockAchievement('level_50');
+    if (coins >= 500) unlockAchievement('rich');
+    if (coins >= 2000) unlockAchievement('richer');
+    if (favs >= 10) unlockAchievement('fav_10');
+    if (likes >= 20) unlockAchievement('like_20');
+    if (pl >= 5) unlockAchievement('playlist_5');
+    if (pl >= 20) unlockAchievement('playlist_20');
+    if (thumbs >= 1) unlockAchievement('thumb_buyer');
+    if (acc.rentals && typeof acc.rentals === 'object' && Object.keys(acc.rentals).length >= 1) unlockAchievement('renter');
+    if (rank === 'vip' || rank === 'super_vip' || rank === 'admin') unlockAchievement('vip_rank');
+    if (rank === 'super_vip' || rank === 'admin') unlockAchievement('super_vip_rank');
     const h = new Date().getHours();
     if (h >= 0 && h < 4) unlockAchievement('night_owl');
-    if (new Date().getHours() === 3 && new Date().getMinutes() === 33) unlockAchievement('secret_333');
+    if (h >= 5 && h < 7) unlockAchievement('early_bird');
+    if (h === 3 && new Date().getMinutes() === 33) unlockAchievement('secret_333');
   }
+
+  function openBadgesModal() {
+    let modal = document.getElementById('badges-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'badges-modal';
+      modal.className = 'shop-modal badges-modal';
+      modal.innerHTML = '<div class="shop-modal-header">'
+        + '<div class="close-shop" id="close-badges-btn"><i data-lucide="x"></i></div>'
+        + '<div class="shop-title"><i data-lucide="award"></i><span>HUY HIỆU</span></div>'
+        + '<div style="width:40px;"></div></div>'
+        + '<div class="badges-modal-body" id="badges-list"></div>';
+      document.body.appendChild(modal);
+      const close = () => { modal.classList.remove('show'); };
+      modal.querySelector('#close-badges-btn').onclick = close;
+      modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    }
+    const list = modal.querySelector('#badges-list');
+    const acc = getAcc() || {};
+    const owned = new Set((acc.achievements || []).map(String));
+    const ids = Object.keys(ACHIEVEMENTS);
+    list.innerHTML = ids.map(id => {
+      const def = ACHIEVEMENTS[id];
+      if (def.hidden && !owned.has(id)) {
+        return '<div class="badge-card locked"><div class="badge-icon">❓</div><div class="badge-info"><div class="badge-name">???</div><div class="badge-desc">Huy hiệu ẩn</div></div></div>';
+      }
+      const got = owned.has(id);
+      return '<div class="badge-card' + (got ? ' got' : ' locked') + '">'
+        + '<div class="badge-icon">' + (def.icon || '🏅') + '</div>'
+        + '<div class="badge-info"><div class="badge-name">' + escapeHtml(def.name) + '</div>'
+        + '<div class="badge-desc">' + escapeHtml(def.desc || '') + '</div></div>'
+        + (got ? '<span class="badge-got-tag">Đã nhận</span>' : '<span class="badge-lock-tag">Chưa</span>')
+        + '</div>';
+    }).join('');
+    modal.classList.add('show');
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+    }
+  }
+
 
   async function syncUserPartial() {
     try {
@@ -376,6 +475,7 @@
         return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
       }
       updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
+      unlockAchievement('gift_first');
       toast('GIFT', '+' + coins + ' XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
       if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
@@ -758,6 +858,7 @@
       btn._xkBound = true;
       btn.onclick = () => {
         const x = btn.getAttribute('data-x');
+        if (x === 'badges') { openBadgesModal(); return; }
         if (x === 'top-week') topSongsByPeriod('week');
         if (x === 'top-month') topSongsByPeriod('month');
         if (x === 'top-year') topSongsByPeriod('year');
@@ -927,6 +1028,7 @@
         rank: String(rank || 'member').slice(0, 31)
       });
       if (input) input.value = '';
+      unlockAchievement('chat_first');
     } catch (err) {
       toast('CHAT', 'Không gửi được: ' + (err.message || err), '#ff4444');
     }

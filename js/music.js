@@ -112,6 +112,7 @@ const DEFAULT_ADMIN_SETTINGS = {
     checkinReward: 15,
     starterCoins: 20,
     siteName: 'XuanKen Music Official',
+    siteTitle: 'XuanKen Music Official',
     siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
     // Chỉ dùng cho localStorage (vd music6_xuanken_accounts) — Firebase luôn ở root
     sitePrefix: 'music6',
@@ -161,8 +162,9 @@ function dataPath(key) {
 function applyBranding() {
     const s = getAdminSettings();
     const name = (s.siteName || DEFAULT_ADMIN_SETTINGS.siteName).trim() || DEFAULT_ADMIN_SETTINGS.siteName;
+    const pageTitle = (s.siteTitle || name).trim() || name;
     const icon = (s.siteIcon || DEFAULT_ADMIN_SETTINGS.siteIcon).trim() || DEFAULT_ADMIN_SETTINGS.siteIcon;
-    document.title = name;
+    document.title = pageTitle;
     let fav = document.getElementById('site-favicon');
     if (!fav) {
         fav = document.querySelector('link[rel="shortcut icon"], link[rel="icon"]');
@@ -2242,7 +2244,7 @@ function updateTimerDisplay() {
         if (hrs > 0) label += '<strong>' + hrs + '</strong> GIỜ ';
         if (mins > 0 || hrs > 0) label += '<strong>' + mins + '</strong> PHÚT ';
         label += '<strong>' + secs + '</strong> GIÂY';
-        if (timerStatus) timerStatus.innerHTML = 'TẮT SAU: ' + label + ' <span style="opacity:.7">(' + clock + ')</span>';
+        if (timerStatus) timerStatus.innerHTML = 'TẮT SAU: ' + label;
         if (openTimerBtn) openTimerBtn.classList.add('active');
     } else {
         if (timerStatus) timerStatus.innerHTML = 'BẠN CHƯA ĐẶT HẸN GIỜ';
@@ -3482,8 +3484,7 @@ async function renderShopThumbs() {
         const isActive = active === id;
         let btn = '';
         if (isActive) {
-            btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>' +
-                '<button type="button" class="shop-buy-btn shop-rent-btn" data-clear-thumb="1">HỦY DÙNG</button>';
+            btn = '<button type="button" class="shop-buy-btn shop-rent-btn" data-clear-thumb="1">HỦY DÙNG</button>';
         } else if (has) {
             btn = '<button type="button" class="shop-buy-btn" data-use-thumb="' + id.replace(/"/g, '') + '">DÙNG</button>';
         } else {
@@ -3491,12 +3492,31 @@ async function renderShopThumbs() {
         }
         const name = (typeof escapeHtml === 'function' ? escapeHtml(th.name || id) : (th.name || id));
         const url = th.url ? String(th.url).replace(/"/g, '&quot;') : '';
+        const isGif = /\.gif(\?|$)/i.test(url) || /\.webp(\?|$)/i.test(url);
+        const preview = url
+            ? ('<button type="button" class="shop-thumb-preview' + (isGif ? ' is-gif' : '') + '" data-thumb-src="' + url + '" title="Xem ảnh">' +
+               (isGif
+                 ? '<span class="thumb-play-icon">▶</span><span class="thumb-placeholder">GIF</span>'
+                 : '<img src="' + url + '" alt="" loading="lazy">') +
+               '</button>')
+            : '<div style="width:40px;height:40px;border-radius:8px;background:var(--progress-bg);"></div>';
         return '<div class="shop-thumb-item" data-thumb-id="' + id.replace(/"/g, '') + '">' +
-            (url ? '<img src="' + url + '" alt="" loading="lazy">' : '<div style="width:40px;height:40px;border-radius:8px;background:var(--progress-bg);"></div>') +
+            preview +
             '<div class="info"><div class="name">' + name + '</div>' +
-            '<div class="price">' + (has ? 'Đã sở hữu' : ((Number(th.price) || 0) + ' xu')) + '</div></div>' +
+            '<div class="price">' + (has ? 'Đã sở hữu' : ((Number(th.price) || 0) + ' XK')) + '</div></div>' +
             btn + '</div>';
     }).join('');
+    list.querySelectorAll('.shop-thumb-preview[data-thumb-src]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            if (btn.dataset.loaded === '1') return;
+            const src = btn.getAttribute('data-thumb-src');
+            if (!src) return;
+            btn.dataset.loaded = '1';
+            btn.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="">';
+            btn.classList.add('loaded');
+        };
+    });
     list.querySelectorAll('[data-buy-thumb]').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
