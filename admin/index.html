@@ -37,26 +37,67 @@
             --header-bg: rgba(12,12,16,0.92);
         }
         html[data-theme="light"] {
-            --bg: #f4f4f8;
+            --bg: #f0f0f5;
             --card: #ffffff;
-            --card2: #f0f0f5;
-            --border: #d0d0dc;
-            --text: #1a1a22;
-            --muted: #6b6b7a;
-            --accent: #8c00ff;
-            --accent2: #ff0040;
-            --ok: #16a34a;
-            --warn: #ea580c;
-            --info: #2563eb;
-            --danger: #dc2626;
-            --page-bg: linear-gradient(165deg, #f7f7fb 0%, #efe8ff 45%, #f4f4f8 100%);
+            --card2: #eef0f6;
+            --border: #c8cad4;
+            --text: #12121a;
+            --muted: #4a4a5c;
+            --accent: #7c3aed;
+            --accent2: #e11d48;
+            --ok: #15803d;
+            --warn: #c2410c;
+            --info: #1d4ed8;
+            --danger: #b91c1c;
+            --page-bg: linear-gradient(165deg, #f4f5fa 0%, #ebe4ff 45%, #f0f0f5 100%);
             --input-bg: #ffffff;
             --calendar-icon: invert(0);
             --color-scheme: light;
-            --header-bg: rgba(255,255,255,0.94);
+            --header-bg: rgba(255,255,255,0.96);
+        }
+        html[data-theme="light"] label,
+        html[data-theme="light"] .muted,
+        html[data-theme="light"] th {
+            color: var(--muted) !important;
+        }
+        html[data-theme="light"] input,
+        html[data-theme="light"] textarea,
+        html[data-theme="light"] select {
+            color: var(--text) !important;
+            background: var(--input-bg) !important;
+            border-color: var(--border) !important;
+        }
+        html[data-theme="light"] .card h2,
+        html[data-theme="light"] .card h3 {
+            color: var(--text);
+        }
+        html[data-theme="light"] code {
+            background: rgba(0,0,0,0.06);
+            color: var(--text);
+        }
+        html[data-theme="light"] .stat .n { color: var(--text); }
+        html[data-theme="light"] .stat .l { color: var(--muted); }
+        html[data-theme="light"] td { color: var(--text); }
+        html[data-theme="light"] .search {
+            background: var(--input-bg);
+            color: var(--text);
+            border-color: var(--border);
+        }
+        html[data-theme="light"] .tab {
+            background: var(--card2);
+            color: var(--muted);
+        }
+        html[data-theme="light"] .pagination button {
+            background: var(--card2);
+            color: var(--text);
+            border-color: var(--border);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html { -webkit-text-size-adjust: 100%; }
+        html {
+            -webkit-text-size-adjust: 100%;
+            background: var(--bg);
+            overscroll-behavior-y: none;
+        }
         body {
             color-scheme: var(--color-scheme);
             font-family: "Roboto Condensed", system-ui, -apple-system, sans-serif;
@@ -67,6 +108,8 @@
             min-height: 100dvh;
             line-height: 1.45;
             padding-bottom: var(--safe-b);
+            overscroll-behavior-y: none;
+            -webkit-overflow-scrolling: touch;
         }
         a { color: var(--info); }
         code {
@@ -132,6 +175,33 @@
             }
             .header h1 { font-size: 1.45rem; }
         }
+
+        @media (max-width: 767px) {
+            .header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 10px;
+            }
+            .header > div {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+            }
+            #admin-identity {
+                justify-content: center;
+                text-align: center;
+            }
+            .header-actions {
+                justify-content: center;
+                width: 100%;
+            }
+            .header h1 {
+                text-align: center;
+            }
+        }
+
 
         /* ===== Cards ===== */
         .card {
@@ -444,24 +514,20 @@
                 justify-content: flex-end;
                 flex-wrap: nowrap;
             }
-            /* Users: Username | Hạng | XK | PIN | UID | Sở hữu | Điểm danh | Thao tác */
+            /* Users: Username | Hạng | XK | Sở hữu | Điểm danh | Thao tác */
             #panel-users th:nth-child(1),
-            #panel-users td:nth-child(1) { width: 12%; }
+            #panel-users td:nth-child(1) { width: 16%; }
             #panel-users th:nth-child(2),
-            #panel-users td:nth-child(2) { width: 11%; }
+            #panel-users td:nth-child(2) { width: 14%; }
             #panel-users th:nth-child(3),
-            #panel-users td:nth-child(3) { width: 9%; }
+            #panel-users td:nth-child(3) { width: 12%; }
             #panel-users th:nth-child(4),
-            #panel-users td:nth-child(4) { width: 14%; }
+            #panel-users td:nth-child(4) { width: 10%; text-align: center; }
             #panel-users th:nth-child(5),
-            #panel-users td:nth-child(5) { width: 10%; }
+            #panel-users td:nth-child(5) { width: 14%; }
             #panel-users th:nth-child(6),
-            #panel-users td:nth-child(6) { width: 7%; text-align: center; }
-            #panel-users th:nth-child(7),
-            #panel-users td:nth-child(7) { width: 10%; }
-            #panel-users th:nth-child(8),
-            #panel-users td:nth-child(8) { width: 27%; text-align: right; }
-            #panel-users td:nth-child(8) .row-actions {
+            #panel-users td:nth-child(6) { width: 34%; text-align: right; }
+            #panel-users td:nth-child(6) .row-actions {
                 justify-content: flex-end;
                 flex-wrap: wrap;
             }
@@ -664,12 +730,16 @@
         /* ===== Misc ===== */
         .muted { color: var(--muted); font-size: 0.8rem; }
         .toast {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text);
             position: fixed;
             top: calc(12px + var(--safe-t));
             left: 50%;
             right: auto;
             transform: translateX(-50%) translateY(-12px);
-            max-width: min(420px, calc(100vw - 24px));
+            max-width: min(640px, calc(100vw - 20px));
             background: var(--card2);
             border: 1px solid var(--border);
             padding: 12px 18px;
@@ -903,8 +973,6 @@
                                 <th>Username</th>
                                 <th>Hạng</th>
                                 <th>XK</th>
-                                <th>PIN</th>
-                                <th>UID</th>
                                 <th>Bài sở hữu</th>
                                 <th>Điểm danh</th>
                                 <th>Thao tác</th>
@@ -969,12 +1037,6 @@
 
             <div class="card">
                 <h2>Email được phép vào Admin</h2>
-                <p class="muted" style="margin:0 0 10px;font-size:0.75rem;line-height:1.45;">
-                    Tách biệt với tài khoản player. Chỉ email thật (Gmail, …) tạo trên Firebase Console mới vào Admin.
-                    Tài khoản player (<code>@xuanken.user</code>) luôn bị chặn.<br>
-                    Để trống danh sách = mọi email thật đều vào được Admin (tiện lúc mới setup).
-                    Khi đã có danh sách → chỉ những email trong list mới vào được.
-                </p>
                 <div class="form-grid">
                     <div class="full">
                         <label>Danh sách email admin (mỗi dòng 1 email)</label>
@@ -1069,7 +1131,6 @@
             <div class="card">
                 <h2>Công cụ</h2>
                 <div class="row-actions form-actions" style="border:none;padding-top:0;margin-top:0;">
-                    <button type="button" class="btn btn-warn" id="bulk-reset-pin-btn" title="PIN do Firebase Auth quản lý — không xóa được từ client"><i class="fa-solid fa-key"></i> PIN = Auth (không xóa được)</button>
                     <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
                 </div>
                 <div id="tools-progress-wrap" style="display:none;margin-top:12px;">
@@ -1085,13 +1146,7 @@
             </div>
 
             <div class="card" style="border-color:rgba(255,68,68,0.45);background:rgba(255,68,68,0.06);">
-                <h2 style="color:#ff6b6b;"><i class="fa-solid fa-skull-crossbones"></i> Vùng nguy hiểm — Reset toàn bộ</h2>
-                <p class="muted" style="margin:0 0 12px;font-size:0.78rem;line-height:1.5;">
-                    Xóa sạch dữ liệu Realtime Database: <strong>users, usernames, songs, prices, giftCodes, legacyUsers, chat, reactions</strong>
-                    và reset bộ đếm đăng ký. <strong>Không xóa được tài khoản Firebase Authentication</strong>
-                    (email/PIN) — bạn phải xóa thủ công trong Firebase Console → Authentication.
-                    Sau khi reset, mở trang <code>clear-local.html</code> trên <strong>cả PC và điện thoại</strong> để xóa localStorage.
-                </p>
+                <h2 style="color:#ff6b6b;">Vùng nguy hiểm — Reset toàn bộ</h2>
                 <div class="form-grid" style="margin-bottom:10px;">
                     <div class="full check-row">
                         <input type="checkbox" id="factory-wipe-songs" checked>
@@ -1122,19 +1177,20 @@
                 <h2>Thương hiệu &amp; đa web</h2>
                 <div class="form-grid">
                     <div style="grid-column:1/-1;">
-                        <label>Tên web (hiển thị trên tab / title)</label>
+                        <label>Tên web trên tab (tab trình duyệt)</label>
                         <input type="text" id="set-site-name" placeholder="XuanKen Music Official">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label>Title trang (thẻ title / tiêu đề)</label>
+                        <input type="text" id="set-site-title" placeholder="XuanKen Music Official — nghe nhạc">
                     </div>
                     <div style="grid-column:1/-1;">
                         <label>Icon web / Favicon (URL ảnh .png / .ico)</label>
                         <input type="url" id="set-site-icon" placeholder="https://.../icon.png">
                     </div>
                     <div style="grid-column:1/-1;">
-                        <label>Prefix localStorage (tách cache giữa các web trên cùng trình duyệt)</label>
+                        <label>Prefix localStorage</label>
                         <input type="text" id="set-site-prefix" placeholder="vd: music6, site1... (để trống = không prefix)">
-                        <p class="muted" style="margin-top:6px;font-size:0.72rem;">
-                            Chỉ ảnh hưởng localStorage (<code>prefix_xuanken_accounts</code>…). Firebase luôn ở root: <code>songs</code>, <code>users</code>, <code>settings</code>.
-                        </p>
                     </div>
                 </div>
                 <div class="row-actions form-actions">
@@ -1144,9 +1200,6 @@
 
             <div class="card">
                 <h2>Xuất / nhập danh sách bài hát</h2>
-                <p class="muted" style="margin-bottom:12px;">
-                    Xuất toàn bộ list bài (JSON) để backup hoặc thêm link mới. Nhập file JSON để ghi đè / bổ sung bài lên Firebase.
-                </p>
                 <div class="row-actions form-actions" style="margin-bottom:12px;border:none;padding-top:0;">
                     <button class="btn btn-ok" id="export-songs-btn"><i class="fa-solid fa-file-export"></i> Xuất list nhạc (JSON)</button>
                     <button class="btn btn-info" id="import-songs-btn"><i class="fa-solid fa-file-import"></i> Nhập list nhạc (JSON)</button>
@@ -1228,7 +1281,8 @@
         function applyBranding() {
             const name = (settingsCache.siteName || DEFAULT_SETTINGS.siteName).trim() || DEFAULT_SETTINGS.siteName;
             const icon = (settingsCache.siteIcon || DEFAULT_SETTINGS.siteIcon).trim() || DEFAULT_SETTINGS.siteIcon;
-            document.title = 'Admin | ' + name;
+            const title = (settingsCache.siteTitle || name).trim() || name;
+            document.title = 'Admin | ' + title;
             const fav = document.getElementById('site-favicon');
             if (fav && icon) fav.href = icon;
         }
@@ -1278,6 +1332,7 @@
                 } catch(e) {}
             }
             document.getElementById('set-site-name').value = settingsCache.siteName || '';
+            if (document.getElementById('set-site-title')) document.getElementById('set-site-title').value = settingsCache.siteTitle || settingsCache.siteName || '';
             document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
             document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
             // Load admin email allowlist (riêng path settings/adminEmails)
@@ -1454,16 +1509,8 @@
             let start = Math.max(1, songsPage - Math.floor(maxButtons / 2));
             let end = Math.min(totalPages, start + maxButtons - 1);
             start = Math.max(1, end - maxButtons + 1);
-            if (start > 1) {
-                html += `<button type="button" data-page="1">1</button>`;
-                if (start > 2) html += `<button type="button" disabled>…</button>`;
-            }
             for (let p = start; p <= end; p++) {
                 html += `<button type="button" data-page="${p}" class="${p === songsPage ? 'active' : ''}">${p}</button>`;
-            }
-            if (end < totalPages) {
-                if (end < totalPages - 1) html += `<button type="button" disabled>…</button>`;
-                html += `<button type="button" data-page="${totalPages}">${totalPages}</button>`;
             }
             html += `<button type="button" data-page="next" ${songsPage >= totalPages ? 'disabled' : ''}>›</button>`;
             el.innerHTML = html;
@@ -1552,7 +1599,7 @@
             const q = filter.trim().toLowerCase();
             const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
             if (!names.length) {
-                tbody.innerHTML = `<tr><td colspan="8" class="muted">Chưa có user</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">Chưa có user</td></tr>`;
                 return;
             }
             const rankOpts = (cur) => {
@@ -1575,13 +1622,6 @@
                         </select>
                     </td>
                     <td data-label="XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
-                    <td data-label="PIN">
-                        <div style="display:flex;gap:6px;align-items:center;min-width:120px;">
-                            <input type="text" inputmode="numeric" maxlength="6" placeholder="PIN mới" data-pin-user="${escapeHtml(name)}" class="pin-input" style="max-width:88px;padding:8px 10px;font-size:0.8rem;">
-                            <button type="button" class="btn btn-info" data-set-pin="${escapeHtml(name)}" title="Đặt PIN 6 số" style="padding:8px 10px;"><i class="fa-solid fa-key"></i></button>
-                        </div>
-                    </td>
-                    <td data-label="UID"><code style="font-size:0.65rem;opacity:0.75">${escapeHtml(String(a.uid || a.key || '').slice(0, 12))}…</code></td>
                     <td data-label="Sở hữu">${(a.owned || []).length}</td>
                     <td data-label="Điểm danh">${escapeHtml(a.lastCheckin || '—')}</td>
                     <td data-label="Thao tác">
@@ -1620,30 +1660,6 @@
                     toast('+50 XK ' + name);
                     renderUsers(document.getElementById('user-search').value);
                     refreshStats();
-                };
-            });
-            tbody.querySelectorAll('[data-set-pin]').forEach(btn => {
-                btn.onclick = async () => {
-                    const name = btn.getAttribute('data-set-pin');
-                    const pinEl = tbody.querySelector('.pin-input[data-pin-user="' + name.replace(/"/g, '') + '"]');
-                    const pin = (pinEl && pinEl.value || '').trim();
-                    if (!/^[0-9]{6}$/.test(pin)) {
-                        toast('PIN phải đúng 6 chữ số');
-                        if (pinEl) pinEl.focus();
-                        return;
-                    }
-                    if (!confirm('Đặt PIN mới cho "' + name + '"?\nUser sẽ đăng nhập player bằng PIN này.')) return;
-                    btn.disabled = true;
-                    try {
-                        await adminSetPlayerPin(name, pin);
-                        toast('Đã đặt PIN cho ' + name);
-                        if (pinEl) pinEl.value = '';
-                    } catch (err) {
-                        console.error(err);
-                        toast('Đổi PIN lỗi: ' + (err.message || err));
-                    } finally {
-                        btn.disabled = false;
-                    }
                 };
             });
             tbody.querySelectorAll('[data-del-user]').forEach(btn => {
@@ -1773,6 +1789,7 @@
                 document.getElementById('set-broadcast').value = '';
             }
             settingsCache.siteName = (document.getElementById('set-site-name').value || '').trim() || DEFAULT_SETTINGS.siteName;
+            if (document.getElementById('set-site-title')) settingsCache.siteTitle = (document.getElementById('set-site-title').value || '').trim();
             settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
             settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
             await db().ref('settings').set({
@@ -2160,10 +2177,6 @@
                 console.error(err);
                 toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — path ' + giftCodesPath() + ' · kiểm tra Rules root');
             }
-        };
-        const bulkPin = document.getElementById('bulk-reset-pin-btn');
-        if (bulkPin) bulkPin.onclick = () => {
-            toast('PIN là mật khẩu Firebase Auth — reset trong Firebase Console → Authentication');
         };
 
         // ===== FACTORY RESET (xóa sạch RTDB) =====
