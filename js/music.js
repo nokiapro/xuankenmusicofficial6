@@ -2555,6 +2555,50 @@ function mapUserProfile(data, name) {
     };
 }
 
+/** Realtime sync profile user giữa các thiết bị (PC / mobile) */
+let _userProfileUnsub = null;
+
+function stopUserProfileListener() {
+    if (typeof _userProfileUnsub === 'function') {
+        try { _userProfileUnsub(); } catch (e) {}
+    }
+    _userProfileUnsub = null;
+}
+
+function startUserProfileListener(uid) {
+    stopUserProfileListener();
+    const id = String(uid || '').trim();
+    if (!id) return;
+    const db = getDb();
+    if (!db) return;
+    const ref = db.ref(dataPath('users') + '/' + id);
+    const handler = (snap) => {
+        const data = snap.val();
+        if (!data) return;
+        const name = String(data.username || getCurrentUsername() || '').trim();
+        if (!name) return;
+        const accounts = getAllAccounts();
+        const mapped = mapUserProfile(data, name);
+        mapped.uid = id;
+        // Chỉ ghi đè local nếu dữ liệu remote khác (tránh loop vô ích)
+        const prev = accounts[name];
+        const prevCoins = prev ? (prev.coins | 0) : null;
+        accounts[name] = mapped;
+        saveAllAccounts(accounts);
+        if (getCurrentUsername() === name) {
+            updateShopBalanceUI();
+            if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
+            if (typeof updateCheckinButtonUI === 'function') updateCheckinButtonUI();
+            if (typeof applyActiveProgressThumb === 'function') applyActiveProgressThumb();
+        }
+        if (prevCoins != null && prevCoins !== (mapped.coins | 0)) {
+            console.log('[sync] coins cập nhật từ Firebase:', prevCoins, '→', mapped.coins | 0);
+        }
+    };
+    ref.on('value', handler);
+    _userProfileUnsub = () => ref.off('value', handler);
+}
+
 /** Lấy profile theo uid (Firebase Auth) */
 async function fetchUserByUid(uid, usernameHint) {
     const id = String(uid || '').trim();
@@ -2571,6 +2615,7 @@ async function fetchUserByUid(uid, usernameHint) {
         accounts[name] = mapUserProfile(data, name);
         accounts[name].uid = id;
         saveAllAccounts(accounts);
+        startUserProfileListener(id);
         return accounts[name];
     } catch (e) {
         console.warn('fetchUserByUid', e);
@@ -2602,7 +2647,41 @@ async function fetchUserFromFirebase(username) {
     return ensureUserAccount(name);
 }
 
-async function pushUserToFirebase(username, account) {
+function buildUserPayload(uid, name, account, includeCoins) {
+    const payload = {
+        uid: uid,
+        username: name,
+        owned: account.owned || [],
+        favorites: account.favorites || [],
+        likes: account.likes || [],
+        dislikes: account.dislikes || [],
+        myPlaylist: account.myPlaylist || [],
+        rentals: account.rentals || {},
+        lastCheckin: account.lastCheckin || '',
+        createdAt: account.createdAt || Date.now(),
+        rank: account.rank || 'member',
+        banned: !!account.banned,
+        banReason: account.banReason || '',
+        xp: Number(account.xp) || 0,
+        level: Number(account.level) || 1,
+        seasonXp: Number(account.seasonXp) || 0,
+        achievements: account.achievements || [],
+        frame: account.frame || '',
+        streak: Number(account.streak) || 0,
+        streakFreeze: Number(account.streakFreeze) || 0,
+        listenedSongs: account.listenedSongs || {},
+        listenTime: account.listenTime || { total: 0, byDay: {} },
+        ownedThumbs: account.ownedThumbs || [],
+        activeThumb: account.activeThumb || '',
+        inviteBy: account.inviteBy || ''
+    };
+    if (includeCoins !== false) {
+        payload.coins = account.coins | 0;
+    }
+    return payload;
+}
+
+async function pushUserToFirebase(username, account, options) {
     const name = String(username || '').trim();
     if (!name || !account) return false;
     const uid = account.uid || getCurrentUid();
@@ -2610,38 +2689,36 @@ async function pushUserToFirebase(username, account) {
         console.warn('pushUser: chưa có uid (chưa Auth)');
         return false;
     }
+    const opts = options || {};
     try {
         const db = getDb();
         if (!db) return false;
-        const payload = {
-            uid: uid,
-            username: name,
-            coins: account.coins | 0,
-            owned: account.owned || [],
-            favorites: account.favorites || [],
-            likes: account.likes || [],
-            dislikes: account.dislikes || [],
-            myPlaylist: account.myPlaylist || [],
-            rentals: account.rentals || {},
-            lastCheckin: account.lastCheckin || '',
-            createdAt: account.createdAt || Date.now(),
-            rank: account.rank || 'member',
-            banned: !!account.banned,
-            banReason: account.banReason || '',
-            xp: Number(account.xp) || 0,
-            level: Number(account.level) || 1,
-            seasonXp: Number(account.seasonXp) || 0,
-            achievements: account.achievements || [],
-            frame: account.frame || '',
-            streak: Number(account.streak) || 0,
-            streakFreeze: Number(account.streakFreeze) || 0,
-            listenedSongs: account.listenedSongs || {},
-            listenTime: account.listenTime || { total: 0, byDay: {} },
-            ownedThumbs: account.ownedThumbs || [],
-            activeThumb: account.activeThumb || '',
-            inviteBy: account.inviteBy || ''
-        };
-        await db.ref(dataPath('users') + '/' + uid).set(payload);
+        // Nếu có delta coins → dùng transaction để 2 thiết bị không ghi đè nhau
+        if (typeof opts.coinsDelta === 'number' && opts.coinsDelta !== 0) {
+            const coinsRef = db.ref(dataPath('users') + '/' + uid + '/coins');
+            const tx = await coinsRef.transaction((current) => {
+                const cur = Number(current);
+                const base = Number.isFinite(cur) ? cur : 0;
+                return Math.max(0, base + opts.coinsDelta);
+            });
+            if (tx.committed) {
+                account.coins = Number(tx.snapshot.val()) || 0;
+                // Cập nhật local theo kết quả transaction (nguồn sự thật)
+                const accounts = getAllAccounts();
+                if (accounts[name]) {
+                    accounts[name].coins = account.coins;
+                    saveAllAccounts(accounts);
+                }
+                if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
+            }
+            // Đẩy các field còn lại (không đụng coins)
+            const payload = buildUserPayload(uid, name, account, false);
+            await db.ref(dataPath('users') + '/' + uid).update(payload);
+        } else {
+            // Không đổi coins → không ghi field coins (tránh ghi đè số xu mới hơn từ thiết bị khác)
+            const payload = buildUserPayload(uid, name, account, false);
+            await db.ref(dataPath('users') + '/' + uid).update(payload);
+        }
         const key = sanitizeUsernameKey(name);
         await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
         return true;
@@ -2669,9 +2746,13 @@ function updateCurrentAccount(mutator) {
         const settings = getAdminSettings();
         accounts[name] = { coins: settings.starterCoins, owned: [], lastCheckin: '', createdAt: Date.now() };
     }
+    const beforeCoins = accounts[name].coins | 0;
     mutator(accounts[name]);
+    const afterCoins = accounts[name].coins | 0;
+    const coinsDelta = afterCoins - beforeCoins;
     saveAllAccounts(accounts);
-    pushUserToFirebase(name, accounts[name]);
+    // coinsDelta giúp Firebase transaction cộng/trừ an toàn giữa PC và mobile
+    pushUserToFirebase(name, accounts[name], { coinsDelta: coinsDelta });
     return accounts[name];
 }
 
@@ -3645,6 +3726,7 @@ async function loginWithUsername(rawName, rawPin) {
     const acc = ensureUserAccount(name);
     if (acc) acc.uid = uid;
     markPinTrusted(name);
+    startUserProfileListener(uid);
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
@@ -3838,7 +3920,7 @@ updateCheckinButtonUI();
             }
             const name = String(data.username).trim();
             setCurrentUsername(name);
-            await fetchUserByUid(user.uid, name);
+            await fetchUserByUid(user.uid, name); // đã gọi startUserProfileListener bên trong
             markPinTrusted(name);
             updateUsernameBadge();
             updateShopBalanceUI();
@@ -3859,6 +3941,19 @@ updateCheckinButtonUI();
         }
     });
 })();
+
+/** Khi mở lại tab / app (PC ↔ mobile) thì kéo lại dữ liệu mới nhất từ Firebase */
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    const uid = getCurrentUid();
+    const name = getCurrentUsername();
+    if (!uid || !name) return;
+    fetchUserByUid(uid, name).then(() => {
+        updateShopBalanceUI();
+        if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
+        if (typeof updateCheckinButtonUI === 'function') updateCheckinButtonUI();
+    }).catch(() => {});
+});
 
 // Settings / prices / songs được load ở cuối file (sau khi define đủ hàm)
 
