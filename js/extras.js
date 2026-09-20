@@ -809,7 +809,9 @@
         const items = Object.keys(val).map(k => ({ k, ...val[k] })).sort((a, b) => (a.at || a.t || 0) - (b.at || b.t || 0));
         box.innerHTML = items.map(m => {
           const rank = (m.rank || 'member').toLowerCase();
-          const badge = '<span class="chat-badge ' + escapeHtml(rank) + '">' + escapeHtml(rank) + '</span>';
+          const rankClass = String(rank || 'member').toLowerCase().replace(/\s+/g, '_');
+          const rankLabel = String(rank || 'member').replace(/_/g, ' ').toUpperCase();
+          const badge = '<span class="chat-badge ' + escapeHtml(rankClass) + '">' + escapeHtml(rankLabel) + '</span>';
           let text = escapeHtml(m.text || '');
           text = text.replace(/@([\w\u00C0-\u024F\u1E00-\u1EFF.-]+)/gi, '<span class="chat-mention">@$1</span>');
           const ts = Number(m.at || m.t) || 0;

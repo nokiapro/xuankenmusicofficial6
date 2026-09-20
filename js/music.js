@@ -2054,7 +2054,7 @@ function renderMyPlaylist() {
     const ids = loadMyPlaylist();
     if (toolbar) toolbar.style.display = ids.length ? 'flex' : 'none';
     if (!ids.length) {
-        list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:0.85rem;">Chưa có bài — bấm icon playlist bên cạnh bài hát để thêm</div>';
+        list.innerHTML = '<div style="text-align:center;padding:40px 16px;color:var(--text-secondary);font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Chưa có bài — bấm icon playlist bên cạnh bài hát để thêm</div>';
         return;
     }
     list.innerHTML = ids.map(id => {
@@ -2231,9 +2231,18 @@ function cancelTimer() {
 
 function updateTimerDisplay() {
     if (remainSeconds > 0) {
-        const mins = Math.floor(remainSeconds / 60);
+        const hrs = Math.floor(remainSeconds / 3600);
+        const mins = Math.floor((remainSeconds % 3600) / 60);
         const secs = remainSeconds % 60;
-        if (timerStatus) timerStatus.innerHTML = `TẮT SAU: <strong>${mins}</strong> PHÚT <strong>${secs}</strong> GIÂY`;
+        const pad = (n) => String(n).padStart(2, '0');
+        const clock = hrs > 0
+            ? (pad(hrs) + ':' + pad(mins) + ':' + pad(secs))
+            : (pad(mins) + ':' + pad(secs));
+        let label = '';
+        if (hrs > 0) label += '<strong>' + hrs + '</strong> GIỜ ';
+        if (mins > 0 || hrs > 0) label += '<strong>' + mins + '</strong> PHÚT ';
+        label += '<strong>' + secs + '</strong> GIÂY';
+        if (timerStatus) timerStatus.innerHTML = 'TẮT SAU: ' + label + ' <span style="opacity:.7">(' + clock + ')</span>';
         if (openTimerBtn) openTimerBtn.classList.add('active');
     } else {
         if (timerStatus) timerStatus.innerHTML = 'BẠN CHƯA ĐẶT HẸN GIỜ';
