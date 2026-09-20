@@ -376,7 +376,7 @@
         return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
       }
       updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
-      toast('GIFT', '+' + coins + ' xu XK', '#4ade80');
+      toast('GIFT', '+' + coins + ' XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
       if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
     } catch (err) {

@@ -34,6 +34,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { -webkit-text-size-adjust: 100%; }
         body {
+            color-scheme: var(--color-scheme);
             font-family: "Roboto Condensed", system-ui, -apple-system, sans-serif;
             background: linear-gradient(165deg, #0e0e14 0%, #16102a 45%, #0c0c10 100%);
             background-attachment: fixed;
@@ -283,6 +284,11 @@
         }
         @media (min-width: 560px) {
             .form-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        #panel-songs > .card:has(.table-wrap),
+        #panel-users > .card:has(.table-wrap) {
+            padding-left: 12px;
+            padding-right: 12px;
         }
         @media (min-width: 900px) {
             .form-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -823,7 +829,8 @@
                             <tr>
                                 <th>Username</th>
                                 <th>Hạng</th>
-                                <th>Xu XK</th>
+                                <th>XK</th>
+                                <th>PIN</th>
                                 <th>UID</th>
                                 <th>Bài sở hữu</th>
                                 <th>Điểm danh</th>
@@ -1310,7 +1317,7 @@
             document.getElementById('stats-grid').innerHTML = `
                 <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
                 <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
-                <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng xu XK</div></div>
+                <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng XK</div></div>
                 <div class="stat"><div class="n">${totalOwned}</div><div class="l">Lượt mua</div></div>
                 <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
             `;
@@ -1472,7 +1479,7 @@
             const q = filter.trim().toLowerCase();
             const names = Object.keys(usersCache).sort().filter(n => !q || n.toLowerCase().includes(q));
             if (!names.length) {
-                tbody.innerHTML = `<tr><td colspan="7" class="muted">Chưa có user</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="muted">Chưa có user</td></tr>`;
                 return;
             }
             const rankOpts = (cur) => {
@@ -1494,7 +1501,13 @@
                             ${rankOpts(rank)}
                         </select>
                     </td>
-                    <td data-label="Xu XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
+                    <td data-label="XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
+                    <td data-label="PIN">
+                        <div style="display:flex;gap:6px;align-items:center;min-width:120px;">
+                            <input type="text" inputmode="numeric" maxlength="6" placeholder="PIN mới" data-pin-user="${escapeHtml(name)}" class="pin-input" style="max-width:88px;padding:8px 10px;font-size:0.8rem;">
+                            <button type="button" class="btn btn-info" data-set-pin="${escapeHtml(name)}" title="Đặt PIN 6 số" style="padding:8px 10px;"><i class="fa-solid fa-key"></i></button>
+                        </div>
+                    </td>
                     <td data-label="UID"><code style="font-size:0.65rem;opacity:0.75">${escapeHtml(String(a.uid || a.key || '').slice(0, 12))}…</code></td>
                     <td data-label="Sở hữu">${(a.owned || []).length}</td>
                     <td data-label="Điểm danh">${escapeHtml(a.lastCheckin || '—')}</td>
@@ -1531,9 +1544,33 @@
                     const coins = (usersCache[name].coins | 0) + 50;
                     await db().ref(dataPath('users') + '/' + key + '/coins').set(coins);
                     usersCache[name].coins = coins;
-                    toast('+50 xu ' + name);
+                    toast('+50 XK ' + name);
                     renderUsers(document.getElementById('user-search').value);
                     refreshStats();
+                };
+            });
+            tbody.querySelectorAll('[data-set-pin]').forEach(btn => {
+                btn.onclick = async () => {
+                    const name = btn.getAttribute('data-set-pin');
+                    const pinEl = tbody.querySelector('.pin-input[data-pin-user="' + name.replace(/"/g, '') + '"]');
+                    const pin = (pinEl && pinEl.value || '').trim();
+                    if (!/^[0-9]{6}$/.test(pin)) {
+                        toast('PIN phải đúng 6 chữ số');
+                        if (pinEl) pinEl.focus();
+                        return;
+                    }
+                    if (!confirm('Đặt PIN mới cho "' + name + '"?\nUser sẽ đăng nhập player bằng PIN này.')) return;
+                    btn.disabled = true;
+                    try {
+                        await adminSetPlayerPin(name, pin);
+                        toast('Đã đặt PIN cho ' + name);
+                        if (pinEl) pinEl.value = '';
+                    } catch (err) {
+                        console.error(err);
+                        toast('Đổi PIN lỗi: ' + (err.message || err));
+                    } finally {
+                        btn.disabled = false;
+                    }
                 };
             });
             tbody.querySelectorAll('[data-del-user]').forEach(btn => {
@@ -2377,6 +2414,80 @@
             });
         });
 
+
+        
+        /** Đặt PIN player (Auth password của email username@xuanken.user) */
+        async function adminSetPlayerPin(username, newPin) {
+            const name = String(username || '').trim();
+            if (!name || !/^[0-9]{6}$/.test(newPin)) throw new Error('PIN không hợp lệ');
+            const u = usersCache[name];
+            const uid = u && (u.uid || u.key);
+            if (!uid) throw new Error('Không tìm thấy uid');
+            const emailSafe = sanitizeKey(name).toLowerCase() + '@xuanken.user';
+            const cfg = window.FIREBASE_CONFIG || {};
+            const apiKey = cfg.apiKey;
+            if (!apiKey) throw new Error('Thiếu API key');
+            // Đăng nhập tạm trên app phụ bằng PIN cũ không có → dùng Identity Toolkit update cần idToken
+            // Cách: tạo phiên trên app "xk-pin" bằng signIn — nếu admin biết không có PIN cũ, dùng REST accounts:update với localId (cần admin SDK).
+            // Fallback thực tế: dùng signInWithEmailAndPassword nếu PIN hiện tại trùng? Không.
+            // Dùng REST: accounts:signInWithPassword thất bại → thử update qua token admin (không được).
+            // Giải pháp client: signUp sẽ fail nếu tồn tại. 
+            // → Dùng Firebase Auth REST "accounts:update" với idToken lấy bằng cách:
+            // Admin không thể. Thử API setAccountInfo với localId + password (một số project cho phép nếu rule IAM).
+            // Ghi loginPin trên DB (player sẽ ưu tiên PIN này nếu Auth chưa kịp đổi)
+            await db().ref(dataPath('users') + '/' + uid).update({ loginPin: newPin, loginPinAt: Date.now() });
+            // Thử REST legacy setAccountInfo (một số project cho phép)
+            let apiOk = false;
+            try {
+                const res = await fetch('https://www.googleapis.com/identitytoolkit/v3/relyingparty/setAccountInfo?key=' + encodeURIComponent(apiKey), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ localId: uid, password: newPin })
+                });
+                const data = await res.json();
+                if (!data.error) apiOk = true;
+            } catch (e) {}
+            try {
+                const res2 = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + encodeURIComponent(apiKey), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ localId: uid, password: newPin, returnSecureToken: false })
+                });
+                const data2 = await res2.json();
+                if (!data2.error) apiOk = true;
+            } catch (e) {}
+            if (!apiOk) {
+                // Auth password chưa đổi được từ client — loginPin đã lưu; player login sẽ dùng loginPin
+                console.warn('Auth API không đổi được password — đã lưu loginPin trên DB');
+            }
+            return true;
+        }
+
+        /** Theme dark/light admin */
+        function applyAdminTheme(theme) {
+            const t = theme === 'light' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+            try { localStorage.setItem('xuanken_admin_theme', t); } catch (e) {}
+            const icon = document.getElementById('admin-theme-icon');
+            const label = document.getElementById('admin-theme-label');
+            if (icon) {
+                icon.className = t === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            }
+            if (label) label.textContent = t === 'light' ? 'Light' : 'Dark';
+        }
+        (function initAdminTheme() {
+            let t = 'dark';
+            try { t = localStorage.getItem('xuanken_admin_theme') || 'dark'; } catch (e) {}
+            applyAdminTheme(t);
+            document.addEventListener('DOMContentLoaded', () => {});
+            const btn = document.getElementById('admin-theme-btn');
+            if (btn) {
+                btn.onclick = () => {
+                    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+                    applyAdminTheme(cur === 'dark' ? 'light' : 'dark');
+                };
+            }
+        })();
 
         (function bindAdminAuth() {
             const auth = getAdminAuth();

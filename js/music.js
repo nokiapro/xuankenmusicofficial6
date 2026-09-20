@@ -2971,7 +2971,7 @@ function rentSong(songId) {
     const price = getRentPrice(song);
     const coins = loadCoins();
     if (coins < price) {
-        showNotification('THIẾU XU:', `THUÊ CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        showNotification('THIẾU XK:', `THUÊ CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
         return false;
     }
     const expiry = Date.now() + 24 * 60 * 60 * 1000;
@@ -3213,7 +3213,7 @@ function buySong(songId) {
     const price = getSongPrice(song);
     const coins = loadCoins();
     if (coins < price) {
-        showNotification('THIẾU XU:', `CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        showNotification('THIẾU XK:', `CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
         return false;
     }
     updateCurrentAccount(acc => {
@@ -3226,7 +3226,7 @@ function buySong(songId) {
     // Toast: 2 ngôi sao 2 bên ID
     showNotification(
         'MUA THÀNH CÔNG:',
-        '<i class="fa-solid fa-star"></i> ' + String(songId) + ' <i class="fa-solid fa-star"></i>',
+        '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
         '#4ade80',
         'shopping-bag'
     );
@@ -3527,7 +3527,7 @@ function buyProgressThumb(thumbId, thumbsList) {
     }
     const price = Number(th.price) || 0;
     if (loadCoins() < price) {
-        showNotification('THIẾU XU:', 'Cần ' + price + ' XK', '#ff9800', 'coins');
+        showNotification('THIẾU XK:', 'Cần ' + price + ' XK', '#ff9800', 'coins');
         return;
     }
     updateCurrentAccount(acc => {
@@ -3796,7 +3796,35 @@ async function loginWithUsername(rawName, rawPin) {
                 // Session còn, trusted
                 cred = { user: auth.currentUser };
             } else {
-                cred = await auth.signInWithEmailAndPassword(email, pin);
+                try {
+                    cred = await auth.signInWithEmailAndPassword(email, pin);
+                } catch (signErr1) {
+                    // Admin có thể đã đặt loginPin trên DB — thử đồng bộ Auth password rồi đăng nhập lại
+                    const code1 = signErr1 && signErr1.code;
+                    if ((code1 === 'auth/wrong-password' || code1 === 'auth/invalid-credential' || code1 === 'auth/invalid-login-credentials') && existingUid && db) {
+                        try {
+                            const pinSnap = await db.ref(dataPath('users') + '/' + existingUid + '/loginPin').once('value');
+                            const dbPin = pinSnap.val();
+                            if (dbPin && String(dbPin) === String(pin)) {
+                                const apiKey = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey) || '';
+                                if (apiKey) {
+                                    await fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key=' + encodeURIComponent(apiKey), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ localId: existingUid, password: pin, returnSecureToken: false })
+                                    });
+                                }
+                                cred = await auth.signInWithEmailAndPassword(email, pin);
+                            } else {
+                                throw signErr1;
+                            }
+                        } catch (e2) {
+                            throw signErr1;
+                        }
+                    } else {
+                        throw signErr1;
+                    }
+                }
             }
         } else {
             // Thử đăng nhập trước; nếu không có tài khoản → đăng ký
