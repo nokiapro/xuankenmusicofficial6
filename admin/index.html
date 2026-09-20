@@ -183,7 +183,7 @@
                 text-align: center;
                 gap: 10px;
             }
-            .header > div {
+            .header > div:first-child {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -194,8 +194,23 @@
                 text-align: center;
             }
             .header-actions {
+                display: flex;
+                flex-direction: row;
+                flex-wrap: nowrap;
                 justify-content: center;
+                align-items: center;
+                gap: 8px;
                 width: 100%;
+            }
+            .header-actions .btn {
+                flex: 1 1 0;
+                min-width: 0;
+                padding: 10px 8px;
+                font-size: 0.75rem;
+                white-space: nowrap;
+            }
+            .header-actions .btn-label {
+                display: inline;
             }
             .header h1 {
                 text-align: center;
@@ -817,6 +832,73 @@
             border-radius: 50px;
         }
         * { scrollbar-width: thin; scrollbar-color: #b33cea transparent; }
+    
+        /* Tabs + pagination: cùng style nút header (pill) */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 12px 0 16px;
+        }
+        .tab {
+            flex: 1 1 auto;
+            min-height: var(--touch);
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.82rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: 0.2s;
+        }
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(140,0,255,0.25);
+        }
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 14px;
+            padding: 4px 0;
+        }
+        .pagination button {
+            min-width: 40px;
+            min-height: 40px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .pagination button.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent));
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 14px rgba(140,0,255,0.3);
+        }
+        .pagination button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
     </style>
 
     <script>
@@ -1081,8 +1163,8 @@
                 <h2>Gift code</h2>
                 <div class="form-grid">
                     <div>
-                        <label>Mã (VD: XUAN2026)</label>
-                        <input type="text" id="gift-new-code" placeholder="CODE" maxlength="24">
+                        <label>Mã</label>
+                        <input type="text" id="gift-new-code" placeholder="" maxlength="24">
                     </div>
                     <div>
                         <label>Xu</label>
@@ -1103,7 +1185,6 @@
 
             <div class="card">
                 <h2>Progress thumb (cửa hàng)</h2>
-                <p class="muted" style="margin-bottom:10px;font-size:0.75rem;">Ảnh thumb thanh progress — user mua trong cửa hàng.</p>
                 <div class="form-grid">
                     <div>
                         <label>ID (vd: cinnamoroll)</label>
@@ -1225,6 +1306,7 @@
             checkinReward: 15,
             starterCoins: 20,
             siteName: 'XuanKen Music Official',
+            siteTitle: 'XuanKen Music Official',
             siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
             sitePrefix: 'music6',
             requirePin: true,
@@ -1797,6 +1879,7 @@
                 checkinReward: settingsCache.checkinReward,
                 starterCoins: settingsCache.starterCoins,
                 siteName: settingsCache.siteName,
+                siteTitle: settingsCache.siteTitle || settingsCache.siteName || '',
                 siteIcon: settingsCache.siteIcon,
                 sitePrefix: settingsCache.sitePrefix
             });
@@ -2128,7 +2211,7 @@
                 const obj = snap.val() || {};
                 const keys = Object.keys(obj);
                 if (!keys.length) {
-                    el.textContent = 'Chưa có gift code (path: ' + path + ')';
+                    el.textContent = 'Chưa có gift code';
                     return;
                 }
                 el.innerHTML = keys.map(k => {
@@ -2442,6 +2525,7 @@
             const prefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
             saveSettingsPartial({
                 siteName: (document.getElementById('set-site-name').value || '').trim(),
+                siteTitle: (document.getElementById('set-site-title') && document.getElementById('set-site-title').value || '').trim(),
                 siteIcon: (document.getElementById('set-site-icon').value || '').trim(),
                 sitePrefix: prefix
             });
