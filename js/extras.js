@@ -565,6 +565,12 @@
         + '</button>';
     }
 
+    
+    // Đủ 6 hàng (42 ô) để grid giãn đều, không trống lệch
+    const totalCells = startPad + daysInMonth;
+    const need = Math.max(0, 42 - totalCells);
+    for (let i = 0; i < need; i++) cells += '<div class="ci-cell empty"></div>';
+
     body.innerHTML = '<div class="ci-head">'
       + '<div class="ci-month">' + monthNames[m] + ' ' + y + '</div>'
       + '<div class="ci-legend"><span class="ci-lg done"></span> Đã điểm danh'
