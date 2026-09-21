@@ -1,51 +1,86 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
 
 :root {
-    --accent-color: #000000;
-    --bg-color: #fcfcfc;
-    --border-color: #f0f0f0;
-    --card-bg: rgba(255, 255, 255, 0.95);
-    --text-primary: #000000;
-    --text-secondary: #333333;
-    --text-tertiary: #555555;
+    color-scheme: light;
+    --font-ui: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-body: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --accent-color: #1c1c1e;
+    --bg-color: #e8e8ed;
+    --border-color: rgba(0, 0, 0, 0.08);
+    /* Liquid glass rim — light */
+    --border-glass: rgba(255, 255, 255, 0.72);
+    --border-glass-outer: rgba(0, 0, 0, 0.06);
+    --border-glass-inner: rgba(255, 255, 255, 0.95);
+    --card-bg: rgba(255, 255, 255, 0.52);
+    --text-primary: #1c1c1e;
+    --text-secondary: #3a3a3c;
+    --text-tertiary: #6c6c70;
     --progress-bg: rgba(0, 0, 0, 0.08);
-    --btn-bg: rgba(0, 0, 0, 0.05);
-    --btn-active-bg: rgba(0, 0, 0, 0.12);
-    --btn-hover: rgba(0, 0, 0, 0.08);
-    --playlist-bg: rgba(255, 255, 255, 1);
-    --playlist-header-bg: rgba(255, 255, 255, 0.98);
+    --btn-bg: rgba(255, 255, 255, 0.42);
+    --btn-active-bg: rgba(0, 0, 0, 0.08);
+    --btn-hover: rgba(255, 255, 255, 0.62);
+    --playlist-bg: rgba(255, 255, 255, 0.58);
+    --playlist-header-bg: rgba(255, 255, 255, 0.68);
     --song-item-hover: rgba(0, 0, 0, 0.04);
-    --input-bg: #fafafa;
-    --modal-bg: rgba(255, 255, 255, 0.98);
-    /* Gradient icon như music2 */
+    --input-bg: rgba(255, 255, 255, 0.7);
+    --modal-bg: rgba(255, 255, 255, 0.62);
+    --glass-highlight: rgba(255, 255, 255, 0.9);
+    --glass-sheen: linear-gradient(155deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.12) 28%, transparent 52%);
+    --glass-shadow: 0 1px 0 rgba(255,255,255,0.9) inset, 0 -1px 0 rgba(0,0,0,0.04) inset, 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+    --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.95) inset, 0 24px 64px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.06);
+    --page-mesh:
+        radial-gradient(ellipse 100% 80% at 20% -10%, rgba(255, 100, 150, 0.2), transparent 50%),
+        radial-gradient(ellipse 90% 70% at 90% 10%, rgba(140, 80, 255, 0.16), transparent 48%),
+        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(80, 160, 255, 0.12), transparent 50%),
+        linear-gradient(180deg, #f2f2f7 0%, #e8e8ed 100%);
+    --blur-amount: 32px;
+    --saturate-amount: 190%;
     --icon-gradient: linear-gradient(135deg, #ff0040, #8c00ff, #ff0040);
     --icon-gradient-hover: linear-gradient(135deg, #ff6b6b, #c2185b, #ff6b6b);
     --icon-gradient-active: linear-gradient(135deg, #ff0040, #ffd700, #ff0040);
     --icon-active-stroke: #ff0040;
+    /* Progress pastel — GIỮ NGUYÊN */
+    --progress-fill: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD);
+    --progress-glow: rgba(243, 184, 186, 0.6);
 }
 
 body.dark {
-    --accent-color: #ffffff;
-    --bg-color: #121212;
-    --border-color: #2a2a2a;
-    --card-bg: rgba(30, 30, 35, 0.95);
-    --text-primary: #ffffff;
-    --text-secondary: #cccccc;
-    --text-tertiary: #999999;
+    color-scheme: dark;
+    --accent-color: #f5f5f7;
+    --bg-color: #000000;
+    --border-color: rgba(255, 255, 255, 0.1);
+    /* Liquid glass rim — dark */
+    --border-glass: rgba(255, 255, 255, 0.18);
+    --border-glass-outer: rgba(255, 255, 255, 0.08);
+    --border-glass-inner: rgba(255, 255, 255, 0.28);
+    --card-bg: rgba(28, 28, 30, 0.52);
+    --text-primary: #f5f5f7;
+    --text-secondary: #aeaeb2;
+    --text-tertiary: #8e8e93;
     --progress-bg: rgba(255, 255, 255, 0.12);
-    --btn-bg: rgba(255, 255, 255, 0.08);
+    --btn-bg: rgba(255, 255, 255, 0.1);
     --btn-active-bg: rgba(255, 255, 255, 0.18);
-    --btn-hover: rgba(255, 255, 255, 0.05);
-    --playlist-bg: rgba(25, 25, 30, 1);
-    --playlist-header-bg: rgba(25, 25, 30, 0.98);
-    --song-item-hover: rgba(255, 255, 255, 0.05);
-    --input-bg: #2a2a2a;
-    --modal-bg: rgba(30, 30, 35, 0.98);
+    --btn-hover: rgba(255, 255, 255, 0.14);
+    --playlist-bg: rgba(28, 28, 30, 0.68);
+    --playlist-header-bg: rgba(44, 44, 46, 0.52);
+    --song-item-hover: rgba(255, 255, 255, 0.06);
+    --input-bg: rgba(58, 58, 60, 0.55);
+    --modal-bg: rgba(28, 28, 30, 0.7);
+    --glass-highlight: rgba(255, 255, 255, 0.16);
+    --glass-sheen: linear-gradient(155deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 30%, transparent 55%);
+    --glass-shadow: 0 1px 0 rgba(255,255,255,0.16) inset, 0 -1px 0 rgba(0,0,0,0.35) inset, 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
+    --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.18) inset, 0 24px 64px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.4);
+    --page-mesh:
+        radial-gradient(ellipse 100% 80% at 15% -5%, rgba(175, 82, 222, 0.26), transparent 52%),
+        radial-gradient(ellipse 90% 70% at 95% 5%, rgba(255, 45, 85, 0.14), transparent 48%),
+        radial-gradient(ellipse 80% 60% at 50% 110%, rgba(88, 86, 214, 0.18), transparent 55%),
+        linear-gradient(180deg, #0a0a0c 0%, #000000 100%);
     --icon-gradient: linear-gradient(135deg, #ffd89b, #c7e9fb, #ffd89b);
     --icon-gradient-hover: linear-gradient(135deg, #fbc2eb, #a6c1ee, #fbc2eb);
     --icon-gradient-active: linear-gradient(135deg, #ffd89b, #ff6b6b, #ffd89b);
-    /* Lucide active ~ màu cam hồng như music2 (gradient active) */
     --icon-active-stroke: #ff6b6b;
+    --progress-fill: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD);
+    --progress-glow: rgba(243, 184, 186, 0.55);
 }
 
 * {
@@ -98,7 +133,7 @@ i[data-lucide],
 }
 
 body {
-    font-family: var(--font-body);
+    font-family: "Roboto Condensed", var(--font-body), sans-serif;
     background-color: var(--bg-color);
     background-image: var(--page-mesh);
     background-attachment: fixed;
@@ -127,12 +162,15 @@ body.no-transition *:not(.notification):not(.notification *) {
     max-width: 450px;
     margin: auto;
     background: var(--card-bg);
-    backdrop-filter: saturate(var(--saturate-amount)) blur(var(--blur-amount));
-    -webkit-backdrop-filter: saturate(var(--saturate-amount)) blur(var(--blur-amount));
+    backdrop-filter: saturate(var(--saturate-amount, 180%)) blur(var(--blur-amount, 32px));
+    -webkit-backdrop-filter: saturate(var(--saturate-amount, 180%)) blur(var(--blur-amount, 32px));
     border-radius: 36px;
     box-shadow: var(--glass-shadow-lg);
     overflow: hidden;
+    /* Viền kính 2 lớp */
     border: 1px solid var(--border-glass);
+    outline: 1px solid var(--border-glass-outer);
+    outline-offset: -1px;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -145,9 +183,22 @@ body.no-transition *:not(.notification):not(.notification *) {
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    background: linear-gradient(145deg, var(--glass-highlight) 0%, transparent 42%, transparent 100%);
-    opacity: 0.35;
+    background: var(--glass-sheen);
+    opacity: 1;
     z-index: 0;
+}
+.player-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    /* rim sáng mỏng quanh cạnh */
+    box-shadow:
+        inset 0 1px 0 0 var(--border-glass-inner),
+        inset 0 0 0 1px var(--border-glass-outer),
+        inset 0 -1px 0 0 rgba(0,0,0,0.06);
 }
 .player-container > * {
     position: relative;
@@ -162,7 +213,7 @@ body.dark .player-container {
 /* ---- Liquid Glass surfaces & type ---- */
 h1, h2, h3, h4, .song-title, .playlist-title, .shop-title, .timer-title,
 .hint-title, .extras-label, .rank-badge, .btn-icon, button, .shop-buy-btn {
-    font-family: var(--font-ui);
+    font-family: "Roboto Condensed", var(--font-ui), sans-serif;
 }
 .song-title {
     font-weight: 700;
@@ -215,21 +266,23 @@ h1, h2, h3, h4, .song-title, .playlist-title, .shop-title, .timer-title,
     letter-spacing: 0.06em;
 }
 input, textarea, select {
-    font-family: var(--font-body);
+    font-family: "Roboto Condensed", var(--font-body), sans-serif;
     background: var(--input-bg) !important;
     border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
     border-radius: 12px;
     backdrop-filter: blur(8px);
 }
-.progress-bar, #progress-bar {
+.progress-bar, #progress-bar, .progress-bar-container {
     background: var(--progress-bg) !important;
-    border-radius: 999px;
-    overflow: hidden;
+    border-radius: 10px;
 }
 .progress-filled, #progress-fill {
-    background: var(--accent-gradient) !important;
-    border-radius: 999px;
+    background: var(--progress-fill, linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD)) !important;
+    background-size: 200% 100% !important;
+    animation: pastelMove 3s linear infinite !important;
+    box-shadow: 0 0 12px var(--progress-glow, rgba(243, 184, 186, 0.6)) !important;
+    border-radius: 10px;
 }
 /* Toast glass */
 #toast-msg, .toast, .notification {
@@ -238,7 +291,7 @@ input, textarea, select {
     border: 1px solid var(--border-glass) !important;
     box-shadow: var(--glass-shadow) !important;
     border-radius: 16px !important;
-    font-family: var(--font-ui) !important;
+    font-family: "Roboto Condensed", var(--font-ui), sans-serif !important;
 }
 /* Login / hint glass */
 .login-panel, .username-gate, .hint-panel, .pin-section {
@@ -3809,3 +3862,39 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   gap: 6px;
 }
 
+
+
+/* ---- Viền kính đỉnh cao (dual rim) ---- */
+.shop-modal,
+.playlist,
+#my-playlist-overlay,
+.timer-modal,
+.login-panel,
+.username-gate,
+.hint-panel,
+.pin-section {
+    border: 1px solid var(--border-glass) !important;
+    outline: 1px solid var(--border-glass-outer);
+    outline-offset: -1px;
+    box-shadow: var(--glass-shadow-lg) !important;
+}
+.btn-icon, .play-btn, .extras-action-btn, .close-shop, .close-playlist, .close-timer {
+    border: 1px solid var(--border-glass) !important;
+    box-shadow:
+        inset 0 1px 0 var(--border-glass-inner),
+        0 4px 16px rgba(0,0,0,0.08) !important;
+}
+body.dark .btn-icon,
+body.dark .play-btn,
+body.dark .extras-action-btn {
+    box-shadow:
+        inset 0 1px 0 var(--border-glass-inner),
+        0 4px 18px rgba(0,0,0,0.35) !important;
+}
+/* Progress pastel luôn thắng theme */
+.progress-filled, #progress-fill {
+    background: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD) !important;
+    background-size: 200% 100% !important;
+    animation: pastelMove 3s linear infinite !important;
+    box-shadow: 0 0 12px rgba(243, 184, 186, 0.6) !important;
+}
