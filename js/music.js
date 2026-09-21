@@ -2519,6 +2519,7 @@ function ensureUserAccount(username) {
             myPlaylist: [],
             rentals: {},
             lastCheckin: '',
+            checkinDays: {},
             createdAt: Date.now(),
             pin: '',
             banned: false,
@@ -2563,6 +2564,7 @@ function mapUserProfile(data, name) {
         myPlaylist: Array.isArray(d.myPlaylist) ? d.myPlaylist.map(String) : [],
         rentals: (d.rentals && typeof d.rentals === 'object') ? d.rentals : {},
         lastCheckin: d.lastCheckin || '',
+        checkinDays: (d.checkinDays && typeof d.checkinDays === 'object') ? d.checkinDays : {},
         createdAt: d.createdAt || Date.now(),
         rank: d.rank || 'member',
         banned: !!d.banned,
@@ -2754,6 +2756,7 @@ function buildUserPayload(uid, name, account, includeCoins) {
         myPlaylist: account.myPlaylist || [],
         rentals: account.rentals || {},
         lastCheckin: account.lastCheckin || '',
+        checkinDays: account.checkinDays || {},
         createdAt: account.createdAt || Date.now(),
         rank: account.rank || 'member',
         banned: !!account.banned,
@@ -3145,44 +3148,78 @@ function hasCheckedInToday() {
     return !!(acc && acc.lastCheckin === getTodayKey());
 }
 
-function doDailyCheckin() {
+function doDailyCheckin(dayKeyOpt) {
     if (!getCurrentUsername()) {
         showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
         return false;
     }
-    if (hasCheckedInToday()) {
-        showNotification('ĐIỂM DANH:', 'HÔM NAY ĐÃ ĐIỂM DANH RỒI', '#ff9800', 'calendar-check');
+    const today = getTodayKey();
+    const dayKey = dayKeyOpt ? String(dayKeyOpt) : today;
+    // Chỉ cho điểm danh từ đầu tháng hiện tại đến hôm nay
+    const now = new Date();
+    const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+    if (dayKey < monthStart || dayKey > today) {
+        showNotification('ĐIỂM DANH:', 'Chỉ điểm danh trong tháng này đến hôm nay', '#ff9800', 'calendar-check');
+        return false;
+    }
+    const acc0 = getCurrentAccount() || {};
+    const days0 = (acc0.checkinDays && typeof acc0.checkinDays === 'object') ? acc0.checkinDays : {};
+    if (days0[dayKey] || (dayKey === today && acc0.lastCheckin === today)) {
+        showNotification('ĐIỂM DANH:', 'Ngày này đã điểm danh rồi', '#ff9800', 'calendar-check');
         return false;
     }
     const reward = getAdminSettings().checkinReward;
+    const isMakeup = dayKey !== today;
+    const MAKEUP_COST = 5;
+    if (isMakeup) {
+        const coins = (acc0.coins | 0);
+        if (coins < MAKEUP_COST) {
+            showNotification('ĐIỂM DANH BÙ:', 'Cần ' + MAKEUP_COST + ' XK (đang có ' + coins + ')', '#ff9800', 'coins');
+            return false;
+        }
+    }
     let streakMsg = '';
     updateCurrentAccount(acc => {
-        const today = getTodayKey();
-        const y = new Date(); y.setDate(y.getDate() - 1);
-        const yKey = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
-        let streak = Number(acc.streak) || 0;
-        if (acc.lastCheckin === yKey) streak += 1;
-        else if (acc.lastCheckin === today) { /* no-op */ }
-        else if ((Number(acc.streakFreeze) || 0) > 0 && acc.lastCheckin !== today) {
-            acc.streakFreeze = (Number(acc.streakFreeze) || 0) - 1;
-            streak = Math.max(1, streak); // giữ streak nhờ freeze
-            streakMsg = ' (dùng 1 Streak Freeze)';
-        } else {
-            streak = 1;
+        if (!acc.checkinDays || typeof acc.checkinDays !== 'object') acc.checkinDays = {};
+        // seed lastCheckin vào map nếu thiếu
+        if (acc.lastCheckin && !acc.checkinDays[acc.lastCheckin]) {
+            acc.checkinDays[acc.lastCheckin] = true;
         }
-        acc.streak = streak;
-        acc.coins = (acc.coins | 0) + reward + Math.min(10, Math.floor(streak / 7) * 5);
-        acc.lastCheckin = today;
-        acc.xp = (Number(acc.xp) || 0) + 10;
-        acc.seasonXp = (Number(acc.seasonXp) || 0) + 10;
-        acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
+        acc.checkinDays[dayKey] = true;
+        let streak = Number(acc.streak) || 0;
+        if (!isMakeup) {
+            const y = new Date(); y.setDate(y.getDate() - 1);
+            const yKey = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+            if (acc.lastCheckin === yKey || acc.checkinDays[yKey]) streak += 1;
+            else if ((Number(acc.streakFreeze) || 0) > 0) {
+                acc.streakFreeze = (Number(acc.streakFreeze) || 0) - 1;
+                streak = Math.max(1, streak);
+                streakMsg = ' (dùng 1 Streak Freeze)';
+            } else {
+                streak = 1;
+            }
+            acc.streak = streak;
+            acc.lastCheckin = today;
+            const bonus = Math.min(10, Math.floor(streak / 7) * 5);
+            acc.coins = (acc.coins | 0) + reward + bonus;
+            acc.xp = (Number(acc.xp) || 0) + 10;
+            acc.seasonXp = (Number(acc.seasonXp) || 0) + 10;
+            acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
+        } else {
+            // Điểm danh bù: trừ 5 XK, không thưởng, không đổi streak
+            acc.coins = Math.max(0, (acc.coins | 0) - MAKEUP_COST);
+            if (dayKey > (acc.lastCheckin || '')) acc.lastCheckin = dayKey;
+        }
     });
     const st = (getCurrentAccount() || {}).streak || 1;
-    showNotification('ĐIỂM DANH:', `+${reward} XU · Streak ${st}${streakMsg}`, '#4ade80', 'coins');
+    const label = isMakeup
+        ? ('Bù ' + dayKey + ': -' + MAKEUP_COST + ' XK')
+        : ('+' + reward + ' XK · Streak ' + st + streakMsg);
+    showNotification('ĐIỂM DANH:', label, isMakeup ? '#f87171' : '#4ade80', 'coins');
     updateCheckinButtonUI();
     updateShopBalanceUI();
     updateUsernameBadge();
-    renderShopList();
+    if (typeof window.renderCheckinCalendar === 'function') window.renderCheckinCalendar();
     return true;
 }
 
@@ -3333,7 +3370,7 @@ function updateUsernameBadge() {
 function updateCheckinButtonUI() {
     const btn = document.getElementById('checkin-btn');
     const txt = document.getElementById('checkin-btn-text');
-    if (!btn) return;
+    if (!btn) return; // đã chuyển điểm danh vào Tiện ích
     if (hasCheckedInToday()) {
         btn.disabled = true;
         btn.classList.add('done');
@@ -3430,18 +3467,101 @@ function renderShopList(highlightSongId) {
 }
 
 
-async function fetchProgressThumbs() {
+let _progressThumbsCache = null;
+let _progressThumbsCacheAt = 0;
+async function fetchProgressThumbs(force) {
+    if (!force && _progressThumbsCache && Date.now() - _progressThumbsCacheAt < 60000) {
+        return _progressThumbsCache;
+    }
     try {
         const db = getDb();
-        if (!db) return [];
+        if (!db) return _progressThumbsCache || [];
         const snap = await db.ref('settings/progressThumbs').once('value');
         const v = snap.val();
-        if (Array.isArray(v)) return v.filter(x => x && (x.id || x.url));
-        if (v && typeof v === 'object') return Object.values(v).filter(x => x && (x.id || x.url));
+        let list = [];
+        if (Array.isArray(v)) list = v.filter(x => x && (x.id || x.url));
+        else if (v && typeof v === 'object') list = Object.values(v).filter(x => x && (x.id || x.url));
+        _progressThumbsCache = list;
+        _progressThumbsCacheAt = Date.now();
+        return list;
     } catch (e) {
         console.warn('fetchProgressThumbs', e);
     }
-    return [];
+    return _progressThumbsCache || [];
+}
+
+/** Cập nhật 1 dòng thumb UI — không rebuild cả list (tránh giật) */
+function patchThumbItemUI(thumbId) {
+    const list = document.getElementById('shop-thumb-list');
+    if (!list) return;
+    const id = String(thumbId || '');
+    const item = list.querySelector('.shop-thumb-item[data-thumb-id="' + id.replace(/"/g, '') + '"]');
+    if (!item) {
+        if (typeof renderShopThumbs === 'function') renderShopThumbs();
+        return;
+    }
+    const acc = (typeof getCurrentAccount === 'function' && getCurrentAccount()) || {};
+    const owned = Array.isArray(acc.ownedThumbs) ? acc.ownedThumbs.map(String) : [];
+    const active = acc.activeThumb ? String(acc.activeThumb) : '';
+    const has = owned.includes(id);
+    const isActive = active === id;
+    let btn = item.querySelector('.shop-buy-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'shop-buy-btn';
+        item.appendChild(btn);
+    }
+    btn.removeAttribute('data-buy-thumb');
+    btn.removeAttribute('data-use-thumb');
+    btn.removeAttribute('data-clear-thumb');
+    if (isActive) {
+        btn.className = 'shop-buy-btn shop-rent-btn';
+        btn.setAttribute('data-clear-thumb', '1');
+        btn.textContent = 'HỦY DÙNG';
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            updateCurrentAccount(a => { a.activeThumb = ''; });
+            applyActiveProgressThumb();
+            patchThumbItemUI(id);
+            // cập nhật các item khác đang active
+            list.querySelectorAll('.shop-thumb-item').forEach(el => {
+                const tid = el.getAttribute('data-thumb-id');
+                if (tid && tid !== id) patchThumbItemUI(tid);
+            });
+            updateShopBalanceUI();
+            showNotification('THUMB:', 'Đã hủy dùng', '#9a9aaa', 'check');
+        };
+    } else if (has) {
+        btn.className = 'shop-buy-btn';
+        btn.setAttribute('data-use-thumb', id);
+        btn.textContent = 'DÙNG';
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const prev = String((getCurrentAccount() || {}).activeThumb || '');
+            updateCurrentAccount(a => { a.activeThumb = id; });
+            applyActiveProgressThumb();
+            if (prev) patchThumbItemUI(prev);
+            patchThumbItemUI(id);
+            updateShopBalanceUI();
+            showNotification('THUMB:', 'Đã áp dụng', '#4ade80', 'check');
+        };
+    } else {
+        btn.className = 'shop-buy-btn';
+        const priceEl = item.querySelector('.price');
+        const priceTxt = priceEl ? priceEl.textContent : '';
+        const m = priceTxt.match(/(\d+)/);
+        const price = m ? m[1] : '';
+        btn.setAttribute('data-buy-thumb', id);
+        btn.textContent = 'MUA ' + (price ? price + ' XK' : '');
+        // buy handler re-bound in renderShopThumbs; fallback:
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            fetchProgressThumbs().then(thumbs => buyProgressThumb(id, thumbs));
+        };
+    }
+    const priceEl = item.querySelector('.price');
+    if (priceEl && has) priceEl.textContent = 'Đã sở hữu';
 }
 
 function applyActiveProgressThumb() {
@@ -3469,7 +3589,10 @@ function applyActiveProgressThumb() {
 async function renderShopThumbs() {
     const list = document.getElementById('shop-thumb-list');
     if (!list) return;
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:0.75rem;">Đang tải...</div>';
+    const hadContent = list.children.length > 0 && !list.querySelector('[data-loading]');
+    if (!hadContent) {
+        list.innerHTML = '<div data-loading="1" style="text-align:center;padding:20px;color:var(--text-secondary);font-size:0.75rem;">Đang tải...</div>';
+    }
     const thumbs = await fetchProgressThumbs();
     if (!thumbs.length) {
         list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:0.78rem;">Chưa có progress thumb<br/><span style="opacity:0.7">Admin thêm ở Cài đặt → Progress thumb</span></div>';
@@ -3561,7 +3684,8 @@ async function renderShopThumbs() {
             const tid = btn.getAttribute('data-use-thumb');
             updateCurrentAccount(acc => { acc.activeThumb = tid; });
             applyActiveProgressThumb();
-            renderShopThumbs();
+            const prevActive = list.querySelectorAll('.shop-thumb-item');
+            prevActive.forEach(el => patchThumbItemUI(el.getAttribute('data-thumb-id')));
             if (typeof showNotification === 'function') showNotification('THUMB:', 'Đã áp dụng', '#4ade80', 'check');
         };
     });
@@ -3570,7 +3694,7 @@ async function renderShopThumbs() {
             e.stopPropagation();
             updateCurrentAccount(acc => { acc.activeThumb = ''; });
             applyActiveProgressThumb();
-            renderShopThumbs();
+            list.querySelectorAll('.shop-thumb-item').forEach(el => patchThumbItemUI(el.getAttribute('data-thumb-id')));
             if (typeof showNotification === 'function') showNotification('THUMB:', 'Đã về mặc định', '#60a5fa', 'check');
         };
     });
@@ -3595,9 +3719,8 @@ function buyProgressThumb(thumbId, thumbsList) {
         acc.coins = (acc.coins | 0) - price;
         if (!Array.isArray(acc.ownedThumbs)) acc.ownedThumbs = [];
         if (!acc.ownedThumbs.includes(String(thumbId))) acc.ownedThumbs.push(String(thumbId));
-        // Không auto bật — hiện nút DÙNG để user chọn
     });
-    renderShopThumbs();
+    patchThumbItemUI(thumbId);
     updateShopBalanceUI();
     showNotification('MUA THUMB:', (th.name || thumbId) + ' — bấm DÙNG để áp dụng', '#4ade80', 'shopping-bag');
 }

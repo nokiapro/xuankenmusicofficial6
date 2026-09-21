@@ -221,7 +221,7 @@
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Top bài nghe nhiều</label>
-                    <div class="extras-actions-grid extras-rank-grid">
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="top-week"><i data-lucide="trophy"></i><span>Top tuần</span></button>
                         <button type="button" class="extras-action-btn" data-x="top-month"><i data-lucide="medal"></i><span>Top tháng</span></button>
                         <button type="button" class="extras-action-btn" data-x="top-year"><i data-lucide="crown"></i><span>Top năm</span></button>
@@ -237,7 +237,7 @@
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Thời gian đã nghe</label>
-                    <div class="extras-actions-grid extras-rank-grid">
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="time-week"><i data-lucide="clock"></i><span>Tuần</span></button>
                         <button type="button" class="extras-action-btn" data-x="time-month"><i data-lucide="clock-3"></i><span>Tháng</span></button>
                         <button type="button" class="extras-action-btn" data-x="time-year"><i data-lucide="timer"></i><span>Năm</span></button>
@@ -264,7 +264,7 @@
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
                         <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
-                        <button type="button" class="extras-action-btn" data-x="room"><i data-lucide="radio"></i><span>Room nghe chung</span></button>
+                        <button type="button" class="extras-action-btn" data-x="checkin"><i data-lucide="calendar-check"></i><span>Điểm danh</span></button>
                     </div>
                 </div>
                 <div id="extras-result" class="extras-result"></div>
@@ -291,31 +291,16 @@
             </div>
         </div>
 
-
-        <!-- Room nghe chung -->
-        <div id="room-modal" class="shop-modal room-modal">
+        <!-- Điểm danh lịch -->
+        <div id="checkin-modal" class="shop-modal checkin-modal">
             <div class="shop-modal-header">
-                <div class="close-shop" id="close-room-btn" title="Quay lại">
+                <div class="close-shop" id="close-checkin-btn" title="Quay lại">
                     <i data-lucide="arrow-left"></i>
                 </div>
-                <div class="shop-title"><i data-lucide="radio"></i><span>ROOM NGHE CHUNG</span></div>
+                <div class="shop-title"><i data-lucide="calendar-check"></i><span>ĐIỂM DANH</span></div>
                 <div style="width:40px;"></div>
             </div>
-            <div class="room-modal-body">
-                <div class="room-status" id="room-status">Chưa vào room</div>
-                <div class="room-now" id="room-now">
-                    <div class="room-now-label">Đang phát</div>
-                    <div class="room-now-title" id="room-now-title">—</div>
-                    <div class="room-now-host" id="room-now-host"></div>
-                </div>
-                <div class="room-members" id="room-members"></div>
-                <div class="room-actions">
-                    <button type="button" class="extras-btn-primary" id="room-join-btn">Vào room chung</button>
-                    <button type="button" class="extras-btn-primary" id="room-host-btn" style="background:linear-gradient(135deg,#17adca,#8c00ff);">Làm host (đồng bộ bài đang nghe)</button>
-                    <button type="button" class="extras-btn-primary" id="room-leave-btn" style="background:rgba(255,255,255,0.12);">Rời room</button>
-                </div>
-                <p class="extras-chat-hint">Host phát bài → mọi người trong room theo bài &amp; trạng thái play/pause. Guest bấm “Vào room” để theo.</p>
-            </div>
+            <div class="checkin-modal-body" id="checkin-modal-body"></div>
         </div>
 
         <!-- Cửa hàng XK -->
@@ -341,12 +326,6 @@
                     <i class="fa-solid fa-coins"></i>
                     <span id="shop-coin-count">0</span> XK
                 </div>
-            </div>
-            <div class="shop-balance-bar">
-                <button type="button" id="checkin-btn" class="checkin-btn" style="width:100%;justify-content:center;">
-                    <i data-lucide="calendar-check"></i>
-                    <span id="checkin-btn-text">ĐIỂM DANH</span>
-                </button>
             </div>
 <div class="shop-tab-bar">
                 <button type="button" class="shop-tab active" data-shop-tab="music" id="shop-tab-music">
