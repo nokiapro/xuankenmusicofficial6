@@ -1,86 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap');
 
 :root {
-    color-scheme: light;
-    --font-ui: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-body: "Roboto Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --accent-color: #1c1c1e;
-    --bg-color: #e8e8ed;
-    --border-color: rgba(0, 0, 0, 0.08);
-    /* Liquid glass rim — light */
-    --border-glass: rgba(255, 255, 255, 0.72);
-    --border-glass-outer: rgba(0, 0, 0, 0.06);
-    --border-glass-inner: rgba(255, 255, 255, 0.95);
-    --card-bg: rgba(255, 255, 255, 0.52);
-    --text-primary: #1c1c1e;
-    --text-secondary: #3a3a3c;
-    --text-tertiary: #6c6c70;
+    --accent-color: #000000;
+    --bg-color: #fcfcfc;
+    --border-color: #f0f0f0;
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-tertiary: #555555;
     --progress-bg: rgba(0, 0, 0, 0.08);
-    --btn-bg: rgba(255, 255, 255, 0.42);
-    --btn-active-bg: rgba(0, 0, 0, 0.08);
-    --btn-hover: rgba(255, 255, 255, 0.62);
-    --playlist-bg: rgba(255, 255, 255, 0.58);
-    --playlist-header-bg: rgba(255, 255, 255, 0.68);
+    --btn-bg: rgba(0, 0, 0, 0.05);
+    --btn-active-bg: rgba(0, 0, 0, 0.12);
+    --btn-hover: rgba(0, 0, 0, 0.08);
+    --playlist-bg: rgba(255, 255, 255, 1);
+    --playlist-header-bg: rgba(255, 255, 255, 0.98);
     --song-item-hover: rgba(0, 0, 0, 0.04);
-    --input-bg: rgba(255, 255, 255, 0.7);
-    --modal-bg: rgba(255, 255, 255, 0.62);
-    --glass-highlight: rgba(255, 255, 255, 0.9);
-    --glass-sheen: linear-gradient(155deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.12) 28%, transparent 52%);
-    --glass-shadow: 0 1px 0 rgba(255,255,255,0.9) inset, 0 -1px 0 rgba(0,0,0,0.04) inset, 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
-    --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.95) inset, 0 24px 64px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.06);
-    --page-mesh:
-        radial-gradient(ellipse 100% 80% at 20% -10%, rgba(255, 100, 150, 0.2), transparent 50%),
-        radial-gradient(ellipse 90% 70% at 90% 10%, rgba(140, 80, 255, 0.16), transparent 48%),
-        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(80, 160, 255, 0.12), transparent 50%),
-        linear-gradient(180deg, #f2f2f7 0%, #e8e8ed 100%);
-    --blur-amount: 32px;
-    --saturate-amount: 190%;
+    --input-bg: #fafafa;
+    --modal-bg: rgba(255, 255, 255, 0.98);
+    /* Gradient icon như music2 */
     --icon-gradient: linear-gradient(135deg, #ff0040, #8c00ff, #ff0040);
     --icon-gradient-hover: linear-gradient(135deg, #ff6b6b, #c2185b, #ff6b6b);
     --icon-gradient-active: linear-gradient(135deg, #ff0040, #ffd700, #ff0040);
     --icon-active-stroke: #ff0040;
-    /* Progress pastel — GIỮ NGUYÊN */
-    --progress-fill: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD);
-    --progress-glow: rgba(243, 184, 186, 0.6);
 }
 
 body.dark {
-    color-scheme: dark;
-    --accent-color: #f5f5f7;
-    --bg-color: #000000;
-    --border-color: rgba(255, 255, 255, 0.1);
-    /* Liquid glass rim — dark */
-    --border-glass: rgba(255, 255, 255, 0.18);
-    --border-glass-outer: rgba(255, 255, 255, 0.08);
-    --border-glass-inner: rgba(255, 255, 255, 0.28);
-    --card-bg: rgba(28, 28, 30, 0.52);
-    --text-primary: #f5f5f7;
-    --text-secondary: #aeaeb2;
-    --text-tertiary: #8e8e93;
+    --accent-color: #ffffff;
+    --bg-color: #121212;
+    --border-color: #2a2a2a;
+    --card-bg: rgba(30, 30, 35, 0.95);
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-tertiary: #999999;
     --progress-bg: rgba(255, 255, 255, 0.12);
-    --btn-bg: rgba(255, 255, 255, 0.1);
+    --btn-bg: rgba(255, 255, 255, 0.08);
     --btn-active-bg: rgba(255, 255, 255, 0.18);
-    --btn-hover: rgba(255, 255, 255, 0.14);
-    --playlist-bg: rgba(28, 28, 30, 0.68);
-    --playlist-header-bg: rgba(44, 44, 46, 0.52);
-    --song-item-hover: rgba(255, 255, 255, 0.06);
-    --input-bg: rgba(58, 58, 60, 0.55);
-    --modal-bg: rgba(28, 28, 30, 0.7);
-    --glass-highlight: rgba(255, 255, 255, 0.16);
-    --glass-sheen: linear-gradient(155deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 30%, transparent 55%);
-    --glass-shadow: 0 1px 0 rgba(255,255,255,0.16) inset, 0 -1px 0 rgba(0,0,0,0.35) inset, 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
-    --glass-shadow-lg: 0 1px 0 rgba(255,255,255,0.18) inset, 0 24px 64px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.4);
-    --page-mesh:
-        radial-gradient(ellipse 100% 80% at 15% -5%, rgba(175, 82, 222, 0.26), transparent 52%),
-        radial-gradient(ellipse 90% 70% at 95% 5%, rgba(255, 45, 85, 0.14), transparent 48%),
-        radial-gradient(ellipse 80% 60% at 50% 110%, rgba(88, 86, 214, 0.18), transparent 55%),
-        linear-gradient(180deg, #0a0a0c 0%, #000000 100%);
+    --btn-hover: rgba(255, 255, 255, 0.05);
+    --playlist-bg: rgba(25, 25, 30, 1);
+    --playlist-header-bg: rgba(25, 25, 30, 0.98);
+    --song-item-hover: rgba(255, 255, 255, 0.05);
+    --input-bg: #2a2a2a;
+    --modal-bg: rgba(30, 30, 35, 0.98);
     --icon-gradient: linear-gradient(135deg, #ffd89b, #c7e9fb, #ffd89b);
     --icon-gradient-hover: linear-gradient(135deg, #fbc2eb, #a6c1ee, #fbc2eb);
     --icon-gradient-active: linear-gradient(135deg, #ffd89b, #ff6b6b, #ffd89b);
+    /* Lucide active ~ màu cam hồng như music2 (gradient active) */
     --icon-active-stroke: #ff6b6b;
-    --progress-fill: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD);
-    --progress-glow: rgba(243, 184, 186, 0.55);
 }
 
 * {
@@ -133,22 +98,18 @@ i[data-lucide],
 }
 
 body {
-    font-family: "Roboto Condensed", var(--font-body), sans-serif;
+    font-family: "Roboto Condensed", sans-serif;
     background-color: var(--bg-color);
-    background-image: var(--page-mesh);
-    background-attachment: fixed;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     margin: 0;
-    padding: 20px;
-    transition: background-color 0.45s ease, color 0.35s ease;
+    padding: 16px;
     color: var(--text-primary);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    letter-spacing: -0.011em;
+    user-select: none;
+    overflow: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Tắt transition khi đổi theme để tránh nháy nút (giữ nguyên animation của notification) */
@@ -162,174 +123,22 @@ body.no-transition *:not(.notification):not(.notification *) {
     max-width: 450px;
     margin: auto;
     background: var(--card-bg);
-    backdrop-filter: saturate(var(--saturate-amount, 180%)) blur(var(--blur-amount, 32px));
-    -webkit-backdrop-filter: saturate(var(--saturate-amount, 180%)) blur(var(--blur-amount, 32px));
-    border-radius: 36px;
-    box-shadow: var(--glass-shadow-lg);
+    backdrop-filter: blur(10px);
+    border-radius: 32px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
     overflow: hidden;
-    /* Viền kính 2 lớp */
-    border: 1px solid var(--border-glass);
-    outline: 1px solid var(--border-glass-outer);
-    outline-offset: -1px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
     display: flex;
     flex-direction: column;
     position: relative;
     z-index: 10;
-    transition: background 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
-}
-.player-container::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: var(--glass-sheen);
-    opacity: 1;
-    z-index: 0;
-}
-.player-container::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 0;
-    /* rim sáng mỏng quanh cạnh */
-    box-shadow:
-        inset 0 1px 0 0 var(--border-glass-inner),
-        inset 0 0 0 1px var(--border-glass-outer),
-        inset 0 -1px 0 0 rgba(0,0,0,0.06);
-}
-.player-container > * {
-    position: relative;
-    z-index: 1;
+    transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 body.dark .player-container {
-    border-color: var(--border-glass);
-    box-shadow: var(--glass-shadow-lg);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
 }
-
-/* ---- Liquid Glass surfaces & type ---- */
-h1, h2, h3, h4, .song-title, .playlist-title, .shop-title, .timer-title,
-.hint-title, .extras-label, .rank-badge, .btn-icon, button, .shop-buy-btn {
-    font-family: "Roboto Condensed", var(--font-ui), sans-serif;
-}
-.song-title {
-    font-weight: 700;
-    letter-spacing: -0.03em;
-}
-.artist-name, .song-item .name, .shop-item .name {
-    letter-spacing: -0.015em;
-}
-.btn-icon, .play-btn {
-    background: var(--btn-bg) !important;
-    backdrop-filter: saturate(160%) blur(16px);
-    -webkit-backdrop-filter: saturate(160%) blur(16px);
-    border: 1px solid var(--border-glass) !important;
-    box-shadow: var(--glass-shadow);
-}
-.play-btn {
-    box-shadow: var(--glass-shadow), 0 0 0 1px rgba(255,45,85,0.08);
-}
-.playlist, #my-playlist-overlay, .timer-modal {
-    background: var(--playlist-bg) !important;
-    backdrop-filter: saturate(var(--saturate-amount)) blur(40px) !important;
-    -webkit-backdrop-filter: saturate(var(--saturate-amount)) blur(40px) !important;
-    border: 1px solid var(--border-glass);
-    box-shadow: var(--glass-shadow-lg);
-}
-.playlist-header, .timer-modal-header {
-    background: var(--playlist-header-bg) !important;
-    backdrop-filter: saturate(180%) blur(20px) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
-    border-bottom-color: var(--border-color) !important;
-}
-.song-item, .shop-item, .shop-thumb-item, .extras-action-btn {
-    border-radius: 14px;
-    transition: background 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-.song-item:hover, .shop-item:hover {
-    background: var(--song-item-hover);
-}
-.extras-action-btn {
-    background: var(--btn-bg) !important;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-glass) !important;
-    box-shadow: inset 0 1px 0 var(--glass-highlight);
-    color: var(--text-primary) !important;
-}
-.extras-label {
-    color: var(--text-tertiary) !important;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-}
-input, textarea, select {
-    font-family: "Roboto Condensed", var(--font-body), sans-serif;
-    background: var(--input-bg) !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-primary) !important;
-    border-radius: 12px;
-    backdrop-filter: blur(8px);
-}
-.progress-bar, #progress-bar, .progress-bar-container {
-    background: var(--progress-bg) !important;
-    border-radius: 10px;
-}
-.progress-filled, #progress-fill {
-    background: var(--progress-fill, linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD)) !important;
-    background-size: 200% 100% !important;
-    animation: pastelMove 3s linear infinite !important;
-    box-shadow: 0 0 12px var(--progress-glow, rgba(243, 184, 186, 0.6)) !important;
-    border-radius: 10px;
-}
-/* Toast glass */
-#toast-msg, .toast, .notification {
-    backdrop-filter: saturate(180%) blur(24px) !important;
-    -webkit-backdrop-filter: saturate(180%) blur(24px) !important;
-    border: 1px solid var(--border-glass) !important;
-    box-shadow: var(--glass-shadow) !important;
-    border-radius: 16px !important;
-    font-family: "Roboto Condensed", var(--font-ui), sans-serif !important;
-}
-/* Login / hint glass */
-.login-panel, .username-gate, .hint-panel, .pin-section {
-    background: var(--card-bg) !important;
-    backdrop-filter: saturate(var(--saturate-amount)) blur(var(--blur-amount));
-    -webkit-backdrop-filter: saturate(var(--saturate-amount)) blur(var(--blur-amount));
-    border: 1px solid var(--border-glass);
-    box-shadow: var(--glass-shadow-lg);
-}
-body.dark .text-primary, body.dark {
-    color: var(--text-primary);
-}
-/* Improve light-mode readability on glass */
-body:not(.dark) .song-title,
-body:not(.dark) .playlist-title,
-body:not(.dark) .shop-title {
-    color: #1c1c1e;
-}
-body:not(.dark) .artist-name,
-body:not(.dark) .text-secondary {
-    color: #3a3a3c;
-}
-body.dark .song-title,
-body.dark .playlist-title,
-body.dark .shop-title {
-    color: #f5f5f7;
-}
-body.dark .artist-name {
-    color: #aeaeb2;
-}
-
-/* Smooth theme crossfade */
-body, .player-container, .shop-modal, .playlist, .btn-icon, .extras-action-btn {
-    transition: background 0.45s ease, background-color 0.45s ease, color 0.35s ease,
-      border-color 0.35s ease, box-shadow 0.45s ease;
-}
-
-
 
 .tracking-widest {
     letter-spacing: normal !important;
@@ -2091,18 +1900,14 @@ body.dark .notification-message {
     width: 100%;
     height: 100%;
     background: var(--playlist-bg);
-    backdrop-filter: saturate(var(--saturate-amount)) blur(40px);
-    -webkit-backdrop-filter: saturate(var(--saturate-amount)) blur(40px);
     z-index: 210;
     transform: translateY(-100%);
     opacity: 0;
-    transition: transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
     display: flex;
     flex-direction: column;
-    border-radius: 36px;
+    border-radius: 32px;
     overflow: hidden;
-    border: 1px solid var(--border-glass);
-    box-shadow: var(--glass-shadow-lg);
 }
 
 .shop-modal.show {
@@ -2111,14 +1916,13 @@ body.dark .notification-message {
 }
 
 .shop-modal-header {
-    padding: 16px 18px;
+    padding: 18px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--border-color);
     background: var(--playlist-header-bg);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: blur(10px);
     flex-shrink: 0;
 }
 
@@ -3862,39 +3666,3 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   gap: 6px;
 }
 
-
-
-/* ---- Viền kính đỉnh cao (dual rim) ---- */
-.shop-modal,
-.playlist,
-#my-playlist-overlay,
-.timer-modal,
-.login-panel,
-.username-gate,
-.hint-panel,
-.pin-section {
-    border: 1px solid var(--border-glass) !important;
-    outline: 1px solid var(--border-glass-outer);
-    outline-offset: -1px;
-    box-shadow: var(--glass-shadow-lg) !important;
-}
-.btn-icon, .play-btn, .extras-action-btn, .close-shop, .close-playlist, .close-timer {
-    border: 1px solid var(--border-glass) !important;
-    box-shadow:
-        inset 0 1px 0 var(--border-glass-inner),
-        0 4px 16px rgba(0,0,0,0.08) !important;
-}
-body.dark .btn-icon,
-body.dark .play-btn,
-body.dark .extras-action-btn {
-    box-shadow:
-        inset 0 1px 0 var(--border-glass-inner),
-        0 4px 18px rgba(0,0,0,0.35) !important;
-}
-/* Progress pastel luôn thắng theme */
-.progress-filled, #progress-fill {
-    background: linear-gradient(90deg, #F5E9FD,#F4E0DF,#F6BCBA,#E3AADD,#C3C7F4,#F5E9FD) !important;
-    background-size: 200% 100% !important;
-    animation: pastelMove 3s linear infinite !important;
-    box-shadow: 0 0 12px rgba(243, 184, 186, 0.6) !important;
-}

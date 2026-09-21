@@ -14,58 +14,46 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700;800&display=swap');
         :root, html[data-theme="dark"] {
-            --bg: #000000;
-            --card: rgba(44, 44, 46, 0.55);
-            --card2: rgba(58, 58, 60, 0.45);
-            --border: rgba(255, 255, 255, 0.12);
-            --text: #f5f5f7;
-            --muted: #8e8e93;
-            --accent: #bf5af2;
-            --accent2: #ff375f;
-            --ok: #30d158;
-            --warn: #ff9f0a;
-            --info: #64d2ff;
-            --danger: #ff453a;
-            --radius: 16px;
+            --bg: #0c0c10;
+            --card: #16161e;
+            --card2: #1c1c26;
+            --border: #2a2a38;
+            --text: #f2f2f5;
+            --muted: #8b8b9a;
+            --accent: #8c00ff;
+            --accent2: #ff0040;
+            --ok: #4ade80;
+            --warn: #ff9800;
+            --info: #60a5fa;
+            --danger: #ff6666;
+            --radius: 14px;
             --touch: 44px;
             --safe-b: env(safe-area-inset-bottom, 0px);
             --safe-t: env(safe-area-inset-top, 0px);
-            --page-bg:
-                radial-gradient(ellipse 90% 70% at 10% -10%, rgba(175, 82, 222, 0.28), transparent 50%),
-                radial-gradient(ellipse 80% 60% at 100% 0%, rgba(255, 45, 85, 0.14), transparent 45%),
-                linear-gradient(180deg, #0a0a0c 0%, #000 100%);
-            --input-bg: rgba(58, 58, 60, 0.5);
+            --page-bg: linear-gradient(165deg, #0e0e14 0%, #16102a 45%, #0c0c10 100%);
+            --input-bg: #121218;
             --calendar-icon: invert(1);
             --color-scheme: dark;
-            --header-bg: rgba(28, 28, 30, 0.55);
-            --glass-blur: saturate(180%) blur(28px);
-            --glass-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-            --font-ui: "Roboto Condensed", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            --header-bg: rgba(12,12,16,0.92);
         }
         html[data-theme="light"] {
-            --bg: #e8e8ed;
-            --card: rgba(255, 255, 255, 0.62);
-            --card2: rgba(255, 255, 255, 0.48);
-            --border: rgba(0, 0, 0, 0.08);
-            --text: #1c1c1e;
-            --muted: #6c6c70;
-            --accent: #af52de;
-            --accent2: #ff2d55;
-            --ok: #28cd41;
-            --warn: #ff9f0a;
-            --info: #007aff;
-            --danger: #ff3b30;
-            --page-bg:
-                radial-gradient(ellipse 90% 70% at 15% -10%, rgba(255, 100, 150, 0.2), transparent 50%),
-                radial-gradient(ellipse 80% 60% at 95% 5%, rgba(140, 80, 255, 0.16), transparent 48%),
-                linear-gradient(180deg, #f2f2f7 0%, #e8e8ed 100%);
-            --input-bg: rgba(255, 255, 255, 0.75);
+            --bg: #f0f0f5;
+            --card: #ffffff;
+            --card2: #eef0f6;
+            --border: #c8cad4;
+            --text: #12121a;
+            --muted: #4a4a5c;
+            --accent: #7c3aed;
+            --accent2: #e11d48;
+            --ok: #15803d;
+            --warn: #c2410c;
+            --info: #1d4ed8;
+            --danger: #b91c1c;
+            --page-bg: linear-gradient(165deg, #f4f5fa 0%, #ebe4ff 45%, #f0f0f5 100%);
+            --input-bg: #ffffff;
             --calendar-icon: invert(0);
             --color-scheme: light;
-            --header-bg: rgba(255, 255, 255, 0.65);
-            --glass-blur: saturate(180%) blur(28px);
-            --glass-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
-            --font-ui: "Roboto Condensed", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            --header-bg: rgba(255,255,255,0.96);
         }
         html[data-theme="light"] label,
         html[data-theme="light"] .muted,
@@ -110,40 +98,6 @@
             background: var(--bg);
             overscroll-behavior-y: none;
         }
-
-        body {
-            background: var(--page-bg) !important;
-            background-attachment: fixed !important;
-            -webkit-font-smoothing: antialiased;
-            letter-spacing: -0.011em;
-        }
-        .card, .stat, .header, header.app-header, .tabs {
-            background: var(--card) !important;
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--border) !important;
-            box-shadow: var(--glass-shadow);
-        }
-        .header, header.app-header {
-            background: var(--header-bg) !important;
-        }
-        input, textarea, select {
-            background: var(--input-bg) !important;
-            backdrop-filter: blur(12px);
-            border-radius: 12px !important;
-        }
-        .btn, .tab, .pagination button {
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border) !important;
-            font-family: var(--font-ui) !important;
-            letter-spacing: -0.02em;
-        }
-        h1, h2, h3 {
-            font-family: var(--font-ui) !important;
-            letter-spacing: -0.03em;
-            font-weight: 700;
-        }
-
         body {
             color-scheme: var(--color-scheme);
             font-family: "Roboto Condensed", system-ui, -apple-system, sans-serif;
@@ -945,17 +899,7 @@
             cursor: not-allowed;
         }
 
-    
-        /* dual glass rim admin */
-        .card, .stat, .header, header.app-header {
-            box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.2) !important;
-        }
-        html[data-theme="light"] .card,
-        html[data-theme="light"] .stat,
-        html[data-theme="light"] .header {
-            box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.95) !important;
-        }
-</style>
+    </style>
 
     <script>
     // Ẩn đuôi .html trên URL (GitHub Pages / static hosting)
