@@ -213,12 +213,6 @@
             <div class="extras-modal-body">
                 <div id="user-xp-badge" class="user-xp-badge" style="display:none;"></div>
                 <div class="extras-section">
-                    <label class="extras-label">Huy hiệu</label>
-                    <div class="extras-actions-grid extras-rank-grid">
-                        <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
-                    </div>
-                </div>
-                <div class="extras-section">
                     <label class="extras-label">Gift code</label>
                     <div class="extras-row">
                         <input id="gift-code-input" placeholder="Nhập mã..." maxlength="24" />
@@ -249,16 +243,34 @@
                         <button type="button" class="extras-action-btn" data-x="time-year"><i data-lucide="timer"></i><span>Năm</span></button>
                     </div>
                 </div>
-                <div id="extras-result" class="extras-result"></div>
-                <div class="extras-section extras-chat-section">
-                    <label class="extras-label">Chat toàn web</label>
-                    <div id="global-chat-box" class="global-chat-box"></div>
-                    <div class="extras-row">
-                        <input id="global-chat-input" placeholder="Nhắn tin… @username" maxlength="300" />
-                        <button type="button" id="global-chat-send" class="extras-btn-primary">Gửi</button>
+                <div class="extras-section">
+                    <label class="extras-label">Khác</label>
+                    <div class="extras-actions-grid extras-rank-grid">
+                        <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
+                        <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
                     </div>
-                    <p class="extras-chat-hint">Admin: <code>/mute user 1h</code> · <code>/mute user forever</code> · <code>/unmute user</code></p>
                 </div>
+                <div id="extras-result" class="extras-result"></div>
+            </div>
+        </div>
+
+
+        <!-- Chat toàn web (khung player) -->
+        <div id="chat-modal" class="shop-modal chat-modal">
+            <div class="shop-modal-header">
+                <div class="close-shop" id="close-chat-btn" title="Quay lại">
+                    <i data-lucide="arrow-left"></i>
+                </div>
+                <div class="shop-title"><i data-lucide="message-circle"></i><span>CHAT TOÀN WEB</span></div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="chat-modal-body">
+                <div id="global-chat-box" class="global-chat-box"></div>
+                <div class="extras-row chat-input-row">
+                    <input id="global-chat-input" placeholder="Nhắn tin… @username" maxlength="300" />
+                    <button type="button" id="global-chat-send" class="extras-btn-primary">Gửi</button>
+                </div>
+                <p class="extras-chat-hint">Admin: <code>/mute user 1h</code> · <code>/mute user forever</code> · <code>/unmute user</code></p>
             </div>
         </div>
 

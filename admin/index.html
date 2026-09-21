@@ -328,7 +328,7 @@
         .tab.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
             color: #fff;
-            border-color: transparent;
+            border: none;
             box-shadow: 0 4px 16px rgba(140,0,255,0.25);
         }
         @media (min-width: 768px) {
@@ -657,7 +657,7 @@
         .pagination button.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
             color: #fff;
-            border-color: transparent;
+            border: none;
         }
         .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
         .pagination .page-info {
@@ -862,7 +862,7 @@
         .tab.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
             color: #fff;
-            border-color: transparent;
+            border: none;
             box-shadow: 0 4px 16px rgba(140,0,255,0.25);
         }
         .pagination {
@@ -891,7 +891,7 @@
         .pagination button.active {
             background: linear-gradient(135deg, var(--accent2), var(--accent));
             color: #fff;
-            border-color: transparent;
+            border: none;
             box-shadow: 0 4px 14px rgba(140,0,255,0.3);
         }
         .pagination button:disabled {
@@ -2540,12 +2540,31 @@
                 const arr = snap.val();
                 const list = Array.isArray(arr) ? arr : (arr && typeof arr === 'object' ? Object.values(arr) : []);
                 if (!list.length) { el.textContent = 'Chưa có thumb'; return; }
-                el.innerHTML = list.map((th, i) =>
-                    '<div style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
-                    (th.url ? '<img src="' + escapeHtml(th.url) + '" style="width:28px;height:28px;object-fit:contain;">' : '') +
-                    '<code>' + escapeHtml(th.id || '') + '</code> ' + escapeHtml(th.name || '') + ' · ' + (th.price|0) + ' xu' +
-                    ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-thumb="' + i + '">Xóa</button></div>'
-                ).join('');
+                el.innerHTML = list.map((th, i) => {
+                    const url = th.url ? String(th.url) : '';
+                    const isGif = /\.gif(\?|$)/i.test(url) || /\.webp(\?|$)/i.test(url);
+                    let preview = '';
+                    if (url) {
+                        if (isGif) {
+                            preview = '<button type="button" class="admin-thumb-preview is-gif" data-thumb-src="' + escapeHtml(url) + '" title="Bấm xem GIF" style="width:36px;height:36px;border:1px solid var(--border);border-radius:8px;background:var(--card2);cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:800;color:var(--muted);">GIF</button>';
+                        } else {
+                            preview = '<img src="' + escapeHtml(url) + '" loading="lazy" style="width:36px;height:36px;object-fit:contain;border-radius:8px;">';
+                        }
+                    }
+                    return '<div style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+                        preview +
+                        '<code>' + escapeHtml(th.id || '') + '</code> ' + escapeHtml(th.name || '') + ' · ' + (th.price|0) + ' XK' +
+                        ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-thumb="' + i + '">Xóa</button></div>';
+                }).join('');
+                el.querySelectorAll('.admin-thumb-preview[data-thumb-src]').forEach(btn => {
+                    btn.onclick = () => {
+                        if (btn.dataset.loaded === '1') return;
+                        const src = btn.getAttribute('data-thumb-src');
+                        if (!src) return;
+                        btn.dataset.loaded = '1';
+                        btn.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">';
+                    };
+                });
                 el.querySelectorAll('[data-del-thumb]').forEach(btn => {
                     btn.onclick = async () => {
                         const idx = parseInt(btn.getAttribute('data-del-thumb'), 10);

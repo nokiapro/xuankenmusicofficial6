@@ -191,6 +191,10 @@
     if (h === 3 && new Date().getMinutes() === 33) unlockAchievement('secret_333');
   }
 
+  function playerHost() {
+    return document.getElementById('player-container') || document.body;
+  }
+
   function openBadgesModal() {
     let modal = document.getElementById('badges-modal');
     if (!modal) {
@@ -198,14 +202,15 @@
       modal.id = 'badges-modal';
       modal.className = 'shop-modal badges-modal';
       modal.innerHTML = '<div class="shop-modal-header">'
-        + '<div class="close-shop" id="close-badges-btn"><i data-lucide="x"></i></div>'
+        + '<div class="close-shop" id="close-badges-btn" title="Quay lại"><i data-lucide="arrow-left"></i></div>'
         + '<div class="shop-title"><i data-lucide="award"></i><span>HUY HIỆU</span></div>'
         + '<div style="width:40px;"></div></div>'
         + '<div class="badges-modal-body" id="badges-list"></div>';
-      document.body.appendChild(modal);
+      playerHost().appendChild(modal);
       const close = () => { modal.classList.remove('show'); };
       modal.querySelector('#close-badges-btn').onclick = close;
-      modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    } else if (modal.parentElement !== playerHost()) {
+      playerHost().appendChild(modal);
     }
     const list = modal.querySelector('#badges-list');
     const acc = getAcc() || {};
@@ -228,6 +233,26 @@
     if (typeof lucide !== 'undefined') {
       try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
     }
+  }
+
+  function openChatModal() {
+    const modal = document.getElementById('chat-modal');
+    if (!modal) return;
+    // Đảm bảo nằm trong player
+    const host = playerHost();
+    if (modal.parentElement !== host) host.appendChild(modal);
+    modal.classList.add('show');
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+    }
+    // Scroll chat xuống cuối
+    const box = document.getElementById('global-chat-box');
+    if (box) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
+  }
+
+  function closeChatModal() {
+    const modal = document.getElementById('chat-modal');
+    if (modal) modal.classList.remove('show');
   }
 
 
@@ -788,6 +813,15 @@
     bindExtrasBtn();
     setInterval(bindExtrasBtn, 1500);
 
+    const closeChatBtn = $('close-chat-btn');
+    if (closeChatBtn && !closeChatBtn._xkBound) {
+      closeChatBtn._xkBound = true;
+      closeChatBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        closeChatModal();
+      });
+    }
+
     const closeBtn = $('close-extras-btn');
     if (closeBtn && !closeBtn._xkBound) {
       closeBtn._xkBound = true;
@@ -859,6 +893,7 @@
       btn.onclick = () => {
         const x = btn.getAttribute('data-x');
         if (x === 'badges') { openBadgesModal(); return; }
+        if (x === 'chat') { openChatModal(); return; }
         if (x === 'top-week') topSongsByPeriod('week');
         if (x === 'top-month') topSongsByPeriod('month');
         if (x === 'top-year') topSongsByPeriod('year');

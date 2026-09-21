@@ -2953,15 +2953,29 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 
 
-/* ===== Huy hiệu modal ===== */
-.badges-modal.show { display: flex; }
-.badges-modal-body {
-  padding: 12px 14px 24px;
+/* ===== Huy hiệu / Chat modal (trong khung player như shop) ===== */
+.badges-modal-body,
+.chat-modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 14px 16px;
   overflow-y: auto;
-  max-height: min(70vh, 520px);
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.chat-modal-body .global-chat-box {
+  flex: 1;
+  min-height: 120px;
+  max-height: none;
+}
+.chat-modal-body .chat-input-row {
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+.chat-modal-body .extras-chat-hint {
+  flex-shrink: 0;
+  margin: 6px 0 0;
 }
 .badge-card {
   display: flex;
