@@ -560,6 +560,7 @@
       if (isToday) cls += ' today';
       if (canMakeup) cls += ' clickable';
       cells += '<button type="button" class="' + cls + '" data-ci-day="' + key + '"' + (canMakeup ? '' : ' disabled') + '>'
+        + (done ? '<span class="ci-check">✓</span>' : '')
         + '<span class="ci-solar">' + d + '</span>'
         + '<span class="ci-lunar">' + escapeHtml(lunarTxt) + '</span>'
         + '</button>';
@@ -571,16 +572,22 @@
     const need = Math.max(0, 42 - totalCells);
     for (let i = 0; i < need; i++) cells += '<div class="ci-cell empty"></div>';
 
+    const streakN = Number(acc.streak) || 0;
     body.innerHTML = '<div class="ci-head">'
-      + '<div class="ci-month">' + monthNames[m] + ' ' + y + '</div>'
-      + '<div class="ci-legend"><span class="ci-lg done"></span> Đã điểm danh'
-      + ' <span class="ci-lg miss"></span> Chưa / bỏ lỡ</div>'
-      + '<div class="ci-reward">Hôm nay +' + reward + ' XK · Điểm danh bù: -5 XK</div>'
+      + '<div class="ci-month">' + monthNames[m] + ' · ' + y + '</div>'
+      + '<div class="ci-legend">'
+      + '<span class="ci-pill"><span class="ci-lg done"></span>Đã điểm danh</span>'
+      + '<span class="ci-pill"><span class="ci-lg miss"></span>Chưa / bỏ lỡ</span>'
+      + '</div>'
+      + '<div class="ci-reward">Hôm nay +' + reward + ' XK &nbsp;·&nbsp; Điểm danh bù −5 XK</div>'
       + '</div>'
       + '<div class="ci-week">' + weekDays.map(w => '<div class="ci-wd">' + w + '</div>').join('') + '</div>'
       + '<div class="ci-grid">' + cells + '</div>'
-      + '<div class="ci-streak">Streak: <b>' + (Number(acc.streak) || 0) + '</b> ngày'
-      + (acc.lastCheckin ? ' · Gần nhất: ' + escapeHtml(acc.lastCheckin) : '') + '</div>';
+      + '<div class="ci-streak">'
+      + '<span class="ci-streak-fire">🔥</span>'
+      + '<span>Streak <b>' + streakN + '</b> ngày</span>'
+      + (acc.lastCheckin ? '<span class="ci-streak-meta">· ' + escapeHtml(acc.lastCheckin) + '</span>' : '')
+      + '</div>';
 
     body.querySelectorAll('.ci-cell.clickable[data-ci-day]').forEach(btn => {
       btn.onclick = () => {
