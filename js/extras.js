@@ -255,6 +255,37 @@
     if (modal) modal.classList.remove('show');
   }
 
+  /** Modal kết quả (Top / Review / Thời gian) — khung player + nút quay lại */
+  function openResultModal(title, icon, bodyHtml) {
+    let modal = document.getElementById('extras-result-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'extras-result-modal';
+      modal.className = 'shop-modal extras-result-modal';
+      modal.innerHTML = '<div class="shop-modal-header">'
+        + '<div class="close-shop" id="close-result-btn" title="Quay lại"><i data-lucide="arrow-left"></i></div>'
+        + '<div class="shop-title"><i data-lucide="sparkles" id="result-modal-icon"></i><span id="result-modal-title">KẾT QUẢ</span></div>'
+        + '<div style="width:40px;"></div></div>'
+        + '<div class="extras-result-modal-body" id="extras-result-modal-body"></div>';
+      playerHost().appendChild(modal);
+      modal.querySelector('#close-result-btn').onclick = () => modal.classList.remove('show');
+    } else if (modal.parentElement !== playerHost()) {
+      playerHost().appendChild(modal);
+    }
+    const titleEl = modal.querySelector('#result-modal-title');
+    if (titleEl) titleEl.textContent = title || 'KẾT QUẢ';
+    const iconWrap = modal.querySelector('.shop-title');
+    if (iconWrap) {
+      iconWrap.innerHTML = '<i data-lucide="' + (icon || 'sparkles') + '"></i><span id="result-modal-title">' +
+        (title || 'KẾT QUẢ').replace(/</g, '&lt;') + '</span>';
+    }
+    const body = modal.querySelector('#extras-result-modal-body');
+    if (body) body.innerHTML = bodyHtml || '';
+    modal.classList.add('show');
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+    }
+  }
 
   async function syncUserPartial() {
     try {
@@ -837,35 +868,28 @@
       giftBtn.onclick = () => redeemGiftCode(($('gift-code-input') || {}).value);
     }
 
-    let lastResultKey = null;
-
-    function showResult(html, key) {
-      const box = $('extras-result');
-      if (!box) return;
-      // Click cùng nút lần nữa → ẩn đi
-      if (key && lastResultKey === key && box.classList.contains('show')) {
-        box.classList.remove('show');
-        box.innerHTML = '';
-        lastResultKey = null;
-        return;
-      }
-      box.innerHTML = html;
-      box.classList.add('show');
-      lastResultKey = key || null;
-    }
-
     function topSongsByPeriod(period) {
       const songs = window.songs || [];
       const sorted = [...songs].sort((a, b) => (Number(b.listenCount) || 0) - (Number(a.listenCount) || 0));
-      const top = sorted.slice(0, 10);
-      const title = period === 'week' ? 'Top tuần' : period === 'month' ? 'Top tháng' : 'Top năm';
-      // listenCount là tổng — chưa có breakdown theo tuần/tháng (hiển thị top tổng, gắn nhãn)
-      let html = '<b>' + title + '</b> <span style="opacity:.7">(theo lượt nghe hiện tại)</span><br/>';
-      if (!top.length) html += 'Chưa có dữ liệu';
-      else top.forEach((s, i) => {
-        html += (i + 1) + '. ' + escapeHtml(s.name || s.id) + ' — <b>' + (s.listenCount || 0) + '</b><br/>';
-      });
-      showResult(html, 'top-' + period);
+      const top = sorted.slice(0, 15);
+      const titles = { week: 'TOP TUẦN', month: 'TOP THÁNG', year: 'TOP NĂM' };
+      const icons = { week: 'trophy', month: 'medal', year: 'crown' };
+      let rows = '';
+      if (!top.length) {
+        rows = '<div class="xr-empty">Chưa có dữ liệu lượt nghe</div>';
+      } else {
+        top.forEach((s, i) => {
+          const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+          rows += '<div class="xr-row ' + rankCls + '">'
+            + '<span class="xr-rank">' + (i + 1) + '</span>'
+            + '<div class="xr-info"><div class="xr-name">' + escapeHtml(s.name || s.id) + '</div>'
+            + '<div class="xr-sub">' + escapeHtml(s.artist || '') + '</div></div>'
+            + '<span class="xr-val"><i data-lucide="headphones"></i> ' + (s.listenCount || 0) + '</span>'
+            + '</div>';
+        });
+      }
+      const body = '<div class="xr-note">Xếp theo tổng lượt nghe hiện tại</div><div class="xr-list">' + rows + '</div>';
+      openResultModal(titles[period] || 'TOP', icons[period] || 'trophy', body);
     }
 
     function userReview(period) {
@@ -873,18 +897,38 @@
       if (!acc) return toast('REVIEW', 'Cần đăng nhập', '#ff9800');
       const listened = acc.listenedSongs ? Object.keys(acc.listenedSongs).length : 0;
       const owned = (acc.owned || []).length;
-      const label = period === 'week' ? 'Tuần này' : period === 'month' ? 'Tháng này' : 'Năm nay';
-      // Approximate from available fields
-      let html = '<b>Review ' + label + '</b><br/>';
-      html += '• Bài đã nghe (unique): <b>' + listened + '</b><br/>';
-      html += '• Đã mua: <b>' + owned + '</b><br/>';
-      html += '• Level: <b>' + (acc.level || 1) + '</b> · XP: <b>' + (acc.xp || 0) + '</b><br/>';
-      html += '• Season XP: <b>' + (acc.seasonXp || 0) + '</b><br/>';
-      html += '• Streak điểm danh: <b>' + (acc.streak || 0) + '</b><br/>';
-      if (period === 'year') {
-        html += '• Rank: <b>' + (acc.rank || 'member') + '</b>';
-      }
-      showResult(html, 'rev-' + period);
+      const labels = { week: 'REVIEW TUẦN', month: 'REVIEW THÁNG', year: 'REVIEW NĂM' };
+      const icons = { week: 'calendar-days', month: 'calendar', year: 'calendar-range' };
+      const rank = String(acc.rank || 'member').replace(/_/g, ' ').toUpperCase();
+      const cards = [
+        { icon: '🎧', label: 'Bài đã nghe', val: listened },
+        { icon: '🛒', label: 'Đã mua', val: owned },
+        { icon: '⭐', label: 'Level', val: (acc.level || 1) },
+        { icon: '✨', label: 'XP', val: (acc.xp || 0) },
+        { icon: '🔥', label: 'Season XP', val: (acc.seasonXp || 0) },
+        { icon: '📅', label: 'Streak', val: (acc.streak || 0) }
+      ];
+      if (period === 'year') cards.push({ icon: '👑', label: 'Hạng', val: rank });
+      const grid = cards.map(c =>
+        '<div class="xr-stat-card"><div class="xr-stat-icon">' + c.icon + '</div>'
+        + '<div class="xr-stat-val">' + escapeHtml(String(c.val)) + '</div>'
+        + '<div class="xr-stat-label">' + escapeHtml(c.label) + '</div></div>'
+      ).join('');
+      openResultModal(labels[period] || 'REVIEW', icons[period] || 'calendar', '<div class="xr-stat-grid">' + grid + '</div>');
+    }
+
+    function showListenTime(period) {
+      const labels = { week: 'THỜI GIAN · TUẦN', month: 'THỜI GIAN · THÁNG', year: 'THỜI GIAN · NĂM' };
+      const sub = { week: '7 ngày gần nhất', month: 'Tháng này', year: 'Năm nay' };
+      const sec = sumListenTime(period);
+      const total = (getAcc() && getAcc().listenTime && getAcc().listenTime.total) || 0;
+      const body = '<div class="xr-time-wrap">'
+        + '<div class="xr-time-card primary"><div class="xr-time-label">' + escapeHtml(sub[period] || '') + '</div>'
+        + '<div class="xr-time-val">' + escapeHtml(formatListenDuration(sec)) + '</div></div>'
+        + '<div class="xr-time-card"><div class="xr-time-label">Tổng mọi thời điểm</div>'
+        + '<div class="xr-time-val">' + escapeHtml(formatListenDuration(total)) + '</div></div>'
+        + '</div>';
+      openResultModal(labels[period] || 'THỜI GIAN', 'clock', body);
     }
 
     panel.querySelectorAll('[data-x]').forEach(btn => {
@@ -901,18 +945,8 @@
         if (x === 'rev-month') userReview('month');
         if (x === 'rev-year') userReview('year');
         if (x === 'time-week' || x === 'time-month' || x === 'time-year') {
-          const period = x.replace('time-', '');
-          const label = period === 'week' ? '7 ngày gần nhất' : period === 'month' ? 'tháng này' : 'năm nay';
-          const sec = sumListenTime(period);
-          const total = (getAcc() && getAcc().listenTime && getAcc().listenTime.total) || 0;
-          showResult(
-            '<b>Thời gian nghe (' + label + ')</b><br/>' +
-            '• Giai đoạn: <b>' + formatListenDuration(sec) + '</b><br/>' +
-            '• Tổng mọi thời điểm: <b>' + formatListenDuration(total) + '</b>',
-            x
-          );
+          showListenTime(x.replace('time-', ''));
         }
-
       };
     });
 
