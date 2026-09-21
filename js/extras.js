@@ -287,6 +287,318 @@
     }
   }
 
+
+  let _usersCache = null;
+  let _usersCacheAt = 0;
+
+  async function fetchAllUsersLite() {
+    if (_usersCache && Date.now() - _usersCacheAt < 60000) return _usersCache;
+    try {
+      const db = typeof getDb === 'function' ? getDb() : (window.db || null);
+      if (!db) return [];
+      const path = (typeof dataPath === 'function' ? dataPath('users') : 'users');
+      const snap = await db.ref(path).once('value');
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(uid => {
+        const u = val[uid] || {};
+        let ownedCount = 0;
+        if (Array.isArray(u.owned)) ownedCount = u.owned.length;
+        else if (u.owned && typeof u.owned === 'object') ownedCount = Object.keys(u.owned).length;
+        else if (typeof u.owned === 'string') ownedCount = u.owned.split(',').filter(Boolean).length;
+        const lt = (u.listenTime && typeof u.listenTime === 'object') ? u.listenTime : {};
+        const byDay = (lt.byDay && typeof lt.byDay === 'object') ? lt.byDay : {};
+        return {
+          uid,
+          username: String(u.username || uid).slice(0, 32),
+          rank: String(u.rank || 'member'),
+          listenTotal: Number(lt.total) || 0,
+          byDay,
+          ownedCount,
+          createdAt: Number(u.createdAt) || 0
+        };
+      });
+      _usersCache = list;
+      _usersCacheAt = Date.now();
+      return list;
+    } catch (e) {
+      console.warn('[lb] fetch users', e);
+      return _usersCache || [];
+    }
+  }
+
+  function sumByDayPeriod(byDay, period) {
+    const now = new Date();
+    let sum = 0;
+    Object.keys(byDay || {}).forEach(k => {
+      const parts = String(k).split('-');
+      if (parts.length < 3) return;
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (Number.isNaN(d.getTime())) return;
+      if (period === 'week') {
+        if (d >= new Date(now.getTime() - 7 * 24 * 3600 * 1000)) sum += Number(byDay[k]) || 0;
+      } else if (period === 'month') {
+        if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) sum += Number(byDay[k]) || 0;
+      } else {
+        if (d.getFullYear() === now.getFullYear()) sum += Number(byDay[k]) || 0;
+      }
+    });
+    return sum;
+  }
+
+  async function showListenLeaderboard(period) {
+    const titles = { week: 'TOP NGHE · TUẦN', month: 'TOP NGHE · THÁNG', year: 'TOP NGHE · NĂM' };
+    openResultModal(titles[period] || 'TOP NGHE', 'headphones', '<div class="xr-empty">Đang tải…</div>');
+    const users = await fetchAllUsersLite();
+    const ranked = users.map(u => ({
+      ...u,
+      score: period === 'year' && !Object.keys(u.byDay || {}).length
+        ? u.listenTotal
+        : sumByDayPeriod(u.byDay, period) || (period === 'year' ? u.listenTotal : 0)
+    })).filter(u => u.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+    let rows = '';
+    if (!ranked.length) rows = '<div class="xr-empty">Chưa có dữ liệu nghe</div>';
+    else ranked.forEach((u, i) => {
+      const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      rows += '<div class="xr-row ' + rankCls + '">'
+        + '<span class="xr-rank">' + (i + 1) + '</span>'
+        + '<div class="xr-info"><div class="xr-name">' + escapeHtml(u.username) + '</div>'
+        + '<div class="xr-sub">' + escapeHtml(String(u.rank).replace(/_/g, ' ').toUpperCase()) + '</div></div>'
+        + '<span class="xr-val">' + escapeHtml(formatListenDuration(u.score)) + '</span></div>';
+    });
+    openResultModal(titles[period] || 'TOP NGHE', 'headphones',
+      '<div class="xr-note">Xếp theo thời gian nghe (' + (period === 'week' ? '7 ngày' : period === 'month' ? 'tháng này' : 'năm nay') + ')</div><div class="xr-list">' + rows + '</div>');
+  }
+
+  async function showOwnLeaderboard(period) {
+    // Owned không có breakdown theo tuần — dùng tổng sở hữu; period chỉ là nhãn UI
+    const titles = { week: 'TOP SỞ HỮU · TUẦN', month: 'TOP SỞ HỮU · THÁNG', year: 'TOP SỞ HỮU · NĂM' };
+    openResultModal(titles[period] || 'TOP SỞ HỮU', 'library', '<div class="xr-empty">Đang tải…</div>');
+    const users = await fetchAllUsersLite();
+    const ranked = users.filter(u => u.ownedCount > 0).sort((a, b) => b.ownedCount - a.ownedCount).slice(0, 20);
+    let rows = '';
+    if (!ranked.length) rows = '<div class="xr-empty">Chưa có dữ liệu sở hữu</div>';
+    else ranked.forEach((u, i) => {
+      const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      rows += '<div class="xr-row ' + rankCls + '">'
+        + '<span class="xr-rank">' + (i + 1) + '</span>'
+        + '<div class="xr-info"><div class="xr-name">' + escapeHtml(u.username) + '</div>'
+        + '<div class="xr-sub">' + escapeHtml(String(u.rank).replace(/_/g, ' ').toUpperCase()) + '</div></div>'
+        + '<span class="xr-val">' + u.ownedCount + ' bài</span></div>';
+    });
+    openResultModal(titles[period] || 'TOP SỞ HỮU', 'library',
+      '<div class="xr-note">Xếp theo số bài đã mua (tổng)</div><div class="xr-list">' + rows + '</div>');
+  }
+
+  /* ===== Room nghe chung (MVP realtime) ===== */
+  const ROOM_ID = 'public';
+  let _roomUnsub = null;
+  let _roomMemberUnsub = null;
+  let _roomJoined = false;
+  let _roomIsHost = false;
+  let _roomApplying = false;
+  let _roomPushTimer = null;
+
+  function roomPath() {
+    return (typeof dataPath === 'function' ? dataPath('listenRoom') : 'listenRoom') + '/' + ROOM_ID;
+  }
+
+  function getRoomUid() {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
+        return firebase.auth().currentUser.uid;
+    } catch (e) {}
+    const acc = getAcc();
+    return (acc && (acc.uid || acc.username)) || null;
+  }
+
+  function getRoomName() {
+    const acc = getAcc();
+    return (acc && acc.username) || 'guest';
+  }
+
+  function openRoomModal() {
+    const modal = document.getElementById('room-modal');
+    if (!modal) return;
+    const host = playerHost();
+    if (modal.parentElement !== host) host.appendChild(modal);
+    modal.classList.add('show');
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+    }
+  }
+
+  function closeRoomModal() {
+    const modal = document.getElementById('room-modal');
+    if (modal) modal.classList.remove('show');
+  }
+
+  function updateRoomUi(state) {
+    const st = document.getElementById('room-status');
+    const title = document.getElementById('room-now-title');
+    const hostEl = document.getElementById('room-now-host');
+    if (!state) {
+      if (st) st.textContent = _roomJoined ? 'Trong room — chờ host' : 'Chưa vào room';
+      if (title) title.textContent = '—';
+      if (hostEl) hostEl.textContent = '';
+      return;
+    }
+    if (st) st.textContent = _roomIsHost ? 'Bạn là HOST' : (_roomJoined ? 'Đang theo room' : 'Chưa vào room');
+    const songName = state.songName || state.songId || '—';
+    if (title) title.textContent = songName + (state.playing ? ' ▶' : ' ⏸');
+    if (hostEl) hostEl.textContent = state.hostName ? ('Host: ' + state.hostName) : '';
+  }
+
+  function applyRoomState(state) {
+    if (!_roomJoined || _roomIsHost || !state || !state.songId) return;
+    if (_roomApplying) return;
+    _roomApplying = true;
+    try {
+      const songs = window.songs || [];
+      const idx = songs.findIndex(s => String(s.id) === String(state.songId));
+      if (idx >= 0 && typeof loadSong === 'function') {
+        const need = (typeof index === 'undefined' || index !== idx);
+        const doPlay = () => {
+          try {
+            if (typeof audio !== 'undefined' && audio) {
+              if (typeof state.t === 'number' && Math.abs((audio.currentTime || 0) - state.t) > 2.5) {
+                audio.currentTime = Math.max(0, state.t);
+              }
+              if (state.playing) {
+                const p = audio.play();
+                if (p && p.catch) p.catch(() => {});
+              } else {
+                audio.pause();
+              }
+            }
+          } catch (e) {}
+        };
+        if (need) {
+          Promise.resolve(loadSong(idx)).then(doPlay).catch(() => {});
+        } else {
+          doPlay();
+        }
+      }
+    } finally {
+      setTimeout(() => { _roomApplying = false; }, 400);
+    }
+  }
+
+  function pushRoomState() {
+    if (!_roomIsHost || !_roomJoined) return;
+    try {
+      const db = typeof getDb === 'function' ? getDb() : null;
+      if (!db) return;
+      const songs = window.songs || [];
+      const i = (typeof index !== 'undefined') ? index : -1;
+      const song = songs[i];
+      const payload = {
+        songId: song ? String(song.id) : '',
+        songName: song ? String(song.name || song.id) : '',
+        playing: !!(typeof audio !== 'undefined' && audio && !audio.paused),
+        t: (typeof audio !== 'undefined' && audio) ? (audio.currentTime || 0) : 0,
+        hostUid: getRoomUid(),
+        hostName: getRoomName(),
+        at: Date.now()
+      };
+      db.ref(roomPath()).update(payload);
+    } catch (e) { console.warn('[room] push', e); }
+  }
+
+  function scheduleRoomPush() {
+    if (!_roomIsHost) return;
+    clearTimeout(_roomPushTimer);
+    _roomPushTimer = setTimeout(pushRoomState, 400);
+  }
+
+  async function joinRoom(asHost) {
+    const db = typeof getDb === 'function' ? getDb() : null;
+    if (!db) return toast('ROOM', 'Chưa kết nối Firebase', '#ff9800');
+    const uid = getRoomUid();
+    if (!uid) return toast('ROOM', 'Cần đăng nhập', '#ff9800');
+    _roomJoined = true;
+    _roomIsHost = !!asHost;
+    const memRef = db.ref(roomPath() + '/members/' + String(uid).replace(/[.#$\[\]]/g, '_'));
+    await memRef.set({ name: getRoomName(), at: Date.now(), host: !!asHost });
+    memRef.onDisconnect().remove();
+    if (_roomUnsub) { try { db.ref(roomPath()).off('value', _roomUnsub); } catch (e) {} }
+    _roomUnsub = (snap) => {
+      const v = snap.val() || {};
+      updateRoomUi(v);
+      if (!_roomIsHost) applyRoomState(v);
+      const mem = v.members || {};
+      const box = document.getElementById('room-members');
+      if (box) {
+        const keys = Object.keys(mem);
+        box.innerHTML = keys.length
+          ? ('<div class="room-mem-title">Thành viên (' + keys.length + ')</div>' +
+             keys.map(k => {
+               const m = mem[k] || {};
+               return '<div class="room-mem">' + escapeHtml(m.name || k) + (m.host ? ' · HOST' : '') + '</div>';
+             }).join(''))
+          : '';
+      }
+    };
+    db.ref(roomPath()).on('value', _roomUnsub);
+    if (asHost) {
+      pushRoomState();
+      toast('ROOM', 'Bạn là host — đang đồng bộ', '#17adca');
+    } else {
+      toast('ROOM', 'Đã vào room', '#4ade80');
+    }
+    updateRoomUi(null);
+  }
+
+  async function leaveRoom() {
+    const db = typeof getDb === 'function' ? getDb() : null;
+    const uid = getRoomUid();
+    if (db && uid) {
+      try {
+        await db.ref(roomPath() + '/members/' + String(uid).replace(/[.#$\[\]]/g, '_')).remove();
+        if (_roomUnsub) db.ref(roomPath()).off('value', _roomUnsub);
+      } catch (e) {}
+    }
+    _roomUnsub = null;
+    _roomJoined = false;
+    _roomIsHost = false;
+    updateRoomUi(null);
+    const box = document.getElementById('room-members');
+    if (box) box.innerHTML = '';
+    toast('ROOM', 'Đã rời room', '#9a9aaa');
+  }
+
+  function bindRoomControls() {
+    const closeBtn = document.getElementById('close-room-btn');
+    if (closeBtn && !closeBtn._xkBound) {
+      closeBtn._xkBound = true;
+      closeBtn.onclick = (e) => { e.preventDefault(); closeRoomModal(); };
+    }
+    const joinBtn = document.getElementById('room-join-btn');
+    if (joinBtn && !joinBtn._xkBound) {
+      joinBtn._xkBound = true;
+      joinBtn.onclick = () => joinRoom(false);
+    }
+    const hostBtn = document.getElementById('room-host-btn');
+    if (hostBtn && !hostBtn._xkBound) {
+      hostBtn._xkBound = true;
+      hostBtn.onclick = () => joinRoom(true);
+    }
+    const leaveBtn = document.getElementById('room-leave-btn');
+    if (leaveBtn && !leaveBtn._xkBound) {
+      leaveBtn._xkBound = true;
+      leaveBtn.onclick = () => leaveRoom();
+    }
+    // Hook play events for host sync
+    if (typeof audio !== 'undefined' && audio && !audio._roomHooked) {
+      audio._roomHooked = true;
+      ['play', 'pause', 'seeked'].forEach(ev => {
+        audio.addEventListener(ev, () => scheduleRoomPush());
+      });
+      setInterval(() => {
+        if (_roomIsHost && _roomJoined && audio && !audio.paused) scheduleRoomPush();
+      }, 3000);
+    }
+  }
+
   async function syncUserPartial() {
     try {
       const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
@@ -938,6 +1250,7 @@
         const x = btn.getAttribute('data-x');
         if (x === 'badges') { openBadgesModal(); return; }
         if (x === 'chat') { openChatModal(); return; }
+        if (x === 'room') { bindRoomControls(); openRoomModal(); return; }
         if (x === 'top-week') topSongsByPeriod('week');
         if (x === 'top-month') topSongsByPeriod('month');
         if (x === 'top-year') topSongsByPeriod('year');
@@ -947,6 +1260,12 @@
         if (x === 'time-week' || x === 'time-month' || x === 'time-year') {
           showListenTime(x.replace('time-', ''));
         }
+        if (x === 'lb-listen-week') showListenLeaderboard('week');
+        if (x === 'lb-listen-month') showListenLeaderboard('month');
+        if (x === 'lb-listen-year') showListenLeaderboard('year');
+        if (x === 'lb-own-week') showOwnLeaderboard('week');
+        if (x === 'lb-own-month') showOwnLeaderboard('month');
+        if (x === 'lb-own-year') showOwnLeaderboard('year');
       };
     });
 

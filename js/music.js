@@ -3506,15 +3506,47 @@ async function renderShopThumbs() {
             '<div class="price">' + (has ? 'Đã sở hữu' : ((Number(th.price) || 0) + ' XK')) + '</div></div>' +
             btn + '</div>';
     }).join('');
+    function showThumbDemo(src) {
+        if (!src) return;
+        let overlay = document.getElementById('shop-thumb-demo-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'shop-thumb-demo-overlay';
+            overlay.className = 'shop-thumb-preview-demo';
+            overlay.onclick = () => overlay.remove();
+            document.body.appendChild(overlay);
+        }
+        overlay.innerHTML = '<img src="' + String(src).replace(/"/g, '&quot;') + '" alt="demo">';
+        overlay.style.display = 'flex';
+        document.body.appendChild(overlay);
+    }
     list.querySelectorAll('.shop-thumb-preview[data-thumb-src]').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
-            if (btn.dataset.loaded === '1') return;
             const src = btn.getAttribute('data-thumb-src');
             if (!src) return;
-            btn.dataset.loaded = '1';
-            btn.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="">';
-            btn.classList.add('loaded');
+            // Load vào preview nhỏ + mở demo lớn
+            if (btn.dataset.loaded !== '1') {
+                btn.dataset.loaded = '1';
+                btn.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="">';
+                btn.classList.add('loaded');
+            }
+            showThumbDemo(src);
+        };
+    });
+    list.querySelectorAll('.shop-thumb-item').forEach(item => {
+        item.onclick = (e) => {
+            if (e.target.closest('button.shop-buy-btn')) return;
+            if (e.target.closest('.shop-thumb-preview')) return; // đã xử lý
+            const prev = item.querySelector('.shop-thumb-preview[data-thumb-src]');
+            const src = prev && prev.getAttribute('data-thumb-src');
+            if (!src) return;
+            if (prev && prev.dataset.loaded !== '1') {
+                prev.dataset.loaded = '1';
+                prev.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="">';
+                prev.classList.add('loaded');
+            }
+            showThumbDemo(src);
         };
     });
     list.querySelectorAll('[data-buy-thumb]').forEach(btn => {

@@ -229,7 +229,7 @@
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Review của bạn</label>
-                    <div class="extras-actions-grid extras-rank-grid">
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="rev-week"><i data-lucide="calendar-days"></i><span>Tuần</span></button>
                         <button type="button" class="extras-action-btn" data-x="rev-month"><i data-lucide="calendar"></i><span>Tháng</span></button>
                         <button type="button" class="extras-action-btn" data-x="rev-year"><i data-lucide="calendar-range"></i><span>Năm</span></button>
@@ -244,10 +244,27 @@
                     </div>
                 </div>
                 <div class="extras-section">
+                    <label class="extras-label">Top nghe</label>
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-week"><i data-lucide="headphones"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-month"><i data-lucide="headphones"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-year"><i data-lucide="headphones"></i><span>Năm</span></button>
+                    </div>
+                </div>
+                <div class="extras-section">
+                    <label class="extras-label">Top sở hữu</label>
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
+                        <button type="button" class="extras-action-btn" data-x="lb-own-week"><i data-lucide="library"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-own-month"><i data-lucide="library"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-own-year"><i data-lucide="library"></i><span>Năm</span></button>
+                    </div>
+                </div>
+                <div class="extras-section">
                     <label class="extras-label">Khác</label>
-                    <div class="extras-actions-grid extras-rank-grid">
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
                         <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
+                        <button type="button" class="extras-action-btn" data-x="room"><i data-lucide="radio"></i><span>Room nghe chung</span></button>
                     </div>
                 </div>
                 <div id="extras-result" class="extras-result"></div>
@@ -271,6 +288,33 @@
                     <button type="button" id="global-chat-send" class="extras-btn-primary">Gửi</button>
                 </div>
                 <p class="extras-chat-hint">Admin: <code>/mute user 1h</code> · <code>/mute user forever</code> · <code>/unmute user</code></p>
+            </div>
+        </div>
+
+
+        <!-- Room nghe chung -->
+        <div id="room-modal" class="shop-modal room-modal">
+            <div class="shop-modal-header">
+                <div class="close-shop" id="close-room-btn" title="Quay lại">
+                    <i data-lucide="arrow-left"></i>
+                </div>
+                <div class="shop-title"><i data-lucide="radio"></i><span>ROOM NGHE CHUNG</span></div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="room-modal-body">
+                <div class="room-status" id="room-status">Chưa vào room</div>
+                <div class="room-now" id="room-now">
+                    <div class="room-now-label">Đang phát</div>
+                    <div class="room-now-title" id="room-now-title">—</div>
+                    <div class="room-now-host" id="room-now-host"></div>
+                </div>
+                <div class="room-members" id="room-members"></div>
+                <div class="room-actions">
+                    <button type="button" class="extras-btn-primary" id="room-join-btn">Vào room chung</button>
+                    <button type="button" class="extras-btn-primary" id="room-host-btn" style="background:linear-gradient(135deg,#17adca,#8c00ff);">Làm host (đồng bộ bài đang nghe)</button>
+                    <button type="button" class="extras-btn-primary" id="room-leave-btn" style="background:rgba(255,255,255,0.12);">Rời room</button>
+                </div>
+                <p class="extras-chat-hint">Host phát bài → mọi người trong room theo bài &amp; trạng thái play/pause. Guest bấm “Vào room” để theo.</p>
             </div>
         </div>
 
