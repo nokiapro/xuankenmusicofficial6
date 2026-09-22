@@ -828,7 +828,8 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     }
 
     let formattedMessage = message;
-    if (typeof message === 'string' && !message.includes('<span')) {
+    // Chỉ bọc gradient text khi message là text thuần (không phải HTML có icon/thẻ)
+    if (typeof message === 'string' && !/<[a-z]/i.test(message)) {
         const gradient = getGradientByTheme();
         formattedMessage = `<span style="font-weight: 700; background: ${gradient}; background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.5px; font-size: inherit; display: inline-block; white-space: nowrap; animation: titleGradientMove 3s ease infinite;">${message}</span>`;
     }
@@ -3087,7 +3088,7 @@ function rentSong(songId) {
         if (!acc.rentals) acc.rentals = {};
         acc.rentals[String(songId)] = expiry;
     });
-    showNotification('THUÊ 24H:', String(songId), '#4ade80', 'clock');
+    showNotification('THUÊ 24H:', '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'clock');
     renderShopList();
     if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
