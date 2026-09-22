@@ -2291,6 +2291,94 @@
             toast(list.length ? ('Đã lưu ' + list.length + ' liên kết') : 'Đã xóa hết liên kết');
         };
 
+        // ----- Gift codes -----
+        async function loadGiftCodes() {
+            const el = document.getElementById('gift-list');
+            if (!el) return;
+            try {
+                const snap = await db().ref(dataPath('giftCodes')).once('value');
+                const all = snap.val() || {};
+                const keys = Object.keys(all);
+                if (!keys.length) {
+                    el.innerHTML = '<span class="muted">Chưa có gift code nào</span>';
+                    return;
+                }
+                el.innerHTML = keys.map(code => {
+                    const g = all[code] || {};
+                    const coins = Number(g.coins) || 0;
+                    const maxUses = g.maxUses == null ? 1 : Number(g.maxUses);
+                    const used = Number(g.usedCount) || 0;
+                    const maxLabel = maxUses < 0 ? '∞' : String(maxUses);
+                    const usedBy = g.usedBy ? String(g.usedBy) : '';
+                    const mapCount = (g.usedByMap && typeof g.usedByMap === 'object') ? Object.keys(g.usedByMap).length : 0;
+                    return '<div style="margin:6px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">'
+                        + '<code style="font-weight:700;letter-spacing:0.04em;">' + escapeHtml(code) + '</code>'
+                        + '<span>' + coins + ' XK</span>'
+                        + '<span class="muted">Dùng: ' + used + '/' + maxLabel + (mapCount ? ' (' + mapCount + ' user)' : '') + '</span>'
+                        + (usedBy ? '<span class="muted">Cuối: ' + escapeHtml(usedBy) + '</span>' : '')
+                        + ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-gift="' + escapeHtml(code) + '">Xóa</button>'
+                        + '</div>';
+                }).join('');
+                el.querySelectorAll('[data-del-gift]').forEach(btn => {
+                    btn.onclick = async () => {
+                        const code = btn.getAttribute('data-del-gift');
+                        if (!code || !confirm('Xóa gift code "' + code + '"?')) return;
+                        try {
+                            await db().ref(dataPath('giftCodes') + '/' + code).remove();
+                            toast('Đã xóa ' + code);
+                            loadGiftCodes();
+                        } catch (e) {
+                            toast('Lỗi xóa: ' + (e.message || e));
+                        }
+                    };
+                });
+            } catch (e) {
+                el.innerHTML = '<span style="color:#f87171;">Lỗi tải gift codes: ' + escapeHtml(e.message || e) + '</span>';
+            }
+        }
+
+        const giftCreateBtn = document.getElementById('gift-create-btn');
+        if (giftCreateBtn) giftCreateBtn.onclick = async () => {
+            let code = (document.getElementById('gift-new-code') && document.getElementById('gift-new-code').value || '').trim().toUpperCase().replace(/\s+/g, '');
+            code = code.replace(/[.#$\[\]\/]/g, '');
+            const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins') && document.getElementById('gift-new-coins').value, 10) || 50);
+            let maxUses = parseInt(document.getElementById('gift-new-uses') && document.getElementById('gift-new-uses').value, 10);
+            if (isNaN(maxUses)) maxUses = 1;
+            if (maxUses < -1) maxUses = -1;
+            if (!code) {
+                toast('Nhập mã gift code');
+                return;
+            }
+            if (code.length > 24) {
+                toast('Mã tối đa 24 ký tự');
+                return;
+            }
+            try {
+                const ref = db().ref(dataPath('giftCodes') + '/' + code);
+                const existing = await ref.once('value');
+                if (existing.exists()) {
+                    if (!confirm('Mã "' + code + '" đã tồn tại. Ghi đè?')) return;
+                }
+                await ref.set({
+                    coins: coins,
+                    maxUses: maxUses,
+                    usedCount: 0,
+                    usedByMap: {},
+                    createdAt: Date.now()
+                });
+                toast('Đã tạo gift code ' + code + ' (+' + coins + ' XK, ' + (maxUses < 0 ? '∞' : maxUses) + ' lần)');
+                if (document.getElementById('gift-new-code')) document.getElementById('gift-new-code').value = '';
+                loadGiftCodes();
+            } catch (e) {
+                const msg = String(e.code || e.message || e);
+                if (/PERMISSION|permission/i.test(msg)) {
+                    toast('Rules chặn ghi giftCodes — kiểm tra Firebase Rules & đăng nhập admin');
+                } else {
+                    toast('Lỗi tạo: ' + msg);
+                }
+            }
+        };
+
         // Progress thumbs
         async function loadThumbAdmin() {
             const el = document.getElementById('thumb-admin-list');

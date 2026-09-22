@@ -679,24 +679,27 @@
 
   // ----- 33 Gift code -----
   async function redeemGiftCode(code) {
-    code = String(code || '').trim().toUpperCase().replace(/\s+/g, '');
+    code = String(code || '').trim().toUpperCase().replace(/\s+/g, '').replace(/[.#$\[\]\/]/g, '');
     if (!code) return toast('GIFT', 'Nhập mã', '#ff9800');
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
     if (!user) return toast('GIFT', 'Cần đăng nhập username', '#ff4444');
+    // Key an toàn cho Firebase (tránh . # $ [ ] /)
+    const userKey = (typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(user) : String(user).replace(/[.#$\[\]\/]/g, '_'));
     try {
-      const db = getDb();
+      const db = typeof getDb === 'function' ? getDb() : null;
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
       const path = (typeof dataPath === 'function' ? dataPath('giftCodes') : 'giftCodes') + '/' + code;
       const ref = db.ref(path);
       const snap = await ref.once('value');
       const data = snap.val();
-      if (!data || !ref) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
+      if (!data) return toast('GIFT', 'Mã không tồn tại', '#ff4444');
       const coins = Number(data.coins) || 0;
+      if (coins <= 0) return toast('GIFT', 'Mã không hợp lệ (0 xu)', '#ff4444');
       const maxUses = data.maxUses == null ? 1 : Number(data.maxUses); // -1 = vĩnh viễn
       const usedCount = Number(data.usedCount) || 0;
       const usedByMap = (data.usedByMap && typeof data.usedByMap === 'object') ? data.usedByMap : {};
       // 1 user chỉ nhận 1 lần / mã
-      if (usedByMap[user]) return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
+      if (usedByMap[userKey] || usedByMap[user]) return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
       // maxUses = 1 kiểu cũ: usedBy string
       if (maxUses === 1 && data.usedBy && String(data.usedBy).trim() && !data.usedByMap) {
         return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
@@ -705,24 +708,26 @@
         return toast('GIFT', 'Mã đã hết lượt dùng', '#ff9800');
       }
       const result = await ref.transaction(current => {
-        if (!current) return current;
+        if (!current) return; // abort
         const max = current.maxUses == null ? 1 : Number(current.maxUses);
         const cnt = Number(current.usedCount) || 0;
-        const map = (current.usedByMap && typeof current.usedByMap === 'object') ? current.usedByMap : {};
-        if (map[user]) return; // abort — đã nhận
+        const map = (current.usedByMap && typeof current.usedByMap === 'object') ? { ...current.usedByMap } : {};
+        if (map[userKey] || map[user]) return; // abort — đã nhận
         if (max === 1 && current.usedBy && String(current.usedBy).trim() && !current.usedByMap) return;
         if (max >= 0 && cnt >= max) return;
-        if (!current.usedByMap) current.usedByMap = {};
-        current.usedByMap[user] = Date.now();
+        map[userKey] = Date.now();
+        current.usedByMap = map;
         current.usedCount = cnt + 1;
-        current.usedBy = user; // user cuối
+        current.usedBy = user; // user cuối (hiển thị)
         current.usedAt = Date.now();
         return current;
       });
-      if (!result.committed) {
+      if (!result || !result.committed) {
         return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
       }
-      updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
+      if (typeof updateCurrentAccount === 'function') {
+        updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
+      }
       unlockAchievement('gift_first');
       toast('GIFT', '+' + coins + ' XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
