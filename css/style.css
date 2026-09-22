@@ -1822,13 +1822,26 @@ body.dark .hint-decoration {
 }
 
 .notification-message {
-    display: inline;
+    display: inline-block;
     white-space: nowrap;
+    max-width: 100%;
+    overflow: visible;
 }
 
-.notification-message span {
-    display: inline;
+/* Giống music2: span message + gradient text */
+.notification-message span,
+.notification-message .noti-msg-grad {
+    display: inline-block;
     white-space: nowrap;
+    transform-origin: left center;
+    transition: transform 0.1s ease;
+}
+
+/* Bắt buộc giữ color:transparent — tránh body.dark đè mất gradient */
+.notification-message .noti-msg-grad,
+.notification-message span[style*="background-clip"] {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent;
 }
 
 .notification-message svg {
@@ -1841,12 +1854,18 @@ body.dark .hint-decoration {
     margin: 0 3px;
 }
 
-/* Sao FA trong toast — nhận gradient từ span cha (background-clip: text) */
+/* Sao FA / icon huy hiệu trong toast */
 .notification-message i.fa-star,
-.notification-message .fa-star {
-    font-size: 0.85em;
-    margin: 0 3px;
+.notification-message .fa-star,
+.notification-message i.noti-badge-fa,
+.notification-message .noti-badge-fa {
+    font-size: 0.9em;
+    margin: 0 4px;
     vertical-align: middle;
+}
+.notification-message i.noti-badge-fa {
+    color: #fbbf24;
+    -webkit-text-fill-color: #fbbf24;
 }
 
 body.dark .notification {
@@ -1860,6 +1879,12 @@ body.dark .notification-title {
 
 body.dark .notification-message {
     color: #aaaaaa;
+}
+
+body.dark .notification-message .noti-msg-grad,
+body.dark .notification-message span[style*="background-clip"] {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent;
 }
 
 @media (max-width: 480px) {
@@ -2968,7 +2993,25 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   background: rgba(251, 191, 36, 0.08);
 }
 .badge-card.locked { opacity: 0.55; }
-.badge-icon { font-size: 1.6rem; line-height: 1; flex-shrink: 0; width: 2rem; text-align: center; }
+.badge-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 12px;
+  background: rgba(140, 0, 255, 0.12);
+  color: #c084fc;
+}
+.badge-card.got .badge-icon {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
+}
+.badge-icon i { font-size: 1.1rem; }
 .badge-info { flex: 1; min-width: 0; }
 .badge-name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
 .badge-desc { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
@@ -3020,35 +3063,75 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
 
-/* ========== Scrollbar kiểu music2 — áp dụng mọi vùng cuộn (hiện tại + sau này) ========== */
+/* ========== Scrollbar đúng kiểu music2 (background-image gradient) ========== */
 :root {
   --xk-scroll-w: 4px;
-  --xk-scroll-track: var(--progress-bg, rgba(255,255,255,0.08));
+  --xk-scroll-track: var(--progress-bg);
   --xk-scroll-thumb: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
-/* Firefox */
-* {
+#playlist-content,
+#my-playlist-content,
+.shop-list,
+.shop-tab-panels,
+.extras-modal-body,
+.extras-result,
+.extras-result-modal-body,
+.badges-modal-body,
+.chat-modal-body,
+.global-chat-box,
+.listen-stats,
+.timer-modal,
+.timer-modal-content {
   scrollbar-width: thin;
   scrollbar-color: #c20175 transparent;
 }
 
-/* WebKit (Chrome / Safari / Edge) — giống music2 */
-*::-webkit-scrollbar {
+#playlist-content::-webkit-scrollbar,
+#my-playlist-content::-webkit-scrollbar,
+.shop-list::-webkit-scrollbar,
+.shop-tab-panels::-webkit-scrollbar,
+.extras-modal-body::-webkit-scrollbar,
+.extras-result::-webkit-scrollbar,
+.extras-result-modal-body::-webkit-scrollbar,
+.badges-modal-body::-webkit-scrollbar,
+.chat-modal-body::-webkit-scrollbar,
+.global-chat-box::-webkit-scrollbar,
+.listen-stats::-webkit-scrollbar,
+.timer-modal::-webkit-scrollbar {
   width: 4px;
-  height: 4px;
 }
-*::-webkit-scrollbar-track {
-  background-color: var(--progress-bg, rgba(255,255,255,0.08));
+
+#playlist-content::-webkit-scrollbar-track,
+#my-playlist-content::-webkit-scrollbar-track,
+.shop-list::-webkit-scrollbar-track,
+.shop-tab-panels::-webkit-scrollbar-track,
+.extras-modal-body::-webkit-scrollbar-track,
+.extras-result::-webkit-scrollbar-track,
+.extras-result-modal-body::-webkit-scrollbar-track,
+.badges-modal-body::-webkit-scrollbar-track,
+.chat-modal-body::-webkit-scrollbar-track,
+.global-chat-box::-webkit-scrollbar-track,
+.listen-stats::-webkit-scrollbar-track,
+.timer-modal::-webkit-scrollbar-track {
+  background-color: var(--progress-bg);
 }
-*::-webkit-scrollbar-thumb {
-  background: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+
+/* Đúng như music2: dùng background-image (không dùng background solid) */
+#playlist-content::-webkit-scrollbar-thumb,
+#my-playlist-content::-webkit-scrollbar-thumb,
+.shop-list::-webkit-scrollbar-thumb,
+.shop-tab-panels::-webkit-scrollbar-thumb,
+.extras-modal-body::-webkit-scrollbar-thumb,
+.extras-result::-webkit-scrollbar-thumb,
+.extras-result-modal-body::-webkit-scrollbar-thumb,
+.badges-modal-body::-webkit-scrollbar-thumb,
+.chat-modal-body::-webkit-scrollbar-thumb,
+.global-chat-box::-webkit-scrollbar-thumb,
+.listen-stats::-webkit-scrollbar-thumb,
+.timer-modal::-webkit-scrollbar-thumb {
   background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
   border-radius: 50px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
-  background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
 /* ===== Result modal (Top / Review / Thời gian) ===== */
@@ -3140,7 +3223,21 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.07);
 }
-.xr-stat-icon { font-size: 1.4rem; margin-bottom: 6px; }
+.xr-stat-icon {
+  font-size: 1.25rem;
+  margin-bottom: 8px;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(140, 0, 255, 0.14);
+  color: #c084fc;
+}
+.xr-stat-icon i { font-size: 1.1rem; }
 .xr-stat-val {
   font-size: 1.25rem;
   font-weight: 800;
@@ -3247,15 +3344,36 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   -webkit-backdrop-filter: blur(12px);
 }
 .ci-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,107,157,0.14), rgba(192,132,252,0.16), rgba(96,165,250,0.12));
+  border: 1px solid rgba(192,132,252,0.28);
+  box-shadow: 0 4px 16px rgba(140,0,255,0.12);
+}
+.ci-month-icon {
+  font-size: 1.1rem;
+  color: #c084fc;
+  flex-shrink: 0;
+}
+.ci-month-text {
   font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: 0.4px;
-  margin-bottom: 8px;
   background: linear-gradient(105deg, #ff6b9d 0%, #c084fc 45%, #60a5fa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 2px 8px rgba(192,132,252,0.25));
+}
+.ci-reward i {
+  margin-right: 4px;
+  color: #fbbf24;
+  font-size: 0.75rem;
 }
 .ci-legend {
   display: flex;
@@ -3461,30 +3579,62 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  text-align: center;
-  font-size: 0.68rem;
+  gap: 12px;
+  text-align: left;
+  font-size: 0.72rem;
   color: var(--text-secondary);
-  padding: 8px 12px;
-  margin-top: 2px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255,255,255,0.07);
+  padding: 12px 14px;
+  margin-top: 6px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255,107,64,0.14), rgba(251,191,36,0.10), rgba(140,0,255,0.10));
+  border: 1px solid rgba(251,146,60,0.28);
+  box-shadow: 0 4px 18px rgba(255,107,64,0.1);
 }
-.ci-streak-fire {
-  font-size: 0.85rem;
-  line-height: 1;
+.ci-streak-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #ff6b40, #fbbf24);
+  color: #fff;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(255,107,64,0.35);
 }
-.ci-streak b {
-  color: #e9d5ff;
+.ci-streak-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.ci-streak-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.75;
+}
+.ci-streak-val {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+.ci-streak-val b {
+  color: #fbbf24;
   font-weight: 800;
+  font-size: 1.05rem;
 }
 .ci-streak-meta {
   opacity: 0.7;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
 }
+.ci-streak-meta i { font-size: 0.65rem; }
 
 /* Ensure top/time use compact */
 .extras-rank-compact {
