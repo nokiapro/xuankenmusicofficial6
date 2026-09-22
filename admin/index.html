@@ -1160,6 +1160,39 @@
             </div>
 
             <div class="card">
+                <h2><i class="fa-solid fa-hourglass-half"></i> Đếm ngược sự kiện</h2>
+                <p class="muted" style="margin:0 0 10px;font-size:0.72rem;">Cấu hình ngày đích — player hiện lịch dương + âm và đồng hồ đếm ngược realtime trong Tiện ích.</p>
+                <div class="form-grid">
+                    <div class="full">
+                        <label>Tiêu đề sự kiện</label>
+                        <input type="text" id="set-countdown-title" placeholder="VD: Sinh nhật XuanKen / Ra mắt album…">
+                    </div>
+                    <div class="full">
+                        <label>Ngày giờ đích</label>
+                        <input type="datetime-local" id="set-countdown-at">
+                    </div>
+                </div>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-countdown-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu đếm ngược</button>
+                    <button type="button" class="btn btn-ghost" id="clear-countdown-btn"><i class="fa-solid fa-xmark"></i> Xóa</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fa-solid fa-link"></i> Liên kết (Tiện ích)</h2>
+                <p class="muted" style="margin:0 0 10px;font-size:0.72rem;">Mỗi dòng một liên kết: <b>Tiêu đề | https://url.com</b> (có thể thêm | icon lucide, vd: youtube).</p>
+                <div class="form-grid">
+                    <div class="full">
+                        <label>Danh sách liên kết</label>
+                        <textarea id="set-partner-links" rows="5" placeholder="YouTube | https://youtube.com/@xuanken&#10;Facebook | https://facebook.com/…&#10;TikTok | https://tiktok.com/@…" style="width:100%;min-height:110px;resize:vertical;"></textarea>
+                    </div>
+                </div>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-links-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu liên kết</button>
+                </div>
+            </div>
+
+            <div class="card">
                 <h2>Gift code</h2>
                 <div class="form-grid">
                     <div>
@@ -1235,11 +1268,11 @@
                     </div>
                     <div class="full check-row">
                         <input type="checkbox" id="factory-wipe-users" checked>
-                        <label for="factory-wipe-users">Xóa toàn bộ user / xu / owned (users + usernames + legacyUsers)</label>
+                        <label for="factory-wipe-users">Xóa toàn bộ user / xu / owned (users + usernames)</label>
                     </div>
                     <div class="full check-row">
                         <input type="checkbox" id="factory-wipe-extras" checked>
-                        <label for="factory-wipe-extras">Xóa prices, giftCodes, chat, reactions, progressThumbs, broadcast</label>
+                        <label for="factory-wipe-extras">Xóa prices, giftCodes, chat, progressThumbs, broadcast, weeklyListens</label>
                     </div>
                     <div class="full check-row">
                         <input type="checkbox" id="factory-reset-settings" checked>
@@ -1417,6 +1450,34 @@
             if (document.getElementById('set-site-title')) document.getElementById('set-site-title').value = settingsCache.siteTitle || settingsCache.siteName || '';
             document.getElementById('set-site-icon').value = settingsCache.siteIcon || '';
             document.getElementById('set-site-prefix').value = settingsCache.sitePrefix || '';
+            // Countdown + partner links
+            try {
+                const ct = document.getElementById('set-countdown-title');
+                const ca = document.getElementById('set-countdown-at');
+                if (ct) ct.value = settingsCache.countdownTitle || '';
+                if (ca && settingsCache.countdownAt) {
+                    const d = new Date(settingsCache.countdownAt);
+                    if (!Number.isNaN(d.getTime())) {
+                        const pad = n => String(n).padStart(2, '0');
+                        ca.value = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+                    }
+                } else if (ca) ca.value = '';
+                const pl = document.getElementById('set-partner-links');
+                if (pl) {
+                    const links = settingsCache.partnerLinks;
+                    if (Array.isArray(links) && links.length) {
+                        pl.value = links.map(L => {
+                            const t = (L && L.title) || '';
+                            const u = (L && L.url) || '';
+                            const ic = (L && L.icon) || '';
+                            return ic ? (t + ' | ' + u + ' | ' + ic) : (t + ' | ' + u);
+                        }).join('\n');
+                    } else if (typeof links === 'string') {
+                        pl.value = links;
+                    } else pl.value = '';
+                }
+            } catch (e) { console.warn('load countdown/links', e); }
+
             // Load admin email allowlist (riêng path settings/adminEmails)
             try {
                 const ae = await db().ref('settings/adminEmails').once('value');
@@ -1874,14 +1935,17 @@
             if (document.getElementById('set-site-title')) settingsCache.siteTitle = (document.getElementById('set-site-title').value || '').trim();
             settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
             settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
-            await db().ref('settings').set({
+            // update (không set) để không xóa countdown / partnerLinks / flash / …
+            await db().ref('settings').update({
                 songPrice: settingsCache.songPrice,
                 checkinReward: settingsCache.checkinReward,
                 starterCoins: settingsCache.starterCoins,
                 siteName: settingsCache.siteName,
                 siteTitle: settingsCache.siteTitle || settingsCache.siteName || '',
                 siteIcon: settingsCache.siteIcon,
-                sitePrefix: settingsCache.sitePrefix
+                sitePrefix: settingsCache.sitePrefix,
+                requirePin: settingsCache.requirePin !== false,
+                allowRegister: settingsCache.allowRegister !== false
             });
             applyBranding();
             toast('Đã lưu cài đặt Firebase');
@@ -1894,375 +1958,7 @@
             }
         };
 
-        // Migrate data cũ music6/ → root (songs, users, prices, giftCodes, chat, reactions)
-        const migrateBtnEl = document.getElementById('migrate-prefix-btn');
-        if (migrateBtnEl) {
-            migrateBtnEl.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate music6/ → root';
-            migrateBtnEl.onclick = async () => {
-                if (!confirm('Migrate dữ liệu từ music6/ → ROOT?\n\n• Copy songs, users, prices, giftCodes, chat, reactions\n• Không xóa music6/\n• Ghi đè root nếu đã có key trùng\n• Cần Rules cho phép đọc music6/ và ghi root')) return;
 
-                const btn = document.getElementById('migrate-prefix-btn');
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang migrate...';
-                try {
-                    const keys = ['songs', 'users', 'prices', 'giftCodes', 'chat', 'reactions'];
-                    let total = 0;
-                    for (const k of keys) {
-                        const snap = await db().ref('music6/' + k).once('value');
-                        const val = snap.val();
-                        if (val == null) continue;
-                        await db().ref(k).set(val);
-                        const n = (typeof val === 'object') ? Object.keys(val).length : 1;
-                        total += n;
-                        console.log('Migrated music6/' + k + ' → /' + k, n);
-                    }
-                    if (total === 0) {
-                        toast('music6/ không có dữ liệu để migrate');
-                    } else {
-                        await loadSongs();
-                        await loadUsers();
-                        toast('Đã migrate music6/ → root (' + total + ' mục)');
-                    }
-                } catch (e) {
-                    console.error('Migrate failed', e);
-                    const msg = (e && (e.code || e.message)) || String(e);
-                    if (/permission|PERMISSION_DENIED/i.test(msg)) {
-                        toast('PERMISSION_DENIED — mở Rules đọc music6/ + ghi root');
-                    } else {
-                        toast('Migrate lỗi: ' + msg);
-                    }
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-right-left"></i> Migrate music6/ → root';
-                }
-            };
-        }
-
-        function exportSongsJson() {
-            // Không xuất listenCount — import sau không đụng lượt nghe
-            const data = songsCache.map(s => ({
-                id: s.id,
-                name: s.name,
-                artist: s.artist || '',
-                audio: s.audio || '',
-                audioFull: s.audioFull || '',
-                audioFull2: s.audioFull2 || '',
-                albumArt: s.albumArt || '',
-                lrc1: s.lrc1 || '',
-                lrc2: s.lrc2 || '',
-                price: s.price != null ? s.price : settingsCache.songPrice,
-                rentPrice: s.rentPrice != null ? s.rentPrice : null,
-                publishAt: s.publishAt || null,
-                hidden: !!s.hidden
-            }));
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'xuanken-songs-' + new Date().toISOString().slice(0, 10) + '.json';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-            toast('Đã xuất ' + data.length + ' bài (không gồm lượt nghe)');
-        }
-
-        async function importSongsFromArray(arr) {
-            if (!Array.isArray(arr) || !arr.length) {
-                toast('JSON không hợp lệ hoặc rỗng');
-                return;
-            }
-            let ok = 0, skip = 0;
-            for (const item of arr) {
-                const id = String(item.id || '').trim();
-                const name = String(item.name || '').trim();
-                const audio = String(item.audio || '').trim();
-                if (!id || !name || !audio || /[.#$\[\]/]/.test(id)) {
-                    skip++;
-                    continue;
-                }
-                // Bài đã có: giữ listenCount trên Firebase (bỏ qua field trong JSON nếu có)
-                // Bài mới: listenCount = 0
-                let liveCount = 0;
-                try {
-                    const snap = await db().ref(dataPath('songs') + '/' + id + '/listenCount').once('value');
-                    if (snap.exists()) liveCount = Number(snap.val()) || 0;
-                } catch (e) {}
-
-                const payload = {
-                    id,
-                    name,
-                    artist: String(item.artist || '').trim(),
-                    audio,
-                    audioFull: item.audioFull ? String(item.audioFull).trim() : null,
-                    audioFull2: item.audioFull2 ? String(item.audioFull2).trim() : null,
-                    albumArt: String(item.albumArt || '').trim(),
-                    lrc1: item.lrc1 != null ? String(item.lrc1) : '',
-                    lrc2: item.lrc2 != null ? String(item.lrc2) : '',
-                    price: item.price != null ? Math.max(0, Number(item.price) || 0) : settingsCache.songPrice,
-                    rentPrice: item.rentPrice != null ? Math.max(0, Number(item.rentPrice) || 0) : null,
-                    publishAt: item.publishAt || null,
-                    hidden: !!item.hidden,
-                    listenCount: liveCount
-                };
-                await db().ref(dataPath('songs') + '/' + id).set(payload);
-                ok++;
-            }
-            toast('Nhập xong: ' + ok + ' bài (không đụng lượt nghe)' + (skip ? ', bỏ qua ' + skip : ''));
-            await loadSongs();
-        }
-
-        document.getElementById('export-songs-btn').onclick = () => exportSongsJson();
-        document.getElementById('import-songs-btn').onclick = () => {
-            document.getElementById('import-songs-file').click();
-        };
-        document.getElementById('import-songs-file').onchange = async (e) => {
-            const file = e.target.files && e.target.files[0];
-            e.target.value = '';
-            if (!file) return;
-            try {
-                const text = await file.text();
-                const data = JSON.parse(text);
-                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
-                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ file? Bài trùng ID sẽ được cập nhật.')) return;
-                await importSongsFromArray(arr);
-            } catch (err) {
-                console.error(err);
-                toast('Không đọc được file JSON');
-            }
-        };
-        document.getElementById('import-songs-paste-btn').onclick = async () => {
-            const raw = document.getElementById('import-songs-textarea').value.trim();
-            if (!raw) {
-                toast('Dán JSON vào ô trước');
-                return;
-            }
-            try {
-                const data = JSON.parse(raw);
-                const arr = Array.isArray(data) ? data : (data.songs || data.list || []);
-                if (!confirm('Nhập ' + (arr.length || 0) + ' bài từ ô dán? Bài trùng ID sẽ được cập nhật.')) return;
-                await importSongsFromArray(arr);
-            } catch (err) {
-                console.error(err);
-                toast('JSON không hợp lệ');
-            }
-        };
-
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.onclick = () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
-            };
-        });
-
-        function updateAdminIdentityUI() {
-            const _aa2 = getAdminAuth(); const user = _aa2 && _aa2.currentUser;
-            const emailEl = document.getElementById('admin-identity-email');
-            const idEl = document.getElementById('admin-identity');
-            if (idEl) {
-                idEl.innerHTML = '<i class="fa-solid fa-crown"></i> Tối Thượng'
-                    + (user && user.email
-                        ? ' <span id="admin-identity-email" style="color:var(--muted);font-weight:400;margin-left:6px;">(' + escapeHtml(user.email) + ')</span>'
-                        : '');
-            }
-            if (emailEl && user && user.email) {
-                emailEl.textContent = '(' + user.email + ')';
-            }
-        }
-
-        async function showApp() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('admin-app').style.display = 'block';
-            updateAdminIdentityUI();
-            try {
-                await loadSettings();
-                await Promise.all([loadSongs(), loadUsers()]);
-            } catch (e) {
-                console.error(e);
-                toast('Lỗi Firebase — kiểm tra Rules / kết nối');
-            }
-        }
-
-        function showLogin() {
-            document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('admin-app').style.display = 'none';
-            document.getElementById('login-error').style.display = 'none';
-        }
-
-        /** Email player = username@xuanken.user — không được vào Admin */
-        function isPlayerSyntheticEmail(email) {
-            const e = String(email || '').trim().toLowerCase();
-            return e.endsWith('@xuanken.user');
-        }
-
-        /** Danh sách email admin cho phép (settings/adminEmails). Rỗng = mọi email THẬT (không phải @xuanken.user). */
-        async function loadAdminEmailAllowlist() {
-            try {
-                const snap = await db().ref('settings/adminEmails').once('value');
-                const val = snap.val();
-                if (Array.isArray(val)) {
-                    return val.map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
-                }
-                if (val && typeof val === 'object') {
-                    return Object.keys(val).map(k => String(k || '').trim().toLowerCase()).filter(Boolean);
-                }
-            } catch (e) {
-                console.warn('loadAdminEmailAllowlist', e);
-            }
-            return [];
-        }
-
-        async function assertAdminAccess(user) {
-            if (!user || !user.email) {
-                throw new Error('NO_EMAIL');
-            }
-            const email = String(user.email).trim().toLowerCase();
-            if (isPlayerSyntheticEmail(email)) {
-                throw new Error('PLAYER_ACCOUNT');
-            }
-            const allow = await loadAdminEmailAllowlist();
-            if (allow.length > 0 && !allow.includes(email)) {
-                throw new Error('NOT_IN_ALLOWLIST');
-            }
-            return true;
-        }
-
-        function adminAccessErrorMessage(code) {
-            if (code === 'PLAYER_ACCOUNT') {
-                return 'Đây là tài khoản player (username + PIN). Admin phải dùng email thật khác, tạo trên Firebase Console.';
-            }
-            if (code === 'NOT_IN_ALLOWLIST') {
-                return 'Email này chưa được cấp quyền Admin. Thêm vào settings/adminEmails trên Firebase.';
-            }
-            if (code === 'NO_EMAIL') return 'Tài khoản không có email';
-            return 'Không có quyền Admin';
-        }
-
-        document.getElementById('admin-login-btn').onclick = async () => {
-            const email = document.getElementById('admin-email').value.trim();
-            const pass = document.getElementById('admin-pass').value;
-            if (!email || !pass) {
-                document.getElementById('login-error').textContent = 'Vui lòng nhập email và mật khẩu';
-                document.getElementById('login-error').style.display = 'block';
-                return;
-            }
-            if (isPlayerSyntheticEmail(email)) {
-                document.getElementById('login-error').textContent = 'Không dùng tài khoản player (@xuanken.user). Hãy dùng email admin thật.';
-                document.getElementById('login-error').style.display = 'block';
-                return;
-            }
-            try {
-                document.getElementById('admin-login-btn').disabled = true;
-                document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
-                const cred = await getAdminAuth().signInWithEmailAndPassword(email, pass);
-                try {
-                    await assertAdminAccess(cred.user);
-                    document.getElementById('login-error').style.display = 'none';
-                } catch (accessErr) {
-                    await getAdminAuth().signOut();
-                    document.getElementById('login-error').textContent = adminAccessErrorMessage(accessErr.message);
-                    document.getElementById('login-error').style.display = 'block';
-                }
-            } catch (err) {
-                console.error(err);
-                let msg = 'Email hoặc mật khẩu không đúng';
-                if (err.code === 'auth/user-not-found') msg = 'Tài khoản không tồn tại — tạo email admin trên Firebase Console → Authentication';
-                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = 'Sai mật khẩu';
-                if (err.code === 'auth/invalid-email') msg = 'Email không hợp lệ';
-                if (err.code === 'auth/too-many-requests') msg = 'Thử lại sau (quá nhiều lần sai)';
-                document.getElementById('login-error').textContent = msg;
-                document.getElementById('login-error').style.display = 'block';
-            } finally {
-                document.getElementById('admin-login-btn').disabled = false;
-                document.getElementById('admin-login-btn').innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Đăng nhập';
-            }
-        };
-
-        document.getElementById('admin-pass').addEventListener('keydown', e => {
-            if (e.key === 'Enter') document.getElementById('admin-login-btn').click();
-        });
-        document.getElementById('admin-email').addEventListener('keydown', e => {
-            if (e.key === 'Enter') document.getElementById('admin-pass').focus();
-        });
-
-        document.getElementById('logout-btn').onclick = async () => {
-            try {
-                await getAdminAuth().signOut();
-            } catch (e) {
-                console.error(e);
-            }
-            showLogin();
-        };
-
-        // Theo dõi trạng thái đăng nhập
-        
-        // Gift codes
-        function giftCodesPath() {
-            return dataPath('giftCodes');
-        }
-        async function loadGiftCodes() {
-            const el = document.getElementById('gift-list');
-            if (!el) return;
-            try {
-                const path = giftCodesPath();
-                const snap = await db().ref(path).once('value');
-                const obj = snap.val() || {};
-                const keys = Object.keys(obj);
-                if (!keys.length) {
-                    el.textContent = 'Chưa có gift code';
-                    return;
-                }
-                el.innerHTML = keys.map(k => {
-                    const g = obj[k] || {};
-                    const maxU = g.maxUses == null ? 1 : Number(g.maxUses);
-                    const cnt = Number(g.usedCount) || 0;
-                    const lim = maxU < 0 ? '∞' : String(maxU);
-                    const used = (cnt > 0 || (g.usedBy && String(g.usedBy).trim()))
-                      ? ('đã dùng ' + cnt + '/' + lim + (g.usedBy ? (' · cuối: ' + escapeHtml(String(g.usedBy))) : ''))
-                      : ('còn trống · tối đa ' + lim);
-                    return '<div style="margin:4px 0;"><code>' + escapeHtml(k) + '</code> · ' + (g.coins|0) + ' xu · ' + used +
-                        ' <button type="button" class="btn btn-danger" style="padding:2px 8px;font-size:0.65rem;" data-del-gift="' + escapeHtml(k) + '">Xóa</button></div>';
-                }).join('');
-                el.querySelectorAll('[data-del-gift]').forEach(btn => {
-                    btn.onclick = async () => {
-                        const c = btn.getAttribute('data-del-gift');
-                        try {
-                            await db().ref(giftCodesPath() + '/' + c).remove();
-                            toast('Đã xóa ' + c);
-                            loadGiftCodes();
-                        } catch (err) {
-                            toast('Xóa lỗi: ' + (err.code || err.message || err));
-                        }
-                    };
-                });
-            } catch (e) {
-                el.textContent = 'Không tải được gift codes: ' + (e.message || e) + ' — path ' + giftCodesPath();
-            }
-        }
-        const giftBtn = document.getElementById('gift-create-btn');
-        if (giftBtn) giftBtn.onclick = async () => {
-            try {
-                const code = (document.getElementById('gift-new-code').value || '').trim().toUpperCase().replace(/\s+/g, '');
-                const coins = Math.max(1, parseInt(document.getElementById('gift-new-coins').value, 10) || 0);
-                if (!code || code.length < 2) { toast('Nhập mã gift (tối thiểu 2 ký tự)'); return; }
-                if (/[.#$\[\]\/]/.test(code)) { toast('Mã không được chứa . # $ [ ] /'); return; }
-                const maxUsesRaw = parseInt(document.getElementById('gift-new-uses') && document.getElementById('gift-new-uses').value, 10);
-                const maxUses = Number.isFinite(maxUsesRaw) ? maxUsesRaw : 1;
-                const payload = { coins: coins, createdAt: Date.now(), usedBy: '', usedCount: 0, maxUses: maxUses, usedByMap: {} };
-                const path = giftCodesPath() + '/' + code;
-                await db().ref(path).set(payload);
-                toast('Đã tạo gift: ' + code + ' (+' + coins + ' xu · ' + (maxUses < 0 ? '∞' : maxUses) + ' lần) @ ' + path);
-                document.getElementById('gift-new-code').value = '';
-                loadGiftCodes();
-            } catch (err) {
-                console.error(err);
-                toast('Lỗi tạo gift: ' + (err.code || err.message || err) + ' — path ' + giftCodesPath() + ' · kiểm tra Rules root');
-            }
-        };
-
-        // ===== FACTORY RESET (xóa sạch RTDB) =====
         const factoryBtn = document.getElementById('factory-reset-btn');
         if (factoryBtn) factoryBtn.onclick = async () => {
             const confirmEl = document.getElementById('factory-confirm-input');
@@ -2283,8 +1979,8 @@
             }
             const summary = [
                 wipeSongs ? 'songs' : null,
-                wipeUsers ? 'users+usernames+legacyUsers' : null,
-                wipeExtras ? 'prices+giftCodes+chat+reactions+thumbs+broadcast' : null,
+                wipeUsers ? 'users+usernames' : null,
+                wipeExtras ? 'prices+giftCodes+chat+thumbs+broadcast+weeklyListens' : null,
                 resetSettings ? 'registrationCount=0' : null
             ].filter(Boolean).join(', ');
             if (!confirm('CẢNH BÁO: Xóa vĩnh viễn dữ liệu Firebase?\n\nSẽ xóa: ' + summary + '\n\nKhông thể hoàn tác. Tiếp tục?')) return;
@@ -2326,16 +2022,11 @@
                     await safeRemove(dataPath('users'), 'users');
                     tick('Xóa usernames...');
                     await safeRemove(dataPath('usernames'), 'usernames');
-                    tick('Xóa legacyUsers...');
-                    await safeRemove('legacyUsers', 'legacyUsers');
-                    // path cũ music6/users nếu còn
-                    await safeRemove('music6/users', 'music6/users (legacy)');
                     usersCache = {};
                 }
                 if (wipeSongs) {
                     tick('Xóa songs...');
                     await safeRemove(dataPath('songs'), 'songs');
-                    await safeRemove('music6/songs', 'music6/songs (legacy)');
                     songsCache = [];
                 }
                 if (wipeExtras) {
@@ -2343,12 +2034,11 @@
                     await safeRemove(dataPath('prices'), 'prices');
                     await safeRemove(dataPath('giftCodes'), 'giftCodes');
                     await safeRemove('chat', 'chat');
-                    await safeRemove('reactions', 'reactions');
                     await safeRemove('settings/progressThumbs', 'progressThumbs');
                     await safeRemove('settings/broadcast', 'broadcast');
                     await safeRemove('settings/chatMutes', 'chatMutes');
-                    await safeRemove('music6/prices', 'music6/prices');
-                    await safeRemove('music6/giftCodes', 'music6/giftCodes');
+                    await safeRemove('weeklyListens', 'weeklyListens');
+                    await safeRemove('weeklyListensMeta', 'weeklyListensMeta');
                 }
                 if (resetSettings) {
                     tick('Reset registrationCount...');
@@ -2529,6 +2219,55 @@
                 siteIcon: (document.getElementById('set-site-icon').value || '').trim(),
                 sitePrefix: prefix
             });
+        };
+
+
+        function parsePartnerLinksText(raw) {
+            const lines = String(raw || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+            const out = [];
+            lines.forEach(line => {
+                const parts = line.split('|').map(s => s.trim()).filter(Boolean);
+                if (parts.length < 2) return;
+                const title = parts[0];
+                const url = parts[1];
+                const icon = parts[2] || '';
+                if (!title || !url) return;
+                out.push({ title, url, icon });
+            });
+            return out;
+        }
+
+        const saveCountdownBtn = document.getElementById('save-countdown-btn');
+        if (saveCountdownBtn) saveCountdownBtn.onclick = async () => {
+            const title = (document.getElementById('set-countdown-title') && document.getElementById('set-countdown-title').value || '').trim();
+            const raw = document.getElementById('set-countdown-at') && document.getElementById('set-countdown-at').value;
+            let at = '';
+            if (raw) {
+                const d = new Date(raw);
+                if (!Number.isNaN(d.getTime())) at = d.toISOString();
+            }
+            if (!at) { toast('Chọn ngày giờ đích'); return; }
+            await saveSettingsPartial({ countdownTitle: title || 'Đếm ngược', countdownAt: at });
+            settingsCache.countdownTitle = title || 'Đếm ngược';
+            settingsCache.countdownAt = at;
+            toast('Đã lưu đếm ngược');
+        };
+        const clearCountdownBtn = document.getElementById('clear-countdown-btn');
+        if (clearCountdownBtn) clearCountdownBtn.onclick = async () => {
+            await saveSettingsPartial({ countdownTitle: '', countdownAt: '' });
+            settingsCache.countdownTitle = '';
+            settingsCache.countdownAt = '';
+            if (document.getElementById('set-countdown-title')) document.getElementById('set-countdown-title').value = '';
+            if (document.getElementById('set-countdown-at')) document.getElementById('set-countdown-at').value = '';
+            toast('Đã xóa đếm ngược');
+        };
+        const saveLinksBtn = document.getElementById('save-links-btn');
+        if (saveLinksBtn) saveLinksBtn.onclick = async () => {
+            const raw = document.getElementById('set-partner-links') && document.getElementById('set-partner-links').value;
+            const list = parsePartnerLinksText(raw);
+            await saveSettingsPartial({ partnerLinks: list });
+            settingsCache.partnerLinks = list;
+            toast(list.length ? ('Đã lưu ' + list.length + ' liên kết') : 'Đã xóa hết liên kết');
         };
 
         // Progress thumbs

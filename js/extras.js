@@ -1,9 +1,7 @@
 /**
- * XuanKen Music — extras pack
- * 12 ban (in music.js) · 13 banner · 29 badges · 32 flash · 33 gift · 43 bulk PIN (admin)
- * 46 dead link (admin) · 51 hotkeys · 62 story · 64 reactions · 69 XP · 70 season
- * 72 gacha · 73 freeze · 74 hidden ach · 84 night · 85 media session
- * 89 offline · 94 broadcast · 96 invite · 98 countdown · 99 QR · 100 year review
+ * XuanKen Music — extras pack (gọn)
+ * Banner · Broadcast · Flash · Gift · Badges/XP · Chat · Checkin
+ * Leaderboards · Countdown · Top tuần · Liên kết · Hotkeys · Media session
  */
 (function () {
   'use strict';
@@ -47,14 +45,6 @@
     vip_rank: { name: 'VIP', desc: 'Đạt hạng VIP', icon: '🥇' },
     super_vip_rank: { name: 'SUPER VIP', desc: 'Đạt hạng SUPER VIP', icon: '👑' }
   };
-
-  const FRAMES = [
-    { id: '', name: 'Mặc định', cost: 0 },
-    { id: 'gold', name: 'Vàng', cost: 50 },
-    { id: 'neon', name: 'Neon', cost: 80 },
-    { id: 'crystal', name: 'Crystal', cost: 120 },
-    { id: 'legend', name: 'Huyền thoại', cost: 200 }
-  ];
 
   function $(id) { return document.getElementById(id); }
   function toast(title, msg, color) {
@@ -354,7 +344,7 @@
       score: period === 'year' && !Object.keys(u.byDay || {}).length
         ? u.listenTotal
         : sumByDayPeriod(u.byDay, period) || (period === 'year' ? u.listenTotal : 0)
-    })).filter(u => u.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+    })).filter(u => u.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
     let rows = '';
     if (!ranked.length) rows = '<div class="xr-empty">Chưa có dữ liệu nghe</div>';
     else ranked.forEach((u, i) => {
@@ -374,7 +364,7 @@
     const titles = { week: 'TOP SỞ HỮU · TUẦN', month: 'TOP SỞ HỮU · THÁNG', year: 'TOP SỞ HỮU · NĂM' };
     openResultModal(titles[period] || 'TOP SỞ HỮU', 'library', '<div class="xr-empty">Đang tải…</div>');
     const users = await fetchAllUsersLite();
-    const ranked = users.filter(u => u.ownedCount > 0).sort((a, b) => b.ownedCount - a.ownedCount).slice(0, 20);
+    const ranked = users.filter(u => u.ownedCount > 0).sort((a, b) => b.ownedCount - a.ownedCount).slice(0, 10);
     let rows = '';
     if (!ranked.length) rows = '<div class="xr-empty">Chưa có dữ liệu sở hữu</div>';
     else ranked.forEach((u, i) => {
@@ -600,215 +590,6 @@
   }
   window.renderCheckinCalendar = renderCheckinCalendar;
 
-  /* ===== Room nghe chung (MVP realtime) ===== */
-  const ROOM_ID = 'public';
-  let _roomUnsub = null;
-  let _roomMemberUnsub = null;
-  let _roomJoined = false;
-  let _roomIsHost = false;
-  let _roomApplying = false;
-  let _roomPushTimer = null;
-
-  function roomPath() {
-    return (typeof dataPath === 'function' ? dataPath('listenRoom') : 'listenRoom') + '/' + ROOM_ID;
-  }
-
-  function getRoomUid() {
-    try {
-      if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser)
-        return firebase.auth().currentUser.uid;
-    } catch (e) {}
-    const acc = getAcc();
-    return (acc && (acc.uid || acc.username)) || null;
-  }
-
-  function getRoomName() {
-    const acc = getAcc();
-    return (acc && acc.username) || 'guest';
-  }
-
-  function openRoomModal() {
-    const modal = document.getElementById('room-modal');
-    if (!modal) return;
-    const host = playerHost();
-    if (modal.parentElement !== host) host.appendChild(modal);
-    modal.classList.add('show');
-    if (typeof lucide !== 'undefined') {
-      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
-    }
-  }
-
-  function closeRoomModal() {
-    const modal = document.getElementById('room-modal');
-    if (modal) modal.classList.remove('show');
-  }
-
-  function updateRoomUi(state) {
-    const st = document.getElementById('room-status');
-    const title = document.getElementById('room-now-title');
-    const hostEl = document.getElementById('room-now-host');
-    if (!state) {
-      if (st) st.textContent = _roomJoined ? 'Trong room — chờ host' : 'Chưa vào room';
-      if (title) title.textContent = '—';
-      if (hostEl) hostEl.textContent = '';
-      return;
-    }
-    if (st) st.textContent = _roomIsHost ? 'Bạn là HOST' : (_roomJoined ? 'Đang theo room' : 'Chưa vào room');
-    const songName = state.songName || state.songId || '—';
-    if (title) title.textContent = songName + (state.playing ? ' ▶' : ' ⏸');
-    if (hostEl) hostEl.textContent = state.hostName ? ('Host: ' + state.hostName) : '';
-  }
-
-  function applyRoomState(state) {
-    if (!_roomJoined || _roomIsHost || !state || !state.songId) return;
-    if (_roomApplying) return;
-    _roomApplying = true;
-    try {
-      const songs = window.songs || [];
-      const idx = songs.findIndex(s => String(s.id) === String(state.songId));
-      if (idx >= 0 && typeof loadSong === 'function') {
-        const need = (typeof index === 'undefined' || index !== idx);
-        const doPlay = () => {
-          try {
-            if (typeof audio !== 'undefined' && audio) {
-              if (typeof state.t === 'number' && Math.abs((audio.currentTime || 0) - state.t) > 2.5) {
-                audio.currentTime = Math.max(0, state.t);
-              }
-              if (state.playing) {
-                const p = audio.play();
-                if (p && p.catch) p.catch(() => {});
-              } else {
-                audio.pause();
-              }
-            }
-          } catch (e) {}
-        };
-        if (need) {
-          Promise.resolve(loadSong(idx)).then(doPlay).catch(() => {});
-        } else {
-          doPlay();
-        }
-      }
-    } finally {
-      setTimeout(() => { _roomApplying = false; }, 400);
-    }
-  }
-
-  function pushRoomState() {
-    if (!_roomIsHost || !_roomJoined) return;
-    try {
-      const db = typeof getDb === 'function' ? getDb() : null;
-      if (!db) return;
-      const songs = window.songs || [];
-      const i = (typeof index !== 'undefined') ? index : -1;
-      const song = songs[i];
-      const payload = {
-        songId: song ? String(song.id) : '',
-        songName: song ? String(song.name || song.id) : '',
-        playing: !!(typeof audio !== 'undefined' && audio && !audio.paused),
-        t: (typeof audio !== 'undefined' && audio) ? (audio.currentTime || 0) : 0,
-        hostUid: getRoomUid(),
-        hostName: getRoomName(),
-        at: Date.now()
-      };
-      db.ref(roomPath()).update(payload);
-    } catch (e) { console.warn('[room] push', e); }
-  }
-
-  function scheduleRoomPush() {
-    if (!_roomIsHost) return;
-    clearTimeout(_roomPushTimer);
-    _roomPushTimer = setTimeout(pushRoomState, 400);
-  }
-
-  async function joinRoom(asHost) {
-    const db = typeof getDb === 'function' ? getDb() : null;
-    if (!db) return toast('ROOM', 'Chưa kết nối Firebase', '#ff9800');
-    const uid = getRoomUid();
-    if (!uid) return toast('ROOM', 'Cần đăng nhập', '#ff9800');
-    _roomJoined = true;
-    _roomIsHost = !!asHost;
-    const memRef = db.ref(roomPath() + '/members/' + String(uid).replace(/[.#$\[\]]/g, '_'));
-    await memRef.set({ name: getRoomName(), at: Date.now(), host: !!asHost });
-    memRef.onDisconnect().remove();
-    if (_roomUnsub) { try { db.ref(roomPath()).off('value', _roomUnsub); } catch (e) {} }
-    _roomUnsub = (snap) => {
-      const v = snap.val() || {};
-      updateRoomUi(v);
-      if (!_roomIsHost) applyRoomState(v);
-      const mem = v.members || {};
-      const box = document.getElementById('room-members');
-      if (box) {
-        const keys = Object.keys(mem);
-        box.innerHTML = keys.length
-          ? ('<div class="room-mem-title">Thành viên (' + keys.length + ')</div>' +
-             keys.map(k => {
-               const m = mem[k] || {};
-               return '<div class="room-mem">' + escapeHtml(m.name || k) + (m.host ? ' · HOST' : '') + '</div>';
-             }).join(''))
-          : '';
-      }
-    };
-    db.ref(roomPath()).on('value', _roomUnsub);
-    if (asHost) {
-      pushRoomState();
-      toast('ROOM', 'Bạn là host — đang đồng bộ', '#17adca');
-    } else {
-      toast('ROOM', 'Đã vào room', '#4ade80');
-    }
-    updateRoomUi(null);
-  }
-
-  async function leaveRoom() {
-    const db = typeof getDb === 'function' ? getDb() : null;
-    const uid = getRoomUid();
-    if (db && uid) {
-      try {
-        await db.ref(roomPath() + '/members/' + String(uid).replace(/[.#$\[\]]/g, '_')).remove();
-        if (_roomUnsub) db.ref(roomPath()).off('value', _roomUnsub);
-      } catch (e) {}
-    }
-    _roomUnsub = null;
-    _roomJoined = false;
-    _roomIsHost = false;
-    updateRoomUi(null);
-    const box = document.getElementById('room-members');
-    if (box) box.innerHTML = '';
-    toast('ROOM', 'Đã rời room', '#9a9aaa');
-  }
-
-  function bindRoomControls() {
-    const closeBtn = document.getElementById('close-room-btn');
-    if (closeBtn && !closeBtn._xkBound) {
-      closeBtn._xkBound = true;
-      closeBtn.onclick = (e) => { e.preventDefault(); closeRoomModal(); };
-    }
-    const joinBtn = document.getElementById('room-join-btn');
-    if (joinBtn && !joinBtn._xkBound) {
-      joinBtn._xkBound = true;
-      joinBtn.onclick = () => joinRoom(false);
-    }
-    const hostBtn = document.getElementById('room-host-btn');
-    if (hostBtn && !hostBtn._xkBound) {
-      hostBtn._xkBound = true;
-      hostBtn.onclick = () => joinRoom(true);
-    }
-    const leaveBtn = document.getElementById('room-leave-btn');
-    if (leaveBtn && !leaveBtn._xkBound) {
-      leaveBtn._xkBound = true;
-      leaveBtn.onclick = () => leaveRoom();
-    }
-    // Hook play events for host sync
-    if (typeof audio !== 'undefined' && audio && !audio._roomHooked) {
-      audio._roomHooked = true;
-      ['play', 'pause', 'seeked'].forEach(ev => {
-        audio.addEventListener(ev, () => scheduleRoomPush());
-      });
-      setInterval(() => {
-        if (_roomIsHost && _roomJoined && audio && !audio.paused) scheduleRoomPush();
-      }, 3000);
-    }
-  }
 
   async function syncUserPartial() {
     try {
@@ -894,119 +675,7 @@
     } catch (e) {}
   }
 
-  // ----- 86 Share card -----
-  function openShareCard() {
-    const songs = window.songs;
-    const index = window.index;
-    if (!songs || !songs[index]) {
-      toast('SHARE', 'Chưa có bài đang phát', '#ff9800');
-      return;
-    }
-    const s = songs[index];
-    const lyricEl = document.getElementById('lyric-text');
-    const lyric = lyricEl ? lyricEl.innerText.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
-    const canvas = document.createElement('canvas');
-    canvas.width = 720;
-    canvas.height = 900;
-    const ctx = canvas.getContext('2d');
-    const grd = ctx.createLinearGradient(0, 0, 720, 900);
-    grd.addColorStop(0, '#1a1025');
-    grd.addColorStop(1, '#8c00ff');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 720, 900);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 28px sans-serif';
-    ctx.fillText('XUANKEN MUSIC', 40, 60);
-    ctx.font = 'bold 36px sans-serif';
-    wrapText(ctx, s.name || s.id, 40, 200, 640, 44);
-    ctx.font = '22px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText(s.artist || 'XuanKen Official', 40, 280);
-    if (lyric) {
-      ctx.font = 'italic 20px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      wrapText(ctx, '“' + lyric + '”', 40, 360, 640, 30);
-    }
-    ctx.font = '16px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText(location.origin + '/?song=' + encodeURIComponent(s.id), 40, 860);
-    canvas.toBlob(blob => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'xuanken-' + (s.id || 'share') + '.png';
-      a.click();
-      URL.revokeObjectURL(url);
-      toast('SHARE CARD', 'Đã tải ảnh chia sẻ', '#4ade80');
-    });
-  }
-  function wrapText(ctx, text, x, y, maxW, lineH) {
-    const words = String(text).split(' ');
-    let line = '';
-    let yy = y;
-    for (let n = 0; n < words.length; n++) {
-      const test = line + words[n] + ' ';
-      if (ctx.measureText(test).width > maxW && n > 0) {
-        ctx.fillText(line, x, yy);
-        line = words[n] + ' ';
-        yy += lineH;
-      } else line = test;
-    }
-    ctx.fillText(line, x, yy);
-  }
 
-  // ----- 64 Reactions -----
-  function sendReaction(emoji) {
-    try {
-      const db = typeof getDb === 'function' ? getDb() : null;
-      if (!db) return;
-      const songs = window.songs;
-      const index = window.index;
-      const sid = songs && songs[index] ? songs[index].id : 'global';
-      const ref = db.ref((typeof dataPath === 'function' ? dataPath('reactions') : 'reactions') + '/' + sid).push();
-      ref.set({ e: emoji || '❤️', t: Date.now(), u: (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '?' });
-      setTimeout(() => ref.remove(), 8000);
-      floatEmoji(emoji || '❤️');
-    } catch (e) {}
-  }
-  function floatEmoji(emoji) {
-    const span = document.createElement('div');
-    span.className = 'react-float';
-    span.textContent = emoji;
-    span.style.left = (20 + Math.random() * 60) + 'vw';
-    document.body.appendChild(span);
-    setTimeout(() => span.remove(), 2000);
-  }
-  function listenReactions() {
-    try {
-      const db = typeof getDb === 'function' ? getDb() : null;
-      if (!db) return;
-      const path = (typeof dataPath === 'function' ? dataPath('reactions') : 'reactions');
-      db.ref(path).on('child_changed', () => {});
-      db.ref(path).on('child_added', snap => {
-        snap.forEach && snap.forEach(() => {});
-      });
-      // lighter: listen to song reactions
-      setInterval(() => {
-        const songs = window.songs;
-        const index = window.index;
-        if (!songs || !songs[index]) return;
-        const sid = songs[index].id;
-        db.ref(path + '/' + sid).limitToLast(3).once('value').then(s => {
-          const v = s.val();
-          if (!v) return;
-          Object.keys(v).forEach(k => {
-            const item = v[k];
-            if (item && item.t && Date.now() - item.t < 3000 && !item._shown) {
-              item._shown = true;
-              floatEmoji(item.e || '❤️');
-            }
-          });
-        }).catch(() => {});
-      }, 2500);
-    } catch (e) {}
-  }
 
   // ----- 33 Gift code -----
   async function redeemGiftCode(code) {
@@ -1097,80 +766,7 @@
     } catch (e) {}
   }
 
-  // ----- 72 Gacha frame -----
-  function buyFrame(frameId) {
-    const f = FRAMES.find(x => x.id === frameId);
-    if (!f) return;
-    const acc = getAcc();
-    if (!acc) return toast('GACHA', 'Cần đăng nhập', '#ff4444');
-    if ((acc.coins | 0) < f.cost) return toast('GACHA', 'Thiếu xu', '#ff9800');
-    updateCurrentAccount(a => {
-      a.coins = (a.coins | 0) - f.cost;
-      a.frame = f.id;
-    });
-    applyFrame();
-    toast('FRAME', 'Đã trang bị: ' + f.name, '#fbbf24');
-    syncUserPartial();
-    if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
-  }
-  function applyFrame() {
-    const acc = getAcc();
-    const art = document.getElementById('current-art');
-    if (!art) return;
-    art.classList.remove('frame-gold', 'frame-neon', 'frame-crystal', 'frame-legend');
-    if (acc && acc.frame) art.classList.add('frame-' + acc.frame);
-  }
 
-  // ----- 73 Buy streak freeze -----
-  function buyStreakFreeze() {
-    const cost = 30;
-    const acc = getAcc();
-    if (!acc) return;
-    if ((acc.coins | 0) < cost) return toast('FREEZE', 'Cần 30 xu', '#ff9800');
-    updateCurrentAccount(a => {
-      a.coins = (a.coins | 0) - cost;
-      a.streakFreeze = (Number(a.streakFreeze) || 0) + 1;
-    });
-    toast('STREAK FREEZE', 'Đang có ' + (getAcc().streakFreeze || 0), '#60a5fa');
-    syncUserPartial();
-  }
-
-  // ----- 83 Multi-profile (device list of usernames) -----
-  const STORAGE_PROFILES = 'xuanken_device_profiles';
-  function saveProfileToDevice(name) {
-    try {
-      let list = JSON.parse(localStorage.getItem(STORAGE_PROFILES) || '[]');
-      if (!Array.isArray(list)) list = [];
-      if (name && !list.includes(name)) list.unshift(name);
-      list = list.slice(0, 5);
-      localStorage.setItem(STORAGE_PROFILES, JSON.stringify(list));
-    } catch (e) {}
-  }
-  function renderProfileSwitcher() {
-    let el = $('profile-switcher');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'profile-switcher';
-      el.className = 'profile-switcher';
-      document.body.appendChild(el);
-    }
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem(STORAGE_PROFILES) || '[]'); } catch (e) {}
-    if (!list.length) { el.style.display = 'none'; return; }
-    el.style.display = 'flex';
-    el.innerHTML = list.map(n => '<button type="button" data-prof="' + escapeHtml(n) + '">' + escapeHtml(n) + '</button>').join('');
-    el.querySelectorAll('[data-prof]').forEach(btn => {
-      btn.onclick = () => {
-        const n = btn.getAttribute('data-prof');
-        const input = document.getElementById('username-input');
-        if (input) {
-          input.value = n;
-          input.dispatchEvent(new Event('input'));
-        }
-        toast('PROFILE', 'Chọn: ' + n + ' — nhập PIN nếu cần', '#a78bfa');
-      };
-    });
-  }
 
   // ----- 84 Night mode -----
   function autoNightMode() {
@@ -1182,26 +778,6 @@
     }
   }
 
-  // ----- 89 Offline vault (cache current full URL if owned) -----
-  async function cacheCurrentForOffline() {
-    if (!('caches' in window)) return toast('OFFLINE', 'Trình duyệt không hỗ trợ', '#ff9800');
-    const songs = window.songs;
-    const index = window.index;
-    if (!songs || !songs[index]) return;
-    const s = songs[index];
-    if (typeof isSongOwned === 'function' && !isSongOwned(s.id)) {
-      return toast('OFFLINE', 'Chỉ cache bài đã mua', '#ff9800');
-    }
-    const url = s.audioFull || s.audio;
-    if (!url) return;
-    try {
-      const cache = await caches.open('xuanken-vault-v1');
-      await cache.add(url);
-      toast('OFFLINE', 'Đã lưu vào vault: ' + s.id, '#4ade80');
-    } catch (e) {
-      toast('OFFLINE', 'Không cache được (CORS?)', '#ff9800');
-    }
-  }
 
   // ----- 98 Countdown for scheduled songs -----
   function showPublishCountdown() {
@@ -1228,51 +804,8 @@
     el.textContent = 'Sắp ra mắt: ' + (soon.name || soon.id) + ' · ' + h + 'h ' + m + 'm ' + sec + 's';
   }
 
-  // ----- 99 QR check-in (link) -----
-  function openQrCheckin() {
-    const url = location.origin + location.pathname + '?checkin=1';
-    const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
-    toast('QR CHECK-IN', 'Mở ảnh QR / quét link điểm danh', '#60a5fa');
-    window.open(qr, '_blank');
-  }
 
-  // ----- 100 Year in review -----
-  function openYearReview() {
-    const acc = getAcc();
-    if (!acc) return toast('REVIEW', 'Cần đăng nhập', '#ff9800');
-    const listened = acc.listenedSongs ? Object.keys(acc.listenedSongs).length : 0;
-    const owned = (acc.owned || []).length;
-    const msg = 'Năm nay bạn: ' + listened + ' bài đã nghe · sở hữu ' + owned +
-      ' · Lv.' + (acc.level || 1) + ' · streak ' + (acc.streak || 0) +
-      ' · XP ' + (acc.xp || 0) + ' · season ' + (acc.seasonXp || 0);
-    toast('YEAR IN REVIEW', msg, '#f472b6');
-  }
 
-  // ----- 62 Story overlay -----
-  function openStoryIfAny() {
-    const songs = window.songs;
-    const index = window.index;
-    if (!songs || !songs[index] || !songs[index].story) return;
-    const story = songs[index].story;
-    const urls = Array.isArray(story) ? story : String(story).split(',').map(s => s.trim()).filter(Boolean);
-    if (!urls.length) return;
-    let i = 0;
-    const ov = document.createElement('div');
-    ov.className = 'story-overlay';
-    ov.innerHTML = '<img alt="story" /><button type="button" class="story-close">&times;</button>';
-    document.body.appendChild(ov);
-    const img = ov.querySelector('img');
-    img.src = urls[0];
-    const next = () => {
-      i++;
-      if (i >= urls.length) { ov.remove(); return; }
-      img.src = urls[i];
-    };
-    ov.addEventListener('click', (e) => {
-      if (e.target.classList.contains('story-close')) ov.remove();
-      else next();
-    });
-  }
 
   // ----- ?song= deep link -----
   function handleDeepLink() {
@@ -1292,6 +825,326 @@
     const inv = params.get('invite') || params.get('ref');
     if (inv) {
       setTimeout(() => applyInvite(inv), 2000);
+    }
+  }
+
+
+  /* ===== Đếm ngược sự kiện (admin cấu hình) ===== */
+  let _cdTimer = null;
+  function stopCountdownTimer() {
+    if (_cdTimer) { clearInterval(_cdTimer); _cdTimer = null; }
+  }
+  function formatCdUnit(n) {
+    return String(Math.max(0, n | 0)).padStart(2, '0');
+  }
+  async function loadCountdownConfig() {
+    try {
+      const db = typeof getDb === 'function' ? getDb() : null;
+      if (!db) return null;
+      const snap = await db.ref('settings').once('value');
+      const s = snap.val() || {};
+      if (!s.countdownAt) return null;
+      const at = Date.parse(s.countdownAt);
+      if (!at || Number.isNaN(at)) return null;
+      return { title: s.countdownTitle || 'Đếm ngược', at };
+    } catch (e) {
+      console.warn('[cd]', e);
+      return null;
+    }
+  }
+  function buildCountdownBody(cfg) {
+    const target = new Date(cfg.at);
+    const y = target.getFullYear();
+    const m = target.getMonth() + 1;
+    const d = target.getDate();
+    const weekday = ['Chủ nhật','Thứ hai','Thứ ba','Thứ tư','Thứ năm','Thứ sáu','Thứ bảy'][target.getDay()];
+    let lunar = { day: '—', month: '—', year: '—', leap: 0 };
+    try {
+      if (typeof solarToLunar === 'function') lunar = solarToLunar(d, m, y, 7);
+    } catch (e) {}
+    const monthNames = ['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+    const lunarMonthTxt = (lunar.leap ? 'Nhuận ' : '') + (monthNames[lunar.month] || ('Tháng ' + lunar.month));
+    const hh = String(target.getHours()).padStart(2,'0');
+    const mm = String(target.getMinutes()).padStart(2,'0');
+    return ''
+      + '<div class="cd-wrap">'
+      +   '<div class="cd-hero">'
+      +     '<div class="cd-hero-glow"></div>'
+      +     '<div class="cd-title">' + escapeHtml(cfg.title) + '</div>'
+      +     '<div class="cd-calendar">'
+      +       '<div class="cd-cal-head">' + escapeHtml(weekday) + '</div>'
+      +       '<div class="cd-cal-day">' + d + '</div>'
+      +       '<div class="cd-cal-month">' + escapeHtml(monthNames[m] + ' · ' + y) + '</div>'
+      +       '<div class="cd-cal-lunar">'
+      +         '<span class="cd-lunar-badge">Âm lịch</span>'
+      +         '<span class="cd-lunar-txt">Ngày ' + escapeHtml(String(lunar.day)) + ' · ' + escapeHtml(lunarMonthTxt) + ' · ' + escapeHtml(String(lunar.year)) + '</span>'
+      +       '</div>'
+      +       '<div class="cd-cal-time"><i data-lucide="clock"></i> ' + hh + ':' + mm + '</div>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="cd-clock" id="cd-clock-live">'
+      +     '<div class="cd-unit"><span class="cd-num" data-u="d">00</span><span class="cd-lab">Ngày</span></div>'
+      +     '<div class="cd-sep">:</div>'
+      +     '<div class="cd-unit"><span class="cd-num" data-u="h">00</span><span class="cd-lab">Giờ</span></div>'
+      +     '<div class="cd-sep">:</div>'
+      +     '<div class="cd-unit"><span class="cd-num" data-u="m">00</span><span class="cd-lab">Phút</span></div>'
+      +     '<div class="cd-sep">:</div>'
+      +     '<div class="cd-unit"><span class="cd-num" data-u="s">00</span><span class="cd-lab">Giây</span></div>'
+      +   '</div>'
+      +   '<div class="cd-status" id="cd-status-live">Đang đếm…</div>'
+      + '</div>';
+  }
+  function tickCountdown(cfg) {
+    const root = document.getElementById('cd-clock-live');
+    const status = document.getElementById('cd-status-live');
+    if (!root) return;
+    const left = cfg.at - Date.now();
+    const done = left <= 0;
+    const abs = Math.abs(left);
+    const days = Math.floor(abs / 86400000);
+    const hours = Math.floor((abs % 86400000) / 3600000);
+    const mins = Math.floor((abs % 3600000) / 60000);
+    const secs = Math.floor((abs % 60000) / 1000);
+    const set = (u, v) => {
+      const el = root.querySelector('[data-u="' + u + '"]');
+      if (el) el.textContent = formatCdUnit(v);
+    };
+    set('d', days);
+    set('h', hours);
+    set('m', mins);
+    set('s', secs);
+    if (status) {
+      if (done) {
+        status.textContent = 'Đã đến ngày sự kiện!';
+        status.classList.add('done');
+      } else {
+        status.textContent = 'Còn lại đến sự kiện';
+        status.classList.remove('done');
+      }
+    }
+  }
+  async function openEventCountdown() {
+    stopCountdownTimer();
+    openResultModal('ĐẾM NGƯỢC', 'hourglass', '<div class="xr-empty">Đang tải…</div>');
+    const cfg = await loadCountdownConfig();
+    if (!cfg) {
+      openResultModal('ĐẾM NGƯỢC', 'hourglass',
+        '<div class="xr-empty">Chưa cấu hình ngày đếm ngược.<br/><span style="opacity:0.7;font-size:0.8rem">Admin → Cài đặt → Đếm ngược sự kiện</span></div>');
+      return;
+    }
+    openResultModal('ĐẾM NGƯỢC', 'hourglass', buildCountdownBody(cfg));
+    if (typeof lucide !== 'undefined') {
+      try {
+        const modal = document.getElementById('extras-result-modal');
+        if (modal) lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
+      } catch (e) {}
+    }
+    tickCountdown(cfg);
+    _cdTimer = setInterval(() => tickCountdown(cfg), 1000);
+  }
+
+  /* ===== Top bài theo tuần (tự động) ===== */
+  function parseWeekKey(key) {
+    const m = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
+    if (!m) return null;
+    return { y: +m[1], m: +m[2], w: +m[3], key: m[0] };
+  }
+  function weekLabelFromKey(key) {
+    if (typeof weekOfMonthLabel === 'function') return weekOfMonthLabel(key);
+    const p = parseWeekKey(key);
+    if (!p) return key;
+    return 'Tuần ' + p.w + ' · Tháng ' + p.m + '/' + p.y;
+  }
+  async function fetchWeeklyMetaList() {
+    try {
+      const db = typeof getDb === 'function' ? getDb() : null;
+      if (!db) return [];
+      const path = typeof dataPath === 'function' ? dataPath('weeklyListensMeta') : 'weeklyListensMeta';
+      const snap = await db.ref(path).once('value');
+      const val = snap.val() || {};
+      const list = Object.keys(val).map(k => {
+        const v = val[k] || {};
+        return {
+          key: v.key || k,
+          label: v.label || weekLabelFromKey(v.key || k),
+          updatedAt: Number(v.updatedAt) || 0
+        };
+      });
+      // luôn thêm tuần hiện tại nếu chưa có
+      const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : null;
+      if (cur && !list.some(x => x.key === cur)) {
+        list.push({ key: cur, label: weekLabelFromKey(cur) + ' (hiện tại)', updatedAt: Date.now() });
+      }
+      list.sort((a, b) => {
+        if (a.key < b.key) return 1;
+        if (a.key > b.key) return -1;
+        return 0;
+      });
+      return list;
+    } catch (e) {
+      console.warn('[weekly]', e);
+      return [];
+    }
+  }
+  async function fetchWeeklyTop(weekKey) {
+    try {
+      const db = typeof getDb === 'function' ? getDb() : null;
+      if (!db) return [];
+      const path = (typeof dataPath === 'function' ? dataPath('weeklyListens') : 'weeklyListens') + '/' + weekKey;
+      const snap = await db.ref(path).once('value');
+      const val = snap.val() || {};
+      const songs = window.songs || [];
+      const rows = Object.keys(val).map(sid => {
+        const count = Number(val[sid]) || 0;
+        const song = songs.find(s => String(s.id) === String(sid));
+        return {
+          id: sid,
+          name: (song && song.name) || sid,
+          artist: (song && song.artist) || '',
+          count
+        };
+      }).filter(r => r.count > 0).sort((a, b) => b.count - a.count).slice(0, 10);
+      return rows;
+    } catch (e) {
+      console.warn('[weekly top]', e);
+      return [];
+    }
+  }
+  function renderWeeklyList(weeks) {
+    if (!weeks.length) {
+      return '<div class="xr-empty">Chưa có dữ liệu top tuần.<br/><span style="opacity:0.7;font-size:0.8rem">Nghe nhạc sẽ tự ghi nhận từng tuần</span></div>';
+    }
+    const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : '';
+    let html = '<div class="wk-list">';
+    weeks.forEach((w, i) => {
+      const isCur = w.key === cur;
+      html += '<button type="button" class="wk-card' + (isCur ? ' current' : '') + '" data-week="' + escapeHtml(w.key) + '">'
+        + '<div class="wk-badge">' + (isCur ? 'NOW' : ('#' + (i + 1))) + '</div>'
+        + '<div class="wk-info"><div class="wk-title">' + escapeHtml(w.label) + '</div>'
+        + '<div class="wk-sub">' + escapeHtml(w.key) + (isCur ? ' · Đang diễn ra' : '') + '</div></div>'
+        + '<div class="wk-arrow"><i data-lucide="chevron-right"></i></div>'
+        + '</button>';
+    });
+    html += '</div>';
+    return html;
+  }
+  function renderWeeklyTopRows(rows, label) {
+    let body = '<div class="xr-note">' + escapeHtml(label) + ' · Top 10 lượt nghe</div>';
+    if (!rows.length) {
+      body += '<div class="xr-empty">Tuần này chưa có lượt nghe</div>';
+      return body;
+    }
+    body += '<div class="xr-list">';
+    rows.forEach((s, i) => {
+      const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      body += '<div class="xr-row ' + rankCls + '">'
+        + '<span class="xr-rank">' + (i + 1) + '</span>'
+        + '<div class="xr-info"><div class="xr-name">' + escapeHtml(s.name) + '</div>'
+        + '<div class="xr-sub">' + escapeHtml(s.artist || s.id) + '</div></div>'
+        + '<span class="xr-val"><i data-lucide="headphones"></i> ' + s.count + '</span>'
+        + '</div>';
+    });
+    body += '</div>';
+    body += '<button type="button" class="wk-back-btn" id="wk-back-btn"><i data-lucide="arrow-left"></i> Về danh sách tuần</button>';
+    return body;
+  }
+  async function openWeeklyArchive() {
+    openResultModal('TOP TUẦN', 'list-music', '<div class="xr-empty">Đang tải…</div>');
+    const weeks = await fetchWeeklyMetaList();
+    openResultModal('TOP TUẦN', 'list-music',
+      '<div class="xr-note">Mỗi tuần tự ghi nhận top bài nghe nhiều nhất</div>' + renderWeeklyList(weeks));
+    bindWeeklyClicks(weeks);
+  }
+  function bindWeeklyClicks(weeks) {
+    const modal = document.getElementById('extras-result-modal');
+    if (!modal) return;
+    if (typeof lucide !== 'undefined') {
+      try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
+    }
+    modal.querySelectorAll('[data-week]').forEach(btn => {
+      btn.onclick = async () => {
+        const key = btn.getAttribute('data-week');
+        const label = weekLabelFromKey(key);
+        openResultModal(label, 'trophy', '<div class="xr-empty">Đang tải…</div>');
+        const rows = await fetchWeeklyTop(key);
+        openResultModal(label, 'trophy', renderWeeklyTopRows(rows, label));
+        if (typeof lucide !== 'undefined') {
+          try {
+            const m2 = document.getElementById('extras-result-modal');
+            if (m2) lucide.createIcons({ nodes: Array.from(m2.querySelectorAll('[data-lucide]')) });
+          } catch (e) {}
+        }
+        const back = document.getElementById('wk-back-btn');
+        if (back) {
+          back.onclick = () => {
+            openResultModal('TOP TUẦN', 'list-music',
+              '<div class="xr-note">Mỗi tuần tự ghi nhận top bài nghe nhiều nhất</div>' + renderWeeklyList(weeks));
+            bindWeeklyClicks(weeks);
+          };
+        }
+      };
+    });
+  }
+
+  /* ===== Liên kết (admin cấu hình) ===== */
+  async function loadPartnerLinks() {
+    try {
+      const db = typeof getDb === 'function' ? getDb() : null;
+      if (!db) return [];
+      const snap = await db.ref('settings/partnerLinks').once('value');
+      let val = snap.val();
+      if (!val) {
+        const s = await db.ref('settings').once('value');
+        val = (s.val() || {}).partnerLinks;
+      }
+      if (Array.isArray(val)) return val.filter(x => x && x.url);
+      if (val && typeof val === 'object') return Object.keys(val).map(k => val[k]).filter(x => x && x.url);
+      return [];
+    } catch (e) {
+      console.warn('[links]', e);
+      return [];
+    }
+  }
+  function iconForLink(L) {
+    const ic = String((L && L.icon) || '').toLowerCase();
+    if (ic) return ic;
+    const u = String((L && L.url) || '').toLowerCase();
+    if (u.includes('youtube') || u.includes('youtu.be')) return 'youtube';
+    if (u.includes('facebook') || u.includes('fb.com')) return 'facebook';
+    if (u.includes('tiktok')) return 'music-2';
+    if (u.includes('instagram')) return 'instagram';
+    if (u.includes('twitter') || u.includes('x.com')) return 'twitter';
+    if (u.includes('discord')) return 'message-circle';
+    if (u.includes('telegram')) return 'send';
+    return 'external-link';
+  }
+  async function openPartnerLinks() {
+    openResultModal('LIÊN KẾT', 'link', '<div class="xr-empty">Đang tải…</div>');
+    const links = await loadPartnerLinks();
+    if (!links.length) {
+      openResultModal('LIÊN KẾT', 'link',
+        '<div class="xr-empty">Chưa có liên kết.<br/><span style="opacity:0.7;font-size:0.8rem">Admin → Cài đặt → Liên kết</span></div>');
+      return;
+    }
+    let html = '<div class="lk-grid">';
+    links.forEach((L, i) => {
+      const icon = iconForLink(L);
+      const title = escapeHtml(L.title || ('Link ' + (i + 1)));
+      const url = escapeHtml(L.url || '#');
+      html += '<a class="lk-card" href="' + url + '" target="_blank" rel="noopener noreferrer">'
+        + '<div class="lk-icon"><i data-lucide="' + escapeHtml(icon) + '"></i></div>'
+        + '<div class="lk-body"><div class="lk-title">' + title + '</div>'
+        + '<div class="lk-url">' + url + '</div></div>'
+        + '<div class="lk-go"><i data-lucide="arrow-up-right"></i></div>'
+        + '</a>';
+    });
+    html += '</div>';
+    openResultModal('LIÊN KẾT', 'link', html);
+    if (typeof lucide !== 'undefined') {
+      try {
+        const modal = document.getElementById('extras-result-modal');
+        if (modal) lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
+      } catch (e) {}
     }
   }
 
@@ -1350,6 +1203,7 @@
       startGlobalChat();
     }
     function closeExtras() {
+      stopCountdownTimer();
       panel.classList.remove('show');
     }
 
@@ -1394,7 +1248,7 @@
     function topSongsByPeriod(period) {
       const songs = window.songs || [];
       const sorted = [...songs].sort((a, b) => (Number(b.listenCount) || 0) - (Number(a.listenCount) || 0));
-      const top = sorted.slice(0, 15);
+      const top = sorted.slice(0, 10);
       const titles = { week: 'TOP TUẦN', month: 'TOP THÁNG', year: 'TOP NĂM' };
       const icons = { week: 'trophy', month: 'medal', year: 'crown' };
       let rows = '';
@@ -1462,6 +1316,9 @@
         if (x === 'badges') { openBadgesModal(); return; }
         if (x === 'chat') { openChatModal(); return; }
         if (x === 'checkin') { openCheckinModal(); return; }
+        if (x === 'countdown') { openEventCountdown(); return; }
+        if (x === 'weekly-archive') { openWeeklyArchive(); return; }
+        if (x === 'links') { openPartnerLinks(); return; }
         if (x === 'top-week') topSongsByPeriod('week');
         if (x === 'top-month') topSongsByPeriod('month');
         if (x === 'top-year') topSongsByPeriod('year');
@@ -1640,10 +1497,8 @@
     flashBadge();
     listenBroadcast();
     initHotkeys();
-    listenReactions();
     autoNightMode();
     updateXpUi();
-    applyFrame();
     checkAchievements();
     handleDeepLink();
     setInterval(showPublishCountdown, 1000);
@@ -1660,15 +1515,13 @@
     // save profile when username set
     setInterval(() => {
       updateXpUi();
-      applyFrame();
-    }, 5000);
+      }, 5000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 600));
   else setTimeout(boot, 600);
 
   window.xkExtras = {
-    redeemGiftCode, sendReaction, buyFrame, buyStreakFreeze,
-    openYearReview, openQrCheckin, applyInvite, unlockAchievement, checkAchievements
+    redeemGiftCode, applyInvite, unlockAchievement, checkAchievements
   };
 })();

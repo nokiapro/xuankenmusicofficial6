@@ -889,10 +889,26 @@ async function fetchListenData() {
 
 
 
-/** Cộng giây nghe thật theo ngày (thống kê tuần/tháng/năm) */
+/** Cộng giây nghe thật theo ngày (thống kê tuần/tháng/năm) — chính xác từng giây */
 let _lastListenTickAt = 0;
+let _listenTimeDirty = false;
+function flushListenTimeToFirebase(force) {
+    try {
+        if (!force && !_listenTimeDirty) return;
+        if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
+        const db = typeof getDb === 'function' ? getDb() : null;
+        const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+        if (!db || !acc || !acc.listenTime) return;
+        const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || acc.uid || '';
+        if (!uid) return;
+        db.ref(dataPath('users') + '/' + uid + '/listenTime').set(acc.listenTime);
+        _listenTimeDirty = false;
+        window._listenTimeSyncAt = Date.now();
+    } catch (e) {}
+}
 function recordListenSeconds(deltaSec) {
-    if (!deltaSec || deltaSec <= 0 || deltaSec > 5) return;
+    // Cho phép mọi đoạn nghe > 0, kể cả vài phần trăm giây; bỏ đoạn quá dài (tab ẩn / lag)
+    if (!deltaSec || deltaSec <= 0 || deltaSec > 8) return;
     if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
     if (typeof updateCurrentAccount !== 'function') return;
     const day = (typeof getTodayKey === 'function') ? getTodayKey() : new Date().toISOString().slice(0, 10);
@@ -902,21 +918,34 @@ function recordListenSeconds(deltaSec) {
         acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
         acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
     });
-    // Sync Firebase thưa (~30s)
+    _listenTimeDirty = true;
+    // Sync Firebase thưa (~15s) — vẫn flush ngay khi pause/ended/beforeunload
     if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
-    if (Date.now() - window._listenTimeSyncAt > 30000) {
-        window._listenTimeSyncAt = Date.now();
-        try {
-            const db = getDb();
-            const name = getCurrentUsername();
-            const acc = getCurrentAccount();
-            if (db && acc && acc.listenTime) {
-                const uid = getCurrentUid() || acc.uid || '';
-                if (uid) db.ref(dataPath('users') + '/' + uid + '/listenTime').set(acc.listenTime);
-            }
-        } catch (e) {}
+    if (Date.now() - window._listenTimeSyncAt > 15000) {
+        flushListenTimeToFirebase(true);
     }
 }
+/** Tick 1 giây khi đang phát — đảm bảo nghe vài giây cũng được cộng đủ */
+setInterval(() => {
+    try {
+        if (typeof audio === 'undefined' || !audio || audio.paused) {
+            if (_lastListenTickAt > 0) {
+                const d = (Date.now() - _lastListenTickAt) / 1000;
+                if (d > 0 && d <= 8) recordListenSeconds(d);
+                _lastListenTickAt = 0;
+            }
+            return;
+        }
+        if (typeof hasUserInteracted !== 'undefined' && !hasUserInteracted) return;
+        if (!songs || !songs[index]) return;
+        const now = Date.now();
+        if (_lastListenTickAt > 0) {
+            const d = (now - _lastListenTickAt) / 1000;
+            if (d > 0 && d <= 8) recordListenSeconds(d);
+        }
+        _lastListenTickAt = now;
+    } catch (e) {}
+}, 1000);
 
 /** Promise với timeout — tránh isUpdatingListen bị kẹt nếu Firebase treo */
 function withTimeout(promise, ms, label) {
@@ -932,6 +961,23 @@ function withTimeout(promise, ms, label) {
  * - Firebase ghi root: songs/{id}/listenCount
  * - Username không bắt buộc; có user thì cộng XP / listenedSongs
  */
+
+/** Tuần trong tháng: 2026-09-W1 … W5 (theo ngày 1–7, 8–14, …) */
+function getWeekOfMonthKey(date) {
+    const d = date ? new Date(date) : new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const w = Math.max(1, Math.ceil(d.getDate() / 7));
+    return y + '-' + m + '-W' + w;
+}
+function weekOfMonthLabel(key) {
+    const m = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
+    if (!m) return String(key || '');
+    return 'Tuần ' + m[3] + ' · Tháng ' + Number(m[2]) + '/' + m[1];
+}
+window.getWeekOfMonthKey = getWeekOfMonthKey;
+window.weekOfMonthLabel = weekOfMonthLabel;
+
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
     const sid = String(songId);
@@ -1008,6 +1054,27 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
                 try { updateListenStatsModal(); } catch (e) {}
                 try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
+                // Top tuần tự động: cộng vào weeklyListens/{weekKey}/{songId}
+                try {
+                    const wk = (typeof getWeekOfMonthKey === 'function')
+                        ? getWeekOfMonthKey()
+                        : (function () {
+                            const now = new Date();
+                            const y = now.getFullYear();
+                            const m = String(now.getMonth() + 1).padStart(2, '0');
+                            const w = Math.ceil(now.getDate() / 7);
+                            return y + '-' + m + '-W' + w;
+                        })();
+                    const wPath = (typeof dataPath === 'function' ? dataPath('weeklyListens') : 'weeklyListens') + '/' + wk + '/' + sid;
+                    db.ref(wPath).transaction(c => (Number(c) || 0) + 1).catch(() => {});
+                    // Lưu meta tuần (label) để UI liệt kê
+                    const metaPath = (typeof dataPath === 'function' ? dataPath('weeklyListensMeta') : 'weeklyListensMeta') + '/' + wk;
+                    db.ref(metaPath).update({
+                        key: wk,
+                        label: (typeof weekOfMonthLabel === 'function') ? weekOfMonthLabel(wk) : wk,
+                        updatedAt: Date.now()
+                    }).catch(() => {});
+                } catch (eW) { console.warn('weeklyListens', eW); }
             } else {
                 console.warn('listenCount: Firebase chưa ghi được — đã lưu local + toast');
             }
@@ -1880,10 +1947,15 @@ audio.ontimeupdate = () => {
             const now = Date.now();
             if (_lastListenTickAt > 0) {
                 const d = (now - _lastListenTickAt) / 1000;
-                if (d > 0 && d < 3) recordListenSeconds(d);
+                if (d > 0 && d <= 8) recordListenSeconds(d);
             }
             _lastListenTickAt = now;
         } else {
+            // Khi pause: cộng nốt đoạn cuối rồi reset
+            if (_lastListenTickAt > 0) {
+                const d = (Date.now() - _lastListenTickAt) / 1000;
+                if (d > 0 && d <= 8) recordListenSeconds(d);
+            }
             _lastListenTickAt = 0;
         }
     } catch (e) {}
@@ -1996,6 +2068,15 @@ audio.onpause = () => {
     if (art) art.style.animationPlayState = 'paused';
     releaseWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
+    // Cộng nốt giây cuối + đẩy Firebase ngay (nghe vài giây cũng lưu)
+    try {
+        if (_lastListenTickAt > 0) {
+            const d = (Date.now() - _lastListenTickAt) / 1000;
+            if (d > 0 && d <= 8) recordListenSeconds(d);
+            _lastListenTickAt = 0;
+        }
+        flushListenTimeToFirebase(true);
+    } catch (e) {}
 };
 
 function escapeHtml(str) {
@@ -2415,6 +2496,14 @@ if (listenCountBtn) {
 
 window.addEventListener('beforeunload', () => {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    try {
+        if (_lastListenTickAt > 0) {
+            const d = (Date.now() - _lastListenTickAt) / 1000;
+            if (d > 0 && d <= 8) recordListenSeconds(d);
+            _lastListenTickAt = 0;
+        }
+        flushListenTimeToFirebase(true);
+    } catch (e) {}
 });
 
 window.adjustLyricFontSize = adjustLyricFontSize;
@@ -2746,6 +2835,8 @@ async function fetchUserFromFirebase(username) {
 }
 
 function buildUserPayload(uid, name, account, includeCoins) {
+    // KHÔNG ghi rank / banned / banReason từ client — chỉ Admin mới được set trên Firebase
+    // (tránh deploy / sync local đè hạng admin đã set)
     const payload = {
         uid: uid,
         username: name,
@@ -2758,9 +2849,6 @@ function buildUserPayload(uid, name, account, includeCoins) {
         lastCheckin: account.lastCheckin || '',
         checkinDays: account.checkinDays || {},
         createdAt: account.createdAt || Date.now(),
-        rank: account.rank || 'member',
-        banned: !!account.banned,
-        banReason: account.banReason || '',
         xp: Number(account.xp) || 0,
         level: Number(account.level) || 1,
         seasonXp: Number(account.seasonXp) || 0,
@@ -4059,18 +4147,7 @@ async function loginWithUsername(rawName, rawPin) {
     }
 
     if (isNew || !profile) {
-        // Khôi phục data user cũ (legacyUsers hoặc music6/users) theo username
         let legacy = null;
-        try {
-            if (db) {
-                const legSnap = await db.ref('legacyUsers/' + key).once('value');
-                legacy = legSnap.val();
-                if (!legacy) {
-                    const m6Snap = await db.ref('music6/users/' + key).once('value');
-                    legacy = m6Snap.val();
-                }
-            }
-        } catch (e) {}
 
         const neu = {
             uid: uid,
