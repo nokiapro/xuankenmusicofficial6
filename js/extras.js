@@ -29,8 +29,6 @@
     level_10: { name: 'Level 10', desc: 'Đạt level 10', icon: '🌟' },
     level_20: { name: 'Level 20', desc: 'Đạt level 20', icon: '✨' },
     level_50: { name: 'Level 50', desc: 'Đạt level 50', icon: '💫' },
-    inviter: { name: 'Người dẫn đường', desc: 'Mời 1 bạn thành công', icon: '🤝' },
-    inviter_5: { name: 'Networker', desc: 'Mời 5 bạn', icon: '🌐' },
     gift_first: { name: 'Quà đầu tay', desc: 'Đổi gift code lần đầu', icon: '🎁' },
     chat_first: { name: 'Lên tiếng', desc: 'Gửi tin chat đầu tiên', icon: '💬' },
     thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: '🎨' },
@@ -179,6 +177,9 @@
     if (h >= 0 && h < 4) unlockAchievement('night_owl');
     if (h >= 5 && h < 7) unlockAchievement('early_bird');
     if (h === 3 && new Date().getMinutes() === 33) unlockAchievement('secret_333');
+    // Marathon: nghe ≥ 60 phút trong phiên hiện tại
+    const sessionSec = Number(window._sessionListenSec) || 0;
+    if (sessionSec >= 3600) unlockAchievement('marathon');
   }
 
   function playerHost() {
@@ -761,7 +762,6 @@
       });
       const invCoins = (inv.val().coins | 0) + reward;
       await db.ref(dataPath('users') + '/' + invUid).update({ coins: invCoins });
-      unlockAchievement('inviter');
       toast('INVITE', 'Cả hai +' + reward + ' xu', '#4ade80');
     } catch (e) {}
   }

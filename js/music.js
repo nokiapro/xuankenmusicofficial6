@@ -918,6 +918,11 @@ function recordListenSeconds(deltaSec) {
         acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
         acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
     });
+    // Theo dõi thời gian nghe trong phiên (cho huy hiệu Marathon)
+    window._sessionListenSec = (Number(window._sessionListenSec) || 0) + deltaSec;
+    if (window._sessionListenSec >= 3600 && window.xkExtras && typeof window.xkExtras.unlockAchievement === 'function') {
+        window.xkExtras.unlockAchievement('marathon');
+    }
     _listenTimeDirty = true;
     // Sync Firebase thưa (~15s) — vẫn flush ngay khi pause/ended/beforeunload
     if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
