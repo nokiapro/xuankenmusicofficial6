@@ -1066,7 +1066,7 @@
             </div>
         </div>
 
-                <div class="panel" id="panel-settings">
+        <div class="panel" id="panel-settings">
             <div class="card">
                 <h2>Cài đặt hệ thống</h2>
                 <div class="form-grid">
@@ -2132,10 +2132,31 @@
             toast('Xong kiểm tra link');
             setTimeout(() => setToolsProgress(false, 0, ''), 2000);
         };
-        // load gifts when settings tab
+        function switchAdminTab(name) {
+            const tabName = String(name || 'songs');
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tabName);
+            });
+            document.querySelectorAll('.panel').forEach(p => {
+                const id = p.id || '';
+                const match = id === ('panel-' + tabName);
+                p.classList.toggle('active', match);
+            });
+            if (tabName === 'settings') {
+                try { if (typeof loadGiftCodes === 'function') loadGiftCodes(); } catch (e) {}
+                try { if (typeof loadThumbAdmin === 'function') loadThumbAdmin(); } catch (e) {}
+            }
+            if (tabName === 'users') {
+                try { if (typeof loadUsers === 'function') loadUsers(); } catch (e) {}
+            }
+            if (tabName === 'songs') {
+                try { if (typeof loadSongs === 'function') loadSongs(); } catch (e) {}
+            }
+        }
         document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                if (tab.dataset.tab === 'settings') loadGiftCodes();
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchAdminTab(tab.dataset.tab);
             });
         });
 
@@ -2336,11 +2357,7 @@
             document.getElementById('thumb-new-url').value = '';
             loadThumbAdmin();
         };
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                if (tab.dataset.tab === 'settings') { loadGiftCodes(); loadThumbAdmin(); }
-            });
-        });
+        /* tab switch đã bind ở switchAdminTab — không gắn trùng */
 
 
         
