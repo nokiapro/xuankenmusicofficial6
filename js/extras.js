@@ -34,8 +34,8 @@
     thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: '🎨' },
     playlist_5: { name: 'DJ nghiệp dư', desc: '5 bài trong playlist', icon: '🎵' },
     playlist_20: { name: 'DJ chính hiệu', desc: '20 bài trong playlist', icon: '🎚️' },
-    fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích', icon: '❤️' },
-    like_20: { name: 'Like máy', desc: 'Like 20 bài', icon: '👍' },
+    fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích (tim)', icon: '❤️' },
+    fav_20: { name: 'Tim máy', desc: '20 bài yêu thích (tim)', icon: '💖' },
     secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', icon: '🔮', hidden: true },
     marathon: { name: 'Marathon', desc: 'Nghe ≥ 60 phút trong phiên', icon: '🏃' },
     rich: { name: 'Túi đầy', desc: 'Có ≥ 500 XK', icon: '💰' },
@@ -140,7 +140,6 @@
     const level = acc.level || 1;
     const coins = acc.coins | 0;
     const favs = (acc.favorites || []).length;
-    const likes = (acc.likes || []).length;
     const pl = (acc.myPlaylist || []).length;
     const thumbs = (acc.ownedThumbs || []).length;
     const rank = String(acc.rank || 'member').toLowerCase();
@@ -166,7 +165,7 @@
     if (coins >= 500) unlockAchievement('rich');
     if (coins >= 2000) unlockAchievement('richer');
     if (favs >= 10) unlockAchievement('fav_10');
-    if (likes >= 20) unlockAchievement('like_20');
+    if (favs >= 20) unlockAchievement('fav_20');
     if (pl >= 5) unlockAchievement('playlist_5');
     if (pl >= 20) unlockAchievement('playlist_20');
     if (thumbs >= 1) unlockAchievement('thumb_buyer');
