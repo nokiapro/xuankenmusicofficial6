@@ -777,7 +777,7 @@ body.dark .album-art {
     padding: 10px 20px;
     border: none;
     border-radius: 999px;
-    background: linear-gradient(135deg, #ff0040, #8c00ff);
+    background: #8c00ff;
     color: #fff;
     font-weight: 700;
     font-size: 0.78rem;
@@ -2100,7 +2100,7 @@ body.dark .notification-message {
     padding: 8px 14px;
     border: none;
     border-radius: 20px;
-    background: linear-gradient(135deg, #ff0040, #8c00ff);
+    background: #8c00ff;
     color: #fff;
     font-weight: 700;
     font-size: 0.72rem;
@@ -2241,7 +2241,7 @@ body.dark .notification-message {
     padding: 7px 12px;
     border: none;
     border-radius: 16px;
-    background: linear-gradient(135deg, #ff0040, #8c00ff);
+    background: #8c00ff;
     color: #fff;
     font-weight: 700;
     font-size: 0.68rem;
@@ -2282,7 +2282,7 @@ body.dark .notification-message {
 }
 
 .shop-rent-btn {
-    background: linear-gradient(135deg, #17adca, #8c00ff) !important;
+    background: #17adca !important;
 }
 
 .demo-badge {
@@ -2685,7 +2685,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     font-weight: 700;
     font-size: 0.8rem;
     cursor: pointer;
-    background: linear-gradient(135deg, #ff0040, #8c00ff);
+    background: #8c00ff;
     color: #fff;
     white-space: nowrap;
     box-sizing: border-box;
@@ -2704,7 +2704,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     padding: 16px 8px;
     border-radius: 16px;
     border: 1px solid rgba(140,0,255,0.22);
-    background: linear-gradient(145deg, rgba(140,0,255,0.18), rgba(255,0,64,0.10));
+    background: rgba(140,0,255,0.15);
     color: var(--text-primary);
     cursor: pointer;
     font-family: inherit;
@@ -2713,7 +2713,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .extras-action-btn:hover {
-    background: linear-gradient(145deg, rgba(140,0,255,0.28), rgba(255,0,64,0.16));
+    background: rgba(140,0,255,0.28);
     border-color: rgba(140,0,255,0.45);
     box-shadow: 0 4px 18px rgba(140,0,255,0.18);
     transform: translateY(-2px);
@@ -2769,7 +2769,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .shop-tab svg { width: 15px; height: 15px; flex-shrink: 0; }
 .shop-tab.active {
-  background: linear-gradient(135deg, rgba(255,0,64,0.2), rgba(140,0,255,0.25));
+  background: rgba(140,0,255,0.22);
   border-color: rgba(140,0,255,0.45);
   color: var(--text-primary);
 }
@@ -3017,7 +3017,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
 
-/* ========== Scrollbar đồng bộ (list bài hát) ========== */
+/* ========== Scrollbar đồng bộ kiểu music2 (list bài hát) ========== */
 :root {
   --xk-scroll-w: 4px;
   --xk-scroll-track: var(--progress-bg, rgba(255,255,255,0.08));
@@ -3052,7 +3052,40 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .chat-modal-body::-webkit-scrollbar,
 .global-chat-box::-webkit-scrollbar,
 .listen-stats::-webkit-scrollbar,
-.timer-modal::-webkit-scrollbar,
+.timer-modal::-webkit-scrollbar {
+  width: 4px;
+}
+
+#playlist-content::-webkit-scrollbar-track,
+#my-playlist-content::-webkit-scrollbar-track,
+.shop-list::-webkit-scrollbar-track,
+.shop-tab-panels::-webkit-scrollbar-track,
+.extras-modal-body::-webkit-scrollbar-track,
+.extras-result::-webkit-scrollbar-track,
+.extras-result-modal-body::-webkit-scrollbar-track,
+.badges-modal-body::-webkit-scrollbar-track,
+.chat-modal-body::-webkit-scrollbar-track,
+.global-chat-box::-webkit-scrollbar-track,
+.listen-stats::-webkit-scrollbar-track,
+.timer-modal::-webkit-scrollbar-track {
+  background-color: var(--progress-bg);
+}
+
+#playlist-content::-webkit-scrollbar-thumb,
+#my-playlist-content::-webkit-scrollbar-thumb,
+.shop-list::-webkit-scrollbar-thumb,
+.shop-tab-panels::-webkit-scrollbar-thumb,
+.extras-modal-body::-webkit-scrollbar-thumb,
+.extras-result::-webkit-scrollbar-thumb,
+.extras-result-modal-body::-webkit-scrollbar-thumb,
+.badges-modal-body::-webkit-scrollbar-thumb,
+.chat-modal-body::-webkit-scrollbar-thumb,
+.global-chat-box::-webkit-scrollbar-thumb,
+.listen-stats::-webkit-scrollbar-thumb,
+.timer-modal::-webkit-scrollbar-thumb {
+  background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+  border-radius: 50px;
+}
 
 /* ===== Result modal (Top / Review / Thời gian) ===== */
 .extras-result-modal-body {
@@ -3498,7 +3531,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 
 /* ===== Extras feature buttons highlight ===== */
 .extras-feat-btn {
-  background: linear-gradient(145deg, rgba(140,0,255,0.12), rgba(255,0,64,0.08)) !important;
+  background: rgba(140,0,255,0.12) !important;
   border-color: rgba(140,0,255,0.22) !important;
 }
 .extras-feat-btn:hover {
@@ -3707,7 +3740,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   color: var(--text-secondary);
 }
 .wk-card.current .wk-badge {
-  background: linear-gradient(135deg, #ff0040, #8c00ff);
+  background: #8c00ff;
   color: #fff;
 }
 .wk-info { flex: 1; min-width: 0; }
