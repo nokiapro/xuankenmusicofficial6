@@ -827,11 +827,14 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         if (svg) svg.style.color = color;
     }
 
+    // Gradient chữ toast giống music2 (luôn bọc, kể cả có icon sao)
     let formattedMessage = message;
-    // Chỉ bọc gradient text khi message là text thuần (không phải HTML có icon/thẻ)
-    if (typeof message === 'string' && !/<[a-z]/i.test(message)) {
+    if (typeof message === 'string') {
         const gradient = getGradientByTheme();
-        formattedMessage = `<span style="font-weight: 700; background: ${gradient}; background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 0.5px; font-size: inherit; display: inline-block; white-space: nowrap; animation: titleGradientMove 3s ease infinite;">${message}</span>`;
+        // Nếu đã có span gradient sẵn thì giữ nguyên
+        if (!message.includes('noti-msg-grad') && !message.includes('background-clip: text')) {
+            formattedMessage = `<span class="noti-msg-grad" style="font-weight:700;background:${gradient};background-size:200% 200%;-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:0.5px;font-size:inherit;display:inline-block;white-space:nowrap;animation:titleGradientMove 3s ease infinite;">${message}</span>`;
+        }
     }
 
     const content = noti.querySelector('.notification-content');
@@ -2686,8 +2689,11 @@ function mapUserProfile(data, name) {
 let _userProfileUnsub = null;
 /** Bài vừa mua trên máy này, chưa chắc đã có trên server — giữ UI ĐÃ MUA */
 let _pendingOwnedAdds = Object.create(null); // { songId: timestamp }
+/** Bài vừa thuê trên máy này — giữ UI thuê + không để sync remote trống ghi đè */
+let _pendingRentals = Object.create(null); // { songId: expiryMs }
 let _profileSyncedFromRemote = false;
 const PENDING_OWNED_MS = 30000;
+const PENDING_RENTAL_MS = 60000;
 
 function markPendingOwned(songId) {
     _pendingOwnedAdds[String(songId)] = Date.now();
@@ -2707,6 +2713,52 @@ function consumePendingOwned(remoteOwned) {
             return;
         }
         keep.push(id);
+    });
+    return keep;
+}
+
+/** Gộp rentals: mỗi bài lấy hạn lâu nhất, bỏ đã hết hạn */
+function mergeRentalsMap(a, b) {
+    const out = Object.create(null);
+    const now = Date.now();
+    const apply = (src) => {
+        if (!src || typeof src !== 'object') return;
+        Object.keys(src).forEach(sid => {
+            const exp = Number(src[sid]) || 0;
+            if (exp <= now) return;
+            const prev = Number(out[sid]) || 0;
+            if (exp > prev) out[sid] = exp;
+        });
+    };
+    apply(a);
+    apply(b);
+    return out;
+}
+
+function markPendingRental(songId, expiry) {
+    const id = String(songId);
+    const exp = Number(expiry) || 0;
+    if (exp > Date.now()) _pendingRentals[id] = exp;
+}
+
+function consumePendingRentals(remoteRentals) {
+    const now = Date.now();
+    const remote = (remoteRentals && typeof remoteRentals === 'object') ? remoteRentals : {};
+    const keep = Object.create(null);
+    Object.keys(_pendingRentals).forEach(id => {
+        const localExp = Number(_pendingRentals[id]) || 0;
+        const remoteExp = Number(remote[id]) || 0;
+        if (remoteExp >= localExp && remoteExp > now) {
+            delete _pendingRentals[id];
+            return;
+        }
+        // Hết hạn hoặc pending quá lâu mà server không có → bỏ
+        if (localExp <= now) {
+            delete _pendingRentals[id];
+            return;
+        }
+        // Giữ pending thêm tối đa ~24h (theo hạn thuê); không xóa sớm chỉ vì 60s
+        keep[id] = localExp;
     });
     return keep;
 }
@@ -2733,22 +2785,34 @@ function startUserProfileListener(uid) {
         const accounts = getAllAccounts();
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
-        // Firebase owned là nguồn chính + bài pending vừa mua trên máy này
+        const prev = accounts[name];
+        // Owned + pending
         const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
         const pending = consumePendingOwned(remoteOwned);
-        mapped.owned = [...new Set([...remoteOwned, ...pending])];
-        // Rentals: lấy max expiry (remote + local còn hạn)
-        const prev = accounts[name];
-        if (prev && prev.rentals && typeof prev.rentals === 'object') {
-            const merged = Object.assign({}, mapped.rentals || {});
-            Object.keys(prev.rentals).forEach(sid => {
-                const a = Number(prev.rentals[sid]) || 0;
-                const b = Number(merged[sid]) || 0;
-                const m = Math.max(a, b);
-                if (m > Date.now()) merged[sid] = m;
-            });
-            mapped.rentals = merged;
-        }
+        mapped.owned = unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned));
+        // Rentals: max expiry (remote + local + pending)
+        const pendingRent = consumePendingRentals(mapped.rentals);
+        mapped.rentals = mergeRentalsMap(
+            mergeRentalsMap(mapped.rentals, prev && prev.rentals),
+            pendingRent
+        );
+        // ownedThumbs / achievements: chỉ thêm → union
+        mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prev && prev.ownedThumbs);
+        mapped.achievements = unionIdArrays(mapped.achievements, prev && prev.achievements);
+        // favorites / playlist: remote là chuẩn nếu có dữ liệu; remote trống mà local còn → giữ local (chống wipe)
+        const preferRemoteList = (remote, local) => {
+            const r = Array.isArray(remote) ? remote.map(String) : [];
+            const l = Array.isArray(local) ? local.map(String) : [];
+            if (r.length === 0 && l.length > 0) return l;
+            return r;
+        };
+        mapped.favorites = preferRemoteList(mapped.favorites, prev && prev.favorites);
+        mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prev && prev.myPlaylist);
+        mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prev && prev.listenedSongs);
+        mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prev && prev.checkinDays);
+        mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prev && prev.xp) || 0);
+        mapped.level = Math.max(Number(mapped.level) || 1, Number(prev && prev.level) || 1);
+        mapped.seasonXp = Math.max(Number(prev && prev.seasonXp) || 0, Number(mapped.seasonXp) || 0);
         const prevCoins = prev ? (prev.coins | 0) : null;
         accounts[name] = mapped;
         saveAllAccounts(accounts);
@@ -2792,6 +2856,7 @@ async function fetchUserByUid(uid, usernameHint) {
             console.warn('[sync] username lệch: local="' + hint + '" firebase="' + remoteName + '" → dùng Firebase');
         }
         const accounts = getAllAccounts();
+        const prevLocal = accounts[name];
         // Xóa bản local cũ gắn sai uid / sai tên cho cùng uid
         Object.keys(accounts).forEach(k => {
             const a = accounts[k];
@@ -2800,15 +2865,59 @@ async function fetchUserByUid(uid, usernameHint) {
                 delete accounts[k];
             }
         });
-        accounts[name] = mapUserProfile(data, name);
-        accounts[name].uid = id;
+        const mapped = mapUserProfile(data, name);
+        mapped.uid = id;
+        // Merge an toàn: local + remote — không mất mua/thuê/playlist… khi Firebase thiếu tạm thời
+        const remoteRentalsBefore = mapped.rentals || {};
+        const pendingRent = consumePendingRentals(mapped.rentals);
+        mapped.rentals = mergeRentalsMap(
+            mergeRentalsMap(mapped.rentals, prevLocal && prevLocal.rentals),
+            pendingRent
+        );
+        const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
+        const pendingOwned = consumePendingOwned(remoteOwned);
+        mapped.owned = unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned));
+        mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
+        mapped.achievements = unionIdArrays(mapped.achievements, prevLocal && prevLocal.achievements);
+        const preferRemoteList = (remote, local) => {
+            const r = Array.isArray(remote) ? remote.map(String) : [];
+            const l = Array.isArray(local) ? local.map(String) : [];
+            if (r.length === 0 && l.length > 0) return l;
+            return r.length ? r : l;
+        };
+        mapped.favorites = preferRemoteList(mapped.favorites, prevLocal && prevLocal.favorites);
+        mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prevLocal && prevLocal.myPlaylist);
+        mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prevLocal && prevLocal.listenedSongs);
+        mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prevLocal && prevLocal.checkinDays);
+        if (prevLocal && prevLocal.listenTime) {
+            const byDay = mergeNumericMaps(
+                (mapped.listenTime && mapped.listenTime.byDay) || {},
+                prevLocal.listenTime.byDay || {}
+            );
+            let total = 0;
+            Object.keys(byDay).forEach(k => { total += Number(byDay[k]) || 0; });
+            total = Math.max(total, Number(mapped.listenTime && mapped.listenTime.total) || 0, Number(prevLocal.listenTime.total) || 0);
+            mapped.listenTime = { total, byDay };
+        }
+        // XP/level: lấy max
+        mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prevLocal && prevLocal.xp) || 0);
+        mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
+        mapped.seasonXp = Math.max(Number(mapped.seasonXp) || 0, Number(prevLocal && prevLocal.seasonXp) || 0);
+        mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prevLocal && prevLocal.streak) || 0);
+        accounts[name] = mapped;
         saveAllAccounts(accounts);
-        // Đồng bộ current username theo Firebase
         if (getCurrentUsername() !== name) {
             setCurrentUsername(name);
         }
         _profileSyncedFromRemote = true;
         startUserProfileListener(id);
+        // Đẩy local còn thiếu (mua/thuê/…) lên Firebase — merge, không ghi đè mất
+        try {
+            pushUserToFirebase(name, mapped, {
+                forceAll: true,
+                coinsDelta: 0
+            });
+        } catch (e) {}
         return accounts[name];
     } catch (e) {
         console.warn('fetchUserByUid', e);
@@ -2842,7 +2951,6 @@ async function fetchUserFromFirebase(username) {
 
 function buildUserPayload(uid, name, account, includeCoins) {
     // KHÔNG ghi rank / banned / banReason từ client — chỉ Admin mới được set trên Firebase
-    // (tránh deploy / sync local đè hạng admin đã set)
     const payload = {
         uid: uid,
         username: name,
@@ -2874,10 +2982,60 @@ function buildUserPayload(uid, name, account, includeCoins) {
     return payload;
 }
 
+/** Union 2 mảng id (string) */
+function unionIdArrays(a, b) {
+    const out = new Set();
+    (Array.isArray(a) ? a : []).forEach(x => { if (x != null && String(x)) out.add(String(x)); });
+    (Array.isArray(b) ? b : []).forEach(x => { if (x != null && String(x)) out.add(String(x)); });
+    return [...out];
+}
+
+/** Merge map số: mỗi key lấy max (listenedSongs, checkinDays truthy, v.v.) */
+function mergeNumericMaps(a, b) {
+    const out = Object.create(null);
+    const apply = (src) => {
+        if (!src || typeof src !== 'object') return;
+        Object.keys(src).forEach(k => {
+            const v = src[k];
+            if (v === true) { out[k] = true; return; }
+            const n = Number(v);
+            if (!Number.isFinite(n)) {
+                if (v != null && out[k] == null) out[k] = v;
+                return;
+            }
+            const prev = Number(out[k]);
+            out[k] = Number.isFinite(prev) ? Math.max(prev, n) : n;
+        });
+    };
+    apply(a);
+    apply(b);
+    return out;
+}
+
+async function txUnionArrayField(db, uid, field, localArr) {
+    const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
+    const local = (Array.isArray(localArr) ? localArr : []).map(String);
+    const tx = await ref.transaction((current) => {
+        const remote = Array.isArray(current) ? current.map(String) : [];
+        return unionIdArrays(remote, local);
+    });
+    if (tx.committed) {
+        return Array.isArray(tx.snapshot.val()) ? tx.snapshot.val().map(String) : local;
+    }
+    return local;
+}
+
+/**
+ * Đồng bộ user → Firebase an toàn đa thiết bị:
+ * - owned / ownedThumbs / achievements: UNION (không mất bài máy khác)
+ * - rentals: max expiry
+ * - coins: delta transaction
+ * - favorites / playlist / likes…: chỉ ghi khi field đó đổi trên máy này
+ * - Không bao giờ .update() cả profile local thiếu lên server
+ */
 async function pushUserToFirebase(username, account, options) {
     const name = String(username || '').trim();
     if (!name || !account) return false;
-    // Auth UID là nguồn chuẩn — không dùng account.uid cũ trong localStorage (dễ lẫn PC)
     const uid = getCurrentUid() || account.uid || '';
     if (!uid) {
         console.warn('pushUser: chưa có uid (chưa Auth)');
@@ -2887,40 +3045,144 @@ async function pushUserToFirebase(username, account, options) {
         console.warn('[sync] account.uid lệch Auth, sửa:', account.uid, '→', uid);
         account.uid = uid;
     }
-    // owned dùng transaction UNION trên server → local thiếu cũng không xóa bài mobile đã mua
-    // coins dùng transaction theo delta → an toàn đa thiết bị
     const opts = options || {};
+    const forceAll = !!opts.forceAll; // đăng nhập: đẩy local còn thiếu lên server (merge)
     try {
         const db = getDb();
         if (!db) return false;
+        const userRef = db.ref(dataPath('users') + '/' + uid);
+        const accounts = getAllAccounts();
 
-        // 1) owned: LUÔN merge (union) trên server — không bao giờ thay bằng mảng local thiếu
-        if (opts.ownedChanged && Array.isArray(account.owned)) {
-            const localOwned = account.owned.map(String);
-            const ownedRef = db.ref(dataPath('users') + '/' + uid + '/owned');
-            const txOwned = await ownedRef.transaction((current) => {
-                const remote = Array.isArray(current) ? current.map(String) : [];
-                return [...new Set([...remote, ...localOwned])];
-            });
-            if (txOwned.committed) {
-                const merged = Array.isArray(txOwned.snapshot.val())
-                    ? txOwned.snapshot.val().map(String)
-                    : localOwned;
-                account.owned = merged;
-                const accounts = getAllAccounts();
-                if (accounts[name]) {
-                    accounts[name].owned = merged;
-                    saveAllAccounts(accounts);
-                }
+        // Luôn đảm bảo uid + username trên node user
+        await userRef.update({ uid: uid, username: name });
+
+        // --- owned: UNION ---
+        if ((opts.ownedChanged || forceAll) && Array.isArray(account.owned)) {
+            const merged = await txUnionArrayField(db, uid, 'owned', account.owned);
+            account.owned = merged;
+            if (accounts[name]) { accounts[name].owned = merged; saveAllAccounts(accounts); }
+        }
+
+        // --- rentals: max expiry ---
+        if ((opts.rentalsChanged || forceAll) && account.rentals && typeof account.rentals === 'object') {
+            const localRentals = account.rentals;
+            const rentalsRef = db.ref(dataPath('users') + '/' + uid + '/rentals');
+            const txRent = await rentalsRef.transaction((current) => mergeRentalsMap(current, localRentals));
+            if (txRent.committed) {
+                const merged = mergeRentalsMap(txRent.snapshot.val(), localRentals);
+                account.rentals = merged;
+                if (accounts[name]) { accounts[name].rentals = merged; saveAllAccounts(accounts); }
             }
         }
 
-        // 2) Các field khác (không gồm coins / owned — owned đã xử lý)
-        const payload = buildUserPayload(uid, name, account, false);
-        delete payload.owned; // owned xử lý bằng transaction ở trên
-        await db.ref(dataPath('users') + '/' + uid).update(payload);
+        // --- ownedThumbs / achievements: UNION (chỉ thêm, không mất) ---
+        if ((opts.ownedThumbsChanged || forceAll) && Array.isArray(account.ownedThumbs)) {
+            const merged = await txUnionArrayField(db, uid, 'ownedThumbs', account.ownedThumbs);
+            account.ownedThumbs = merged;
+            if (accounts[name]) { accounts[name].ownedThumbs = merged; saveAllAccounts(accounts); }
+        }
+        if ((opts.achievementsChanged || forceAll) && Array.isArray(account.achievements)) {
+            const merged = await txUnionArrayField(db, uid, 'achievements', account.achievements);
+            account.achievements = merged;
+            if (accounts[name]) { accounts[name].achievements = merged; saveAllAccounts(accounts); }
+        }
 
-        // 3) coins: transaction theo delta
+        // --- favorites / myPlaylist / likes / dislikes: ghi khi đổi (user chủ động thêm/xóa) ---
+        // forceAll: UNION để không xóa data máy khác khi mới login
+        const arrayReplaceOrUnion = async (field, localArr, changedFlag) => {
+            if (!(opts[changedFlag] || forceAll)) return;
+            const local = (Array.isArray(localArr) ? localArr : []).map(String);
+            if (forceAll && !opts[changedFlag]) {
+                const merged = await txUnionArrayField(db, uid, field, local);
+                account[field] = merged;
+                if (accounts[name]) { accounts[name][field] = merged; saveAllAccounts(accounts); }
+            } else {
+                await db.ref(dataPath('users') + '/' + uid + '/' + field).set(local);
+            }
+        };
+        await arrayReplaceOrUnion('favorites', account.favorites, 'favoritesChanged');
+        await arrayReplaceOrUnion('myPlaylist', account.myPlaylist, 'myPlaylistChanged');
+        await arrayReplaceOrUnion('likes', account.likes, 'likesChanged');
+        await arrayReplaceOrUnion('dislikes', account.dislikes, 'dislikesChanged');
+
+        // --- maps: listenedSongs / checkinDays / listenTime — merge max ---
+        const mergeMapField = async (field, localMap, changedFlag) => {
+            if (!(opts[changedFlag] || forceAll)) return;
+            const local = (localMap && typeof localMap === 'object') ? localMap : {};
+            const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
+            const tx = await ref.transaction((current) => mergeNumericMaps(current, local));
+            if (tx.committed && tx.snapshot.val()) {
+                account[field] = tx.snapshot.val();
+                if (accounts[name]) { accounts[name][field] = account[field]; saveAllAccounts(accounts); }
+            }
+        };
+        await mergeMapField('listenedSongs', account.listenedSongs, 'listenedSongsChanged');
+        await mergeMapField('checkinDays', account.checkinDays, 'checkinChanged');
+        if (opts.listenTimeChanged || forceAll) {
+            const local = (account.listenTime && typeof account.listenTime === 'object')
+                ? account.listenTime
+                : { total: 0, byDay: {} };
+            const ref = db.ref(dataPath('users') + '/' + uid + '/listenTime');
+            const tx = await ref.transaction((current) => {
+                const cur = (current && typeof current === 'object') ? current : { total: 0, byDay: {} };
+                const byDay = mergeNumericMaps(cur.byDay, local.byDay);
+                let total = 0;
+                Object.keys(byDay).forEach(k => { total += Number(byDay[k]) || 0; });
+                // Giữ total max giữa remote/local nếu byDay thiếu
+                total = Math.max(total, Number(cur.total) || 0, Number(local.total) || 0);
+                return { total, byDay };
+            });
+            if (tx.committed && tx.snapshot.val()) {
+                account.listenTime = tx.snapshot.val();
+                if (accounts[name]) { accounts[name].listenTime = account.listenTime; saveAllAccounts(accounts); }
+            }
+        }
+
+        // --- scalars chỉ khi đổi ---
+        const scalarPayload = {};
+        if (opts.checkinChanged || forceAll) {
+            scalarPayload.lastCheckin = account.lastCheckin || '';
+            scalarPayload.streak = Number(account.streak) || 0;
+            scalarPayload.streakFreeze = Number(account.streakFreeze) || 0;
+        }
+        if (opts.xpChanged || forceAll) {
+            // XP/level: lấy max để không bị máy thấp đè máy cao
+            scalarPayload.xp = Number(account.xp) || 0;
+            scalarPayload.level = Number(account.level) || 1;
+            scalarPayload.seasonXp = Number(account.seasonXp) || 0;
+        }
+        if (opts.activeThumbChanged || forceAll) {
+            scalarPayload.activeThumb = account.activeThumb || '';
+            scalarPayload.frame = account.frame || '';
+        }
+        if (opts.inviteChanged || forceAll) {
+            if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
+        }
+        if (account.createdAt) scalarPayload.createdAt = account.createdAt;
+        if (Object.keys(scalarPayload).length) {
+            // XP: transaction max
+            if (scalarPayload.xp != null) {
+                const xpRef = db.ref(dataPath('users') + '/' + uid + '/xp');
+                const localXp = Number(scalarPayload.xp) || 0;
+                await xpRef.transaction((cur) => Math.max(Number(cur) || 0, localXp));
+                delete scalarPayload.xp;
+                const levelRef = db.ref(dataPath('users') + '/' + uid + '/level');
+                const localLv = Number(scalarPayload.level) || 1;
+                await levelRef.transaction((cur) => Math.max(Number(cur) || 1, localLv));
+                delete scalarPayload.level;
+                if (scalarPayload.seasonXp != null) {
+                    const sRef = db.ref(dataPath('users') + '/' + uid + '/seasonXp');
+                    const localS = Number(scalarPayload.seasonXp) || 0;
+                    await sRef.transaction((cur) => Math.max(Number(cur) || 0, localS));
+                    delete scalarPayload.seasonXp;
+                }
+            }
+            if (Object.keys(scalarPayload).length) {
+                await userRef.update(scalarPayload);
+            }
+        }
+
+        // --- coins: delta ---
         if (typeof opts.coinsDelta === 'number' && opts.coinsDelta !== 0) {
             const coinsRef = db.ref(dataPath('users') + '/' + uid + '/coins');
             const tx = await coinsRef.transaction((current) => {
@@ -2930,7 +3192,6 @@ async function pushUserToFirebase(username, account, options) {
             });
             if (tx.committed) {
                 account.coins = Number(tx.snapshot.val()) || 0;
-                const accounts = getAllAccounts();
                 if (accounts[name]) {
                     accounts[name].coins = account.coins;
                     saveAllAccounts(accounts);
@@ -2978,21 +3239,52 @@ function updateCurrentAccount(mutator) {
     const accounts = getAllAccounts();
     if (!accounts[name]) {
         const settings = getAdminSettings();
-        accounts[name] = { coins: settings.starterCoins, owned: [], lastCheckin: '', createdAt: Date.now() };
+        accounts[name] = {
+            coins: settings.starterCoins, owned: [], rentals: {}, favorites: [],
+            myPlaylist: [], ownedThumbs: [], achievements: [], lastCheckin: '', createdAt: Date.now()
+        };
     }
-    const beforeCoins = accounts[name].coins | 0;
-    const beforeOwned = JSON.stringify((accounts[name].owned || []).map(String).sort());
-    mutator(accounts[name]);
-    const afterCoins = accounts[name].coins | 0;
-    const afterOwned = JSON.stringify((accounts[name].owned || []).map(String).sort());
-    const coinsDelta = afterCoins - beforeCoins;
-    const ownedChanged = beforeOwned !== afterOwned;
+    const acc = accounts[name];
+    const snap = (v) => JSON.stringify(v == null ? null : v);
+    const before = {
+        coins: acc.coins | 0,
+        owned: snap((acc.owned || []).map(String).sort()),
+        rentals: snap(acc.rentals || {}),
+        favorites: snap((acc.favorites || []).map(String).sort()),
+        myPlaylist: snap((acc.myPlaylist || []).map(String).sort()),
+        likes: snap((acc.likes || []).map(String).sort()),
+        dislikes: snap((acc.dislikes || []).map(String).sort()),
+        ownedThumbs: snap((acc.ownedThumbs || []).map(String).sort()),
+        achievements: snap((acc.achievements || []).map(String).sort()),
+        listenedSongs: snap(acc.listenedSongs || {}),
+        listenTime: snap(acc.listenTime || {}),
+        checkin: snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
+        xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
+        activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
+        inviteBy: snap(acc.inviteBy || '')
+    };
+    mutator(acc);
+    const afterCoins = acc.coins | 0;
+    const opts = {
+        coinsDelta: afterCoins - before.coins,
+        ownedChanged: before.owned !== snap((acc.owned || []).map(String).sort()),
+        rentalsChanged: before.rentals !== snap(acc.rentals || {}),
+        favoritesChanged: before.favorites !== snap((acc.favorites || []).map(String).sort()),
+        myPlaylistChanged: before.myPlaylist !== snap((acc.myPlaylist || []).map(String).sort()),
+        likesChanged: before.likes !== snap((acc.likes || []).map(String).sort()),
+        dislikesChanged: before.dislikes !== snap((acc.dislikes || []).map(String).sort()),
+        ownedThumbsChanged: before.ownedThumbs !== snap((acc.ownedThumbs || []).map(String).sort()),
+        achievementsChanged: before.achievements !== snap((acc.achievements || []).map(String).sort()),
+        listenedSongsChanged: before.listenedSongs !== snap(acc.listenedSongs || {}),
+        listenTimeChanged: before.listenTime !== snap(acc.listenTime || {}),
+        checkinChanged: before.checkin !== snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
+        xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
+        activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
+        inviteChanged: before.inviteBy !== snap(acc.inviteBy || '')
+    };
     saveAllAccounts(accounts);
-    pushUserToFirebase(name, accounts[name], {
-        coinsDelta: coinsDelta,
-        ownedChanged: ownedChanged
-    });
-    return accounts[name];
+    pushUserToFirebase(name, acc, opts);
+    return acc;
 }
 
 function getTodayKey() {
@@ -3038,15 +3330,19 @@ function isSongOwned(songId) {
 
 function isSongRented(songId) {
     const id = String(songId);
+    const now = Date.now();
     const acc = getCurrentAccount();
-    if (!acc || !acc.rentals || !acc.rentals[id]) return false;
-    return Number(acc.rentals[id]) > Date.now();
+    const fromAcc = acc && acc.rentals ? Number(acc.rentals[id]) || 0 : 0;
+    const fromPending = Number(_pendingRentals[id]) || 0;
+    return Math.max(fromAcc, fromPending) > now;
 }
 
 function getRentExpiry(songId) {
+    const id = String(songId);
     const acc = getCurrentAccount();
-    if (!acc || !acc.rentals) return 0;
-    return Number(acc.rentals[String(songId)]) || 0;
+    const fromAcc = acc && acc.rentals ? Number(acc.rentals[id]) || 0 : 0;
+    const fromPending = Number(_pendingRentals[id]) || 0;
+    return Math.max(fromAcc, fromPending);
 }
 
 function getRentPrice(song) {
@@ -3083,6 +3379,7 @@ function rentSong(songId) {
         return false;
     }
     const expiry = Date.now() + 24 * 60 * 60 * 1000;
+    markPendingRental(songId, expiry);
     updateCurrentAccount(acc => {
         acc.coins = (acc.coins | 0) - price;
         if (!acc.rentals) acc.rentals = {};

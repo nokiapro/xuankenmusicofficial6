@@ -7,42 +7,53 @@
   'use strict';
 
   const ACHIEVEMENTS = {
-    first_listen: { name: 'Lần nghe đầu', desc: 'Nghe 1 bài qua 5 giây', icon: '🎧' },
-    listens_10: { name: 'Tai nghe bền', desc: '10 bài đã nghe', icon: '📻' },
-    listens_25: { name: 'Fan cứng', desc: '25 bài đã nghe', icon: '💿' },
-    listens_50: { name: 'Nghiện nhạc', desc: '50 bài đã nghe', icon: '🔥' },
-    listens_100: { name: 'Huyền thoại nghe', desc: '100 bài đã nghe', icon: '👑' },
-    listens_200: { name: 'Không ngủ', desc: '200 bài đã nghe', icon: '🌌' },
-    checkin_3: { name: 'Bắt đầu đều', desc: 'Streak 3 ngày', icon: '📅' },
-    checkin_7: { name: 'Tuần đầy đủ', desc: 'Streak 7 ngày', icon: '🗓️' },
-    checkin_14: { name: 'Hai tuần kiên trì', desc: 'Streak 14 ngày', icon: '💪' },
-    checkin_30: { name: 'Tháng chuyên cần', desc: 'Streak 30 ngày', icon: '🏆' },
-    night_owl: { name: 'Cú đêm', desc: 'Nghe trong 0h–4h', icon: '🦉', hidden: true },
-    early_bird: { name: 'Chim sớm', desc: 'Nghe trong 5h–7h', icon: '🐦', hidden: true },
-    collector: { name: 'Nhà sưu tập', desc: 'Sở hữu 5 bài', icon: '📦' },
-    collector_10: { name: 'Kho nhạc', desc: 'Sở hữu 10 bài', icon: '🗂️' },
-    collector_25: { name: 'Thư viện sống', desc: 'Sở hữu 25 bài', icon: '📚' },
-    collector_50: { name: 'Đại gia nhạc', desc: 'Sở hữu 50 bài', icon: '💎' },
-    first_buy: { name: 'Giao dịch đầu', desc: 'Mua bài đầu tiên', icon: '🛒' },
-    renter: { name: 'Thuê bao', desc: 'Thuê 1 bài 24h', icon: '⏳' },
-    level_5: { name: 'Level 5', desc: 'Đạt level 5', icon: '⭐' },
-    level_10: { name: 'Level 10', desc: 'Đạt level 10', icon: '🌟' },
-    level_20: { name: 'Level 20', desc: 'Đạt level 20', icon: '✨' },
-    level_50: { name: 'Level 50', desc: 'Đạt level 50', icon: '💫' },
-    gift_first: { name: 'Quà đầu tay', desc: 'Đổi gift code lần đầu', icon: '🎁' },
-    chat_first: { name: 'Lên tiếng', desc: 'Gửi tin chat đầu tiên', icon: '💬' },
-    thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: '🎨' },
-    playlist_5: { name: 'DJ nghiệp dư', desc: '5 bài trong playlist', icon: '🎵' },
-    playlist_20: { name: 'DJ chính hiệu', desc: '20 bài trong playlist', icon: '🎚️' },
-    fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích (tim)', icon: '❤️' },
-    fav_20: { name: 'Tim máy', desc: '20 bài yêu thích (tim)', icon: '💖' },
-    secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', icon: '🔮', hidden: true },
-    marathon: { name: 'Marathon', desc: 'Nghe ≥ 60 phút trong phiên', icon: '🏃' },
-    rich: { name: 'Túi đầy', desc: 'Có ≥ 500 XK', icon: '💰' },
-    richer: { name: 'Đại gia XK', desc: 'Có ≥ 2000 XK', icon: '🏦' },
-    vip_rank: { name: 'VIP', desc: 'Đạt hạng VIP', icon: '🥇' },
-    super_vip_rank: { name: 'SUPER VIP', desc: 'Đạt hạng SUPER VIP', icon: '👑' }
+    first_listen: { name: 'Lần nghe đầu', desc: 'Nghe 1 bài qua 5 giây', icon: 'fa-solid fa-headphones' },
+    listens_10: { name: 'Tai nghe bền', desc: '10 bài đã nghe', icon: 'fa-solid fa-radio' },
+    listens_25: { name: 'Fan cứng', desc: '25 bài đã nghe', icon: 'fa-solid fa-compact-disc' },
+    listens_50: { name: 'Nghiện nhạc', desc: '50 bài đã nghe', icon: 'fa-solid fa-fire' },
+    listens_100: { name: 'Huyền thoại nghe', desc: '100 bài đã nghe', icon: 'fa-solid fa-crown' },
+    listens_200: { name: 'Không ngủ', desc: '200 bài đã nghe', icon: 'fa-solid fa-moon-stars' },
+    checkin_3: { name: 'Bắt đầu đều', desc: 'Streak 3 ngày', icon: 'fa-solid fa-calendar-day' },
+    checkin_7: { name: 'Tuần đầy đủ', desc: 'Streak 7 ngày', icon: 'fa-solid fa-calendar-week' },
+    checkin_14: { name: 'Hai tuần kiên trì', desc: 'Streak 14 ngày', icon: 'fa-solid fa-dumbbell' },
+    checkin_30: { name: 'Tháng chuyên cần', desc: 'Streak 30 ngày', icon: 'fa-solid fa-trophy' },
+    night_owl: { name: 'Cú đêm', desc: 'Nghe trong 0h–4h', icon: 'fa-solid fa-owl', hidden: true },
+    early_bird: { name: 'Chim sớm', desc: 'Nghe trong 5h–7h', icon: 'fa-solid fa-dove', hidden: true },
+    collector: { name: 'Nhà sưu tập', desc: 'Sở hữu 5 bài', icon: 'fa-solid fa-box-open' },
+    collector_10: { name: 'Kho nhạc', desc: 'Sở hữu 10 bài', icon: 'fa-solid fa-folder-open' },
+    collector_25: { name: 'Thư viện sống', desc: 'Sở hữu 25 bài', icon: 'fa-solid fa-books' },
+    collector_50: { name: 'Đại gia nhạc', desc: 'Sở hữu 50 bài', icon: 'fa-solid fa-gem' },
+    first_buy: { name: 'Giao dịch đầu', desc: 'Mua bài đầu tiên', icon: 'fa-solid fa-cart-shopping' },
+    renter: { name: 'Thuê bao', desc: 'Thuê 1 bài 24h', icon: 'fa-solid fa-clock' },
+    level_5: { name: 'Level 5', desc: 'Đạt level 5', icon: 'fa-solid fa-star' },
+    level_10: { name: 'Level 10', desc: 'Đạt level 10', icon: 'fa-solid fa-stars' },
+    level_20: { name: 'Level 20', desc: 'Đạt level 20', icon: 'fa-solid fa-sparkles' },
+    level_50: { name: 'Level 50', desc: 'Đạt level 50', icon: 'fa-solid fa-galaxy' },
+    gift_first: { name: 'Quà đầu tay', desc: 'Đổi gift code lần đầu', icon: 'fa-solid fa-gift' },
+    chat_first: { name: 'Lên tiếng', desc: 'Gửi tin chat đầu tiên', icon: 'fa-solid fa-comments' },
+    thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: 'fa-solid fa-palette' },
+    playlist_5: { name: 'DJ nghiệp dư', desc: '5 bài trong playlist', icon: 'fa-solid fa-music' },
+    playlist_20: { name: 'DJ chính hiệu', desc: '20 bài trong playlist', icon: 'fa-solid fa-sliders' },
+    fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích (tim)', icon: 'fa-solid fa-heart' },
+    fav_20: { name: 'Tim máy', desc: '20 bài yêu thích (tim)', icon: 'fa-solid fa-heart-circle-plus' },
+    secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', icon: 'fa-solid fa-crystal-ball', hidden: true },
+    marathon: { name: 'Marathon', desc: 'Nghe ≥ 60 phút trong phiên', icon: 'fa-solid fa-person-running' },
+    rich: { name: 'Túi đầy', desc: 'Có ≥ 500 XK', icon: 'fa-solid fa-coins' },
+    richer: { name: 'Đại gia XK', desc: 'Có ≥ 2000 XK', icon: 'fa-solid fa-building-columns' },
+    vip_rank: { name: 'VIP', desc: 'Đạt hạng VIP', icon: 'fa-solid fa-medal' },
+    super_vip_rank: { name: 'SUPER VIP', desc: 'Đạt hạng SUPER VIP', icon: 'fa-solid fa-crown' }
   };
+
+  function badgeIconHtml(iconClass, extraClass) {
+    const cls = String(iconClass || 'fa-solid fa-award').trim();
+    // Đã là HTML sẵn
+    if (cls.indexOf('<') >= 0) return cls;
+    // Emoji cũ (fallback)
+    if (!/^fa[srb]?\s|^fa-solid|^fa-regular|^fa-light|^fa-brands/.test(cls) && !cls.startsWith('fa-')) {
+      return '<span class="badge-emoji">' + cls + '</span>';
+    }
+    return '<i class="' + cls + (extraClass ? ' ' + extraClass : '') + '" aria-hidden="true"></i>';
+  }
 
   function $(id) { return document.getElementById(id); }
   function toast(title, msg, color) {
@@ -127,7 +138,10 @@
       acc.achievements.push(id);
       got = true;
     });
-    if (got) toast('Huy hiệu:', (def.icon ? def.icon + ' ' : '') + def.name + (def.hidden ? ' ✨' : ''), '#fbbf24');
+    if (got) {
+      const iconPart = badgeIconHtml(def.icon, 'noti-badge-fa');
+      toast('Huy hiệu:', iconPart + ' ' + def.name + (def.hidden ? ' <i class="fa-solid fa-sparkles"></i>' : ''), '#fbbf24');
+    }
     syncUserPartial();
   }
 
@@ -209,11 +223,11 @@
     list.innerHTML = ids.map(id => {
       const def = ACHIEVEMENTS[id];
       if (def.hidden && !owned.has(id)) {
-        return '<div class="badge-card locked"><div class="badge-icon">❓</div><div class="badge-info"><div class="badge-name">???</div><div class="badge-desc">Huy hiệu ẩn</div></div></div>';
+        return '<div class="badge-card locked"><div class="badge-icon"><i class="fa-solid fa-question" aria-hidden="true"></i></div><div class="badge-info"><div class="badge-name">???</div><div class="badge-desc">Huy hiệu ẩn</div></div></div>';
       }
       const got = owned.has(id);
       return '<div class="badge-card' + (got ? ' got' : ' locked') + '">'
-        + '<div class="badge-icon">' + (def.icon || '🏅') + '</div>'
+        + '<div class="badge-icon">' + badgeIconHtml(def.icon) + '</div>'
         + '<div class="badge-info"><div class="badge-name">' + escapeHtml(def.name) + '</div>'
         + '<div class="badge-desc">' + escapeHtml(def.desc || '') + '</div></div>'
         + (got ? '<span class="badge-got-tag">Đã nhận</span>' : '<span class="badge-lock-tag">Chưa</span>')
@@ -564,19 +578,25 @@
 
     const streakN = Number(acc.streak) || 0;
     body.innerHTML = '<div class="ci-head">'
-      + '<div class="ci-month">' + monthNames[m] + ' · ' + y + '</div>'
+      + '<div class="ci-month">'
+      + '<i class="fa-solid fa-calendar-days ci-month-icon" aria-hidden="true"></i>'
+      + '<span class="ci-month-text">' + monthNames[m] + ' · ' + y + '</span>'
+      + '</div>'
       + '<div class="ci-legend">'
       + '<span class="ci-pill"><span class="ci-lg done"></span>Đã điểm danh</span>'
       + '<span class="ci-pill"><span class="ci-lg miss"></span>Chưa / bỏ lỡ</span>'
       + '</div>'
-      + '<div class="ci-reward">Hôm nay +' + reward + ' XK &nbsp;·&nbsp; Điểm danh bù −5 XK</div>'
+      + '<div class="ci-reward"><i class="fa-solid fa-coins"></i> Hôm nay +' + reward + ' XK &nbsp;·&nbsp; Điểm danh bù −5 XK</div>'
       + '</div>'
       + '<div class="ci-week">' + weekDays.map(w => '<div class="ci-wd">' + w + '</div>').join('') + '</div>'
       + '<div class="ci-grid">' + cells + '</div>'
       + '<div class="ci-streak">'
-      + '<span class="ci-streak-fire">🔥</span>'
-      + '<span>Streak <b>' + streakN + '</b> ngày</span>'
-      + (acc.lastCheckin ? '<span class="ci-streak-meta">· ' + escapeHtml(acc.lastCheckin) + '</span>' : '')
+      + '<span class="ci-streak-badge"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i></span>'
+      + '<div class="ci-streak-body">'
+      + '<span class="ci-streak-label">Chuỗi điểm danh</span>'
+      + '<span class="ci-streak-val"><b>' + streakN + '</b> ngày' + (streakN > 0 ? ' liên tiếp' : '') + '</span>'
+      + (acc.lastCheckin ? '<span class="ci-streak-meta"><i class="fa-regular fa-clock"></i> Lần cuối: ' + escapeHtml(acc.lastCheckin) + '</span>' : '')
+      + '</div>'
       + '</div>';
 
     body.querySelectorAll('.ci-cell.clickable[data-ci-day]').forEach(btn => {
@@ -1282,16 +1302,16 @@
       const icons = { week: 'calendar-days', month: 'calendar', year: 'calendar-range' };
       const rank = String(acc.rank || 'member').replace(/_/g, ' ').toUpperCase();
       const cards = [
-        { icon: '🎧', label: 'Bài đã nghe', val: listened },
-        { icon: '🛒', label: 'Đã mua', val: owned },
-        { icon: '⭐', label: 'Level', val: (acc.level || 1) },
-        { icon: '✨', label: 'XP', val: (acc.xp || 0) },
-        { icon: '🔥', label: 'Season XP', val: (acc.seasonXp || 0) },
-        { icon: '📅', label: 'Streak', val: (acc.streak || 0) }
+        { icon: 'fa-solid fa-headphones', label: 'Bài đã nghe', val: listened },
+        { icon: 'fa-solid fa-cart-shopping', label: 'Đã mua', val: owned },
+        { icon: 'fa-solid fa-star', label: 'Level', val: (acc.level || 1) },
+        { icon: 'fa-solid fa-bolt', label: 'XP', val: (acc.xp || 0) },
+        { icon: 'fa-solid fa-fire', label: 'Season XP', val: (acc.seasonXp || 0) },
+        { icon: 'fa-solid fa-calendar-check', label: 'Streak', val: (acc.streak || 0) }
       ];
-      if (period === 'year') cards.push({ icon: '👑', label: 'Hạng', val: rank });
+      if (period === 'year') cards.push({ icon: 'fa-solid fa-crown', label: 'Hạng', val: rank });
       const grid = cards.map(c =>
-        '<div class="xr-stat-card"><div class="xr-stat-icon">' + c.icon + '</div>'
+        '<div class="xr-stat-card"><div class="xr-stat-icon">' + badgeIconHtml(c.icon) + '</div>'
         + '<div class="xr-stat-val">' + escapeHtml(String(c.val)) + '</div>'
         + '<div class="xr-stat-label">' + escapeHtml(c.label) + '</div></div>'
       ).join('');
