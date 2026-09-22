@@ -395,16 +395,45 @@ body.dark .play-btn.playing svg {
     height: 100%;
 }
 
-.btn-icon:hover {
-    transform: scale(1.08);
-    background: rgba(0, 0, 0, 0.08);
-    color: var(--text-primary);
+/* Hover chỉ khi chuột thật (tránh hover “dính” trên cảm ứng trông như đang ấn) */
+@media (hover: hover) and (pointer: fine) {
+    .btn-icon:hover {
+        transform: scale(1.08);
+        background: rgba(0, 0, 0, 0.06);
+        color: var(--text-primary);
+    }
+    body.dark .btn-icon:hover {
+        background: rgba(255, 255, 255, 0.14);
+    }
+    .play-btn:hover {
+        transform: scale(1.08);
+    }
+    .top-right-action .btn-icon:hover,
+    .top-left-action .btn-icon:hover,
+    .top-bar-icons .btn-icon:hover {
+        background: rgba(0, 0, 0, 0.1);
+        transform: rotate(6deg) scale(1.08);
+        color: var(--text-primary);
+    }
+    body.dark .top-right-action .btn-icon:hover,
+    body.dark .top-left-action .btn-icon:hover,
+    body.dark .top-bar-icons .btn-icon:hover {
+        background: rgba(255, 255, 255, 0.18);
+    }
+    .main-actions .btn-icon:hover {
+        transform: scale(1.08);
+    }
+    .song-act-btn:hover {
+        transform: scale(1.06);
+    }
+    .my-playlist-playall-btn:hover,
+    .checkin-btn:hover:not(:disabled),
+    .shop-buy-btn:hover {
+        transform: scale(1.04);
+    }
 }
 
-body.dark .btn-icon:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
+/* Chỉ khi thật sự nhấn mới thu nhỏ — không dùng trên :hover */
 .btn-icon:active {
     transform: scale(0.92);
 }
@@ -413,11 +442,7 @@ body.dark .btn-icon:hover {
     /* Giống các nút khác, chỉ hơi to hơn một chút */
     width: 50px;
     height: 50px;
-    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.play-btn:hover {
-    transform: scale(1.08);
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .play-btn:active {
@@ -429,10 +454,10 @@ body.dark .btn-icon:hover {
 .top-bar-icons .btn-icon {
     background: rgba(0, 0, 0, 0.07);
     backdrop-filter: blur(4px);
-    transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55),
-                background 0.25s ease,
-                color 0.25s ease,
-                box-shadow 0.25s ease;
+    transition: transform 0.2s ease,
+                background 0.2s ease,
+                color 0.2s ease,
+                box-shadow 0.2s ease;
 }
 
 body.dark .top-right-action .btn-icon,
@@ -441,24 +466,10 @@ body.dark .top-bar-icons .btn-icon {
     background: rgba(255, 255, 255, 0.12);
 }
 
-.top-right-action .btn-icon:hover,
-.top-left-action .btn-icon:hover,
-.top-bar-icons .btn-icon:hover {
-    background: rgba(0, 0, 0, 0.1);
-    transform: rotate(6deg) scale(1.1);
-    color: var(--text-primary);
-}
-
-body.dark .top-right-action .btn-icon:hover,
-body.dark .top-left-action .btn-icon:hover,
-body.dark .top-bar-icons .btn-icon:hover {
-    background: rgba(255, 255, 255, 0.12);
-}
-
 .top-right-action .btn-icon:active,
 .top-left-action .btn-icon:active,
 .top-bar-icons .btn-icon:active {
-    transform: rotate(0deg) scale(0.9);
+    transform: rotate(0deg) scale(0.92);
 }
 
 .album-art {
@@ -667,17 +678,13 @@ body.dark .album-art {
 }
 
 .main-actions .btn-icon {
-    transition: transform 0.22s cubic-bezier(0.68, -0.55, 0.265, 1.55),
-                background 0.22s ease,
-                color 0.22s ease;
-}
-
-.main-actions .btn-icon:hover {
-    transform: scale(1.1);
+    transition: transform 0.2s ease,
+                background 0.2s ease,
+                color 0.2s ease;
 }
 
 .main-actions .btn-icon:active {
-    transform: scale(0.9);
+    transform: scale(0.92);
 }
 
 .playlist {
@@ -777,7 +784,7 @@ body.dark .album-art {
     padding: 10px 20px;
     border: none;
     border-radius: 999px;
-    background: #8c00ff;
+    background: linear-gradient(135deg, #ff0040, #8c00ff);
     color: #fff;
     font-weight: 700;
     font-size: 0.78rem;
@@ -787,10 +794,6 @@ body.dark .album-art {
     font-family: inherit;
     box-shadow: 0 6px 18px rgba(140, 0, 255, 0.25);
     transition: transform 0.15s ease, opacity 0.15s ease;
-}
-
-.my-playlist-playall-btn:hover {
-    transform: scale(1.04);
 }
 
 .my-playlist-playall-btn:active {
@@ -910,7 +913,6 @@ body.dark .song-item.active {
 
 .song-act-btn:hover {
     background: var(--btn-hover);
-    transform: scale(1.08);
 }
 
 .song-act-btn.on-fav {
@@ -1197,13 +1199,22 @@ body.dark .song-item.active {
     transition: all 0.25s;
     background: var(--input-bg);
     color: var(--text-primary);
+    /* Ẩn mũi tên tăng/giảm (spinner) của input number */
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.timer-input::-webkit-outer-spin-button,
+.timer-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+    display: none;
 }
 
 .timer-input:focus {
     border-color: var(--accent-color);
     background: var(--card-bg);
     box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.03);
-    transform: scale(1.01);
 }
 
 .timer-start-btn {
@@ -2100,7 +2111,7 @@ body.dark .notification-message {
     padding: 8px 14px;
     border: none;
     border-radius: 20px;
-    background: #8c00ff;
+    background: linear-gradient(135deg, #ff0040, #8c00ff);
     color: #fff;
     font-weight: 700;
     font-size: 0.72rem;
@@ -2115,10 +2126,6 @@ body.dark .notification-message {
     width: 14px;
     height: 14px;
     stroke: #fff;
-}
-
-.checkin-btn:hover:not(:disabled) {
-    transform: scale(1.04);
 }
 
 .checkin-btn:disabled,
@@ -2241,7 +2248,7 @@ body.dark .notification-message {
     padding: 7px 12px;
     border: none;
     border-radius: 16px;
-    background: #8c00ff;
+    background: linear-gradient(135deg, #ff0040, #8c00ff);
     color: #fff;
     font-weight: 700;
     font-size: 0.68rem;
@@ -2251,10 +2258,6 @@ body.dark .notification-message {
     font-family: inherit;
     transition: transform 0.15s, opacity 0.15s;
     white-space: nowrap;
-}
-
-.shop-buy-btn:hover {
-    transform: scale(1.05);
 }
 
 .shop-buy-btn:disabled {
@@ -2282,7 +2285,7 @@ body.dark .notification-message {
 }
 
 .shop-rent-btn {
-    background: #17adca !important;
+    background: linear-gradient(135deg, #17adca, #8c00ff) !important;
 }
 
 .demo-badge {
@@ -2685,7 +2688,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     font-weight: 700;
     font-size: 0.8rem;
     cursor: pointer;
-    background: #8c00ff;
+    background: linear-gradient(135deg, #ff0040, #8c00ff);
     color: #fff;
     white-space: nowrap;
     box-sizing: border-box;
@@ -2704,7 +2707,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     padding: 16px 8px;
     border-radius: 16px;
     border: 1px solid rgba(140,0,255,0.22);
-    background: rgba(140,0,255,0.15);
+    background: linear-gradient(145deg, rgba(140,0,255,0.18), rgba(255,0,64,0.10));
     color: var(--text-primary);
     cursor: pointer;
     font-family: inherit;
@@ -2713,7 +2716,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     transition: transform 0.2s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .extras-action-btn:hover {
-    background: rgba(140,0,255,0.28);
+    background: linear-gradient(145deg, rgba(140,0,255,0.28), rgba(255,0,64,0.16));
     border-color: rgba(140,0,255,0.45);
     box-shadow: 0 4px 18px rgba(140,0,255,0.18);
     transform: translateY(-2px);
@@ -2769,7 +2772,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .shop-tab svg { width: 15px; height: 15px; flex-shrink: 0; }
 .shop-tab.active {
-  background: rgba(140,0,255,0.22);
+  background: linear-gradient(135deg, rgba(255,0,64,0.2), rgba(140,0,255,0.25));
   border-color: rgba(140,0,255,0.45);
   color: var(--text-primary);
 }
@@ -3017,74 +3020,35 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
 
-/* ========== Scrollbar đồng bộ kiểu music2 (list bài hát) ========== */
+/* ========== Scrollbar kiểu music2 — áp dụng mọi vùng cuộn (hiện tại + sau này) ========== */
 :root {
   --xk-scroll-w: 4px;
   --xk-scroll-track: var(--progress-bg, rgba(255,255,255,0.08));
   --xk-scroll-thumb: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
-#playlist-content,
-#my-playlist-content,
-.shop-list,
-.shop-tab-panels,
-.extras-modal-body,
-.extras-result,
-.extras-result-modal-body,
-.badges-modal-body,
-.chat-modal-body,
-.global-chat-box,
-.listen-stats,
-.timer-modal,
-.timer-modal-content {
+/* Firefox */
+* {
   scrollbar-width: thin;
-  scrollbar-color: #c20175 #1a1a1a22;
+  scrollbar-color: #c20175 transparent;
 }
 
-#playlist-content::-webkit-scrollbar,
-#my-playlist-content::-webkit-scrollbar,
-.shop-list::-webkit-scrollbar,
-.shop-tab-panels::-webkit-scrollbar,
-.extras-modal-body::-webkit-scrollbar,
-.extras-result::-webkit-scrollbar,
-.extras-result-modal-body::-webkit-scrollbar,
-.badges-modal-body::-webkit-scrollbar,
-.chat-modal-body::-webkit-scrollbar,
-.global-chat-box::-webkit-scrollbar,
-.listen-stats::-webkit-scrollbar,
-.timer-modal::-webkit-scrollbar {
+/* WebKit (Chrome / Safari / Edge) — giống music2 */
+*::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
-
-#playlist-content::-webkit-scrollbar-track,
-#my-playlist-content::-webkit-scrollbar-track,
-.shop-list::-webkit-scrollbar-track,
-.shop-tab-panels::-webkit-scrollbar-track,
-.extras-modal-body::-webkit-scrollbar-track,
-.extras-result::-webkit-scrollbar-track,
-.extras-result-modal-body::-webkit-scrollbar-track,
-.badges-modal-body::-webkit-scrollbar-track,
-.chat-modal-body::-webkit-scrollbar-track,
-.global-chat-box::-webkit-scrollbar-track,
-.listen-stats::-webkit-scrollbar-track,
-.timer-modal::-webkit-scrollbar-track {
-  background-color: var(--progress-bg);
+*::-webkit-scrollbar-track {
+  background-color: var(--progress-bg, rgba(255,255,255,0.08));
 }
-
-#playlist-content::-webkit-scrollbar-thumb,
-#my-playlist-content::-webkit-scrollbar-thumb,
-.shop-list::-webkit-scrollbar-thumb,
-.shop-tab-panels::-webkit-scrollbar-thumb,
-.extras-modal-body::-webkit-scrollbar-thumb,
-.extras-result::-webkit-scrollbar-thumb,
-.extras-result-modal-body::-webkit-scrollbar-thumb,
-.badges-modal-body::-webkit-scrollbar-thumb,
-.chat-modal-body::-webkit-scrollbar-thumb,
-.global-chat-box::-webkit-scrollbar-thumb,
-.listen-stats::-webkit-scrollbar-thumb,
-.timer-modal::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
   background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
   border-radius: 50px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+  background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
 /* ===== Result modal (Top / Review / Thời gian) ===== */
@@ -3531,7 +3495,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 
 /* ===== Extras feature buttons highlight ===== */
 .extras-feat-btn {
-  background: rgba(140,0,255,0.12) !important;
+  background: linear-gradient(145deg, rgba(140,0,255,0.12), rgba(255,0,64,0.08)) !important;
   border-color: rgba(140,0,255,0.22) !important;
 }
 .extras-feat-btn:hover {
@@ -3740,7 +3704,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   color: var(--text-secondary);
 }
 .wk-card.current .wk-badge {
-  background: #8c00ff;
+  background: linear-gradient(135deg, #ff0040, #8c00ff);
   color: #fff;
 }
 .wk-info { flex: 1; min-width: 0; }
