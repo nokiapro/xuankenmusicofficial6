@@ -921,7 +921,7 @@
     <div id="login-screen" class="wrap">
         <div class="login-box">
             <h1>ADMIN XUANKEN</h1>
-            <div class="error" id="login-error">Email hoặc mật khẩu không đúng</div>
+            <div class="error" id="login-error" style="display:none;">Email hoặc mật khẩu không đúng</div>
             <label for="admin-email">Email admin</label>
             <input type="email" id="admin-email" placeholder="admin@gmail.com" autocomplete="username">
             <label for="admin-pass">Mật khẩu</label>
@@ -2417,11 +2417,195 @@
             }
         })();
 
+        function showLogin() {
+            const login = document.getElementById('login-screen');
+            const app = document.getElementById('admin-app');
+            if (login) login.style.display = '';
+            if (app) app.style.display = 'none';
+        }
+
+        function adminAccessErrorMessage(code) {
+            const c = String(code || '');
+            if (c === 'not-admin-email' || c === 'player-email') {
+                return 'Email này không được phép vào Admin (chỉ email admin thật).';
+            }
+            if (c === 'no-email') return 'Tài khoản không có email hợp lệ.';
+            if (c === 'not-in-allowlist') {
+                return 'Email chưa nằm trong danh sách admin (settings/adminEmails).';
+            }
+            return c || 'Không có quyền Admin.';
+        }
+
+        async function assertAdminAccess(user) {
+            if (!user) throw new Error('no-email');
+            const email = String(user.email || '').trim().toLowerCase();
+            if (!email || !email.includes('@')) throw new Error('no-email');
+            // Tài khoản player ảo không được vào admin
+            if (email.endsWith('@xuanken.user')) throw new Error('player-email');
+
+            // Allowlist (nếu có và không rỗng) — bắt buộc khớp
+            try {
+                const snap = await db().ref('settings/adminEmails').once('value');
+                const val = snap.val();
+                let list = [];
+                if (Array.isArray(val)) list = val;
+                else if (val && typeof val === 'object') list = Object.keys(val);
+                list = list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+                if (list.length > 0 && list.indexOf(email) === -1) {
+                    throw new Error('not-in-allowlist');
+                }
+            } catch (e) {
+                // permission_denied / network → vẫn cho vào nếu đã là email thật (auth ok)
+                if (e && (e.message === 'not-in-allowlist' || e.message === 'player-email' || e.message === 'no-email')) {
+                    throw e;
+                }
+                console.warn('assertAdminAccess allowlist check:', e && (e.code || e.message));
+            }
+            return true;
+        }
+
+        let _adminBootstrapped = false;
+        async function bootstrapAdminData() {
+            if (_adminBootstrapped) return;
+            _adminBootstrapped = true;
+            try {
+                await loadSettings();
+            } catch (e) { console.warn('loadSettings', e); }
+            try {
+                await loadSongs();
+            } catch (e) { console.warn('loadSongs', e); }
+            try {
+                await loadUsers();
+            } catch (e) { console.warn('loadUsers', e); }
+            // Cập nhật email trên header
+            try {
+                const auth = getAdminAuth();
+                const u = auth && auth.currentUser;
+                const el = document.getElementById('admin-identity-email');
+                if (el && u) el.textContent = u.email || '';
+            } catch (e) {}
+        }
+
+        async function showApp() {
+            const login = document.getElementById('login-screen');
+            const app = document.getElementById('admin-app');
+            if (login) login.style.display = 'none';
+            if (app) app.style.display = '';
+            await bootstrapAdminData();
+        }
+
+        function setLoginError(msg) {
+            const errEl = document.getElementById('login-error');
+            if (!errEl) return;
+            if (msg) {
+                errEl.textContent = msg;
+                errEl.style.display = 'block';
+            } else {
+                errEl.style.display = 'none';
+            }
+        }
+
+        function firebaseAuthErrorMessage(err) {
+            const code = (err && err.code) || '';
+            if (code === 'auth/invalid-email') return 'Email không hợp lệ.';
+            if (code === 'auth/user-disabled') return 'Tài khoản đã bị vô hiệu hóa.';
+            if (code === 'auth/user-not-found') return 'Không tìm thấy tài khoản với email này.';
+            if (code === 'auth/wrong-password') return 'Mật khẩu không đúng.';
+            if (code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+                return 'Email hoặc mật khẩu không đúng.';
+            }
+            if (code === 'auth/too-many-requests') return 'Thử quá nhiều lần. Đợi một lúc rồi thử lại.';
+            if (code === 'auth/network-request-failed') return 'Lỗi mạng — kiểm tra kết nối.';
+            return (err && err.message) || 'Đăng nhập thất bại.';
+        }
+
+        async function doAdminLogin() {
+            const emailEl = document.getElementById('admin-email');
+            const passEl = document.getElementById('admin-pass');
+            const btn = document.getElementById('admin-login-btn');
+            const email = (emailEl && emailEl.value || '').trim();
+            const pass = (passEl && passEl.value || '');
+            setLoginError('');
+            if (!email || !pass) {
+                setLoginError('Nhập đầy đủ email và mật khẩu.');
+                return;
+            }
+            if (email.toLowerCase().endsWith('@xuanken.user')) {
+                setLoginError('Đây là tài khoản player — dùng email admin Firebase (Gmail thật).');
+                return;
+            }
+            const auth = getAdminAuth();
+            if (!auth) {
+                setLoginError('Firebase Auth chưa khởi tạo được. Tải lại trang.');
+                return;
+            }
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng nhập...';
+            }
+            try {
+                await auth.signInWithEmailAndPassword(email, pass);
+                // onAuthStateChanged sẽ gọi assertAdminAccess + showApp
+            } catch (err) {
+                console.warn('Admin login error:', err);
+                setLoginError(firebaseAuthErrorMessage(err));
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Đăng nhập';
+                }
+            }
+        }
+
+        (function bindAdminLoginUi() {
+            const btn = document.getElementById('admin-login-btn');
+            if (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    doAdminLogin();
+                });
+            }
+            const passEl = document.getElementById('admin-pass');
+            if (passEl) {
+                passEl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        doAdminLogin();
+                    }
+                });
+            }
+            const emailEl = document.getElementById('admin-email');
+            if (emailEl) {
+                emailEl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const p = document.getElementById('admin-pass');
+                        if (p) p.focus();
+                    }
+                });
+            }
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async function () {
+                    _adminBootstrapped = false;
+                    const auth = getAdminAuth();
+                    try {
+                        if (auth) await auth.signOut();
+                    } catch (e) {
+                        console.warn('logout', e);
+                    }
+                    showLogin();
+                    setLoginError('');
+                });
+            }
+        })();
+
         (function bindAdminAuth() {
             const auth = getAdminAuth();
             if (!auth) {
                 console.error('Admin Auth không khởi tạo được');
                 showLogin();
+                setLoginError('Firebase Auth chưa sẵn sàng. Kiểm tra firebase-config.js và tải lại trang.');
                 return;
             }
             // Persistence riêng cho app admin (không đụng player)
@@ -2432,21 +2616,18 @@
             } catch (e) {}
             auth.onAuthStateChanged(async (user) => {
                 if (!user) {
+                    _adminBootstrapped = false;
                     showLogin();
                     return;
                 }
                 try {
                     await assertAdminAccess(user);
-                    showApp();
+                    await showApp();
                 } catch (e) {
                     console.warn('Admin access denied:', e && e.message);
                     try { await auth.signOut(); } catch (x) {}
                     showLogin();
-                    const errEl = document.getElementById('login-error');
-                    if (errEl) {
-                        errEl.textContent = adminAccessErrorMessage((e && e.message) || '');
-                        errEl.style.display = 'block';
-                    }
+                    setLoginError(adminAccessErrorMessage((e && e.message) || ''));
                 }
             });
         })();
