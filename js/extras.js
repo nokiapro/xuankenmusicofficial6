@@ -1401,27 +1401,49 @@
             timeStr = pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear()
               + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
           }
+          const uname = String(m.u || '?');
           return '<div class="chat-msg">'
             + '<div class="chat-msg-main">'
             + badge
-            + '<span class="chat-user">' + escapeHtml(m.u || '?') + ':</span> '
+            + '<button type="button" class="chat-user" data-chat-user="' + escapeHtml(uname) + '"'
+            + (timeStr ? ' data-chat-time="' + escapeHtml(timeStr) + '"' : '')
+            + ' title="Bấm để @tag và xem thời gian">' + escapeHtml(uname) + ':</button> '
             + '<span class="chat-text">' + text + '</span>'
-            + (timeStr ? '<button type="button" class="chat-time-toggle" title="Thời gian">▼</button>' : '')
             + '</div>'
-            + (timeStr ? '<div class="chat-msg-time" hidden>' + escapeHtml(timeStr) + '</div>' : '')
+            + (timeStr ? '<div class="chat-msg-time" hidden><i class="fa-regular fa-clock"></i> ' + escapeHtml(timeStr) + '</div>' : '')
             + '</div>';
         }).join('') || '<div style="opacity:.6">Chưa có tin nhắn</div>';
-        box.querySelectorAll('.chat-time-toggle').forEach(btn => {
+        box.querySelectorAll('.chat-user[data-chat-user]').forEach(btn => {
           btn.onclick = (ev) => {
             ev.preventDefault();
+            ev.stopPropagation();
             const wrap = btn.closest('.chat-msg');
+            const uname = btn.getAttribute('data-chat-user') || '';
+            // Hiện / ẩn thời gian gửi
             const timeEl = wrap && wrap.querySelector('.chat-msg-time');
-            if (!timeEl) return;
-            const open = timeEl.hasAttribute('hidden');
-            if (open) timeEl.removeAttribute('hidden');
-            else timeEl.setAttribute('hidden', '');
-            btn.classList.toggle('open', open);
-            btn.textContent = open ? '▲' : '▼';
+            if (timeEl) {
+              const open = timeEl.hasAttribute('hidden');
+              if (open) timeEl.removeAttribute('hidden');
+              else timeEl.setAttribute('hidden', '');
+              btn.classList.toggle('time-open', open);
+            }
+            // Chèn @username vào ô nhập (tag)
+            if (uname && uname !== '?') {
+              const input = $('global-chat-input');
+              if (input) {
+                const tag = '@' + uname;
+                const cur = String(input.value || '');
+                // Không chèn trùng nếu đã có tag đó ở cuối
+                if (!new RegExp('@' + uname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(cur)) {
+                  input.value = (cur.replace(/\s+$/, '') + (cur.trim() ? ' ' : '') + tag + ' ').replace(/^\s+/, '');
+                }
+                input.focus();
+                try {
+                  const len = input.value.length;
+                  input.setSelectionRange(len, len);
+                } catch (e) {}
+              }
+            }
           };
         });
         box.scrollTop = box.scrollHeight;

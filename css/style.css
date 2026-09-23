@@ -2866,6 +2866,20 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   font-weight: 800;
   color: #c4b5fd;
   margin-right: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  display: inline;
+  text-align: left;
+}
+.chat-msg .chat-user:hover {
+  color: #e9d5ff;
+  text-decoration: underline;
+}
+.chat-msg .chat-user.time-open {
+  color: #a78bfa;
 }
 .chat-msg .chat-badge {
   font-size: 0.6rem;
@@ -2930,28 +2944,20 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   gap: 4px;
   line-height: 1.4;
 }
-.chat-msg .chat-user { font-weight: 800; color: #c4b5fd; }
-.chat-time-toggle {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--border-color);
-  background: var(--progress-bg);
-  color: var(--text-secondary);
-  font-size: 0.55rem;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-left: 4px;
-}
-.chat-time-toggle.open { color: #c4b5fd; border-color: rgba(140,0,255,0.5); }
 .chat-msg-time {
   font-size: 0.65rem;
   color: var(--text-secondary);
-  opacity: 0.85;
-  padding: 2px 0 4px 4px;
+  opacity: 0.9;
+  padding: 3px 0 4px 2px;
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.chat-msg-time i {
+  font-size: 0.7rem;
+  color: #a78bfa;
+  opacity: 0.9;
 }
 
 
