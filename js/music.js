@@ -961,6 +961,14 @@ function persistListenTimeNow() {
                 _lastListenTickAt = 0;
             }
         }
+        // Ép ghi localStorage trước khi put Firebase
+        try {
+            const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
+            if (name && typeof getAllAccounts === 'function' && typeof saveAllAccounts === 'function') {
+                saveAllAccounts(getAllAccounts());
+                window._listenLocalSaveAt = Date.now();
+            }
+        } catch (e) {}
         return flushListenTimeToFirebase(true);
     } catch (e) {
         return Promise.resolve(false);
@@ -988,7 +996,15 @@ function recordListenSeconds(deltaSec) {
     const add = Number(deltaSec) || 0;
     acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + add;
     acc.listenTime.total = (Number(acc.listenTime.total) || 0) + add;
-    if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
+    // Ghi localStorage thưa (~3s) — tránh spam I/O mỗi giây trên mobile
+    if (!window._listenLocalSaveAt) window._listenLocalSaveAt = 0;
+    if (Date.now() - window._listenLocalSaveAt > 3000) {
+        if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
+        window._listenLocalSaveAt = Date.now();
+    } else {
+        // Vẫn giữ object trong memory (accounts[name] đã mutate)
+        try { accounts[name] = acc; } catch (e) {}
+    }
 
     // Phiên nghe (huy hiệu Marathon)
     window._sessionListenSec = (Number(window._sessionListenSec) || 0) + add;
@@ -999,6 +1015,8 @@ function recordListenSeconds(deltaSec) {
     if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
     // Backup định kỳ ~15s (phòng trường hợp không kịp flush khi thoát)
     if (Date.now() - window._listenTimeSyncAt > 15000) {
+        if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
+        window._listenLocalSaveAt = Date.now();
         flushListenTimeToFirebase(true);
     }
 }
@@ -2859,9 +2877,16 @@ function startUserProfileListener(uid) {
         mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prev && prev.myPlaylist);
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prev && prev.listenedSongs);
         mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prev && prev.checkinDays);
+        // listenTime: giữ giây local chưa flush — không để remote cũ xóa
+        mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prev && prev.listenTime);
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prev && prev.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prev && prev.level) || 1);
         mapped.seasonXp = Math.max(Number(prev && prev.seasonXp) || 0, Number(mapped.seasonXp) || 0);
+        // streak: lấy max (tránh remote thấp đè local vừa điểm danh)
+        mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prev && prev.streak) || 0);
+        if (prev && prev.lastCheckin && (!mapped.lastCheckin || String(prev.lastCheckin) > String(mapped.lastCheckin))) {
+            mapped.lastCheckin = prev.lastCheckin;
+        }
         const prevCoins = prev ? (prev.coins | 0) : null;
         accounts[name] = mapped;
         saveAllAccounts(accounts);
@@ -2938,21 +2963,15 @@ async function fetchUserByUid(uid, usernameHint) {
         mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prevLocal && prevLocal.myPlaylist);
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prevLocal && prevLocal.listenedSongs);
         mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prevLocal && prevLocal.checkinDays);
-        if (prevLocal && prevLocal.listenTime) {
-            const byDay = mergeNumericMaps(
-                (mapped.listenTime && mapped.listenTime.byDay) || {},
-                prevLocal.listenTime.byDay || {}
-            );
-            let total = 0;
-            Object.keys(byDay).forEach(k => { total += Number(byDay[k]) || 0; });
-            total = Math.max(total, Number(mapped.listenTime && mapped.listenTime.total) || 0, Number(prevLocal.listenTime.total) || 0);
-            mapped.listenTime = { total, byDay };
-        }
-        // XP/level: lấy max
+        mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prevLocal && prevLocal.listenTime);
+        // XP/level/streak: lấy max
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prevLocal && prevLocal.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
         mapped.seasonXp = Math.max(Number(mapped.seasonXp) || 0, Number(prevLocal && prevLocal.seasonXp) || 0);
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prevLocal && prevLocal.streak) || 0);
+        if (prevLocal && prevLocal.lastCheckin && (!mapped.lastCheckin || String(prevLocal.lastCheckin) > String(mapped.lastCheckin))) {
+            mapped.lastCheckin = prevLocal.lastCheckin;
+        }
         accounts[name] = mapped;
         saveAllAccounts(accounts);
         if (getCurrentUsername() !== name) {
@@ -3368,12 +3387,17 @@ function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
     const id = String(songId);
     if (loadOwnedSongs().includes(id)) return true;
+    // Vừa mua trên máy này (pending sync) — vẫn coi là sở hữu
+    if (_pendingOwnedAdds[id] && (Date.now() - (_pendingOwnedAdds[id] || 0) < PENDING_OWNED_MS)) {
+        return true;
+    }
     // Thuê 24h còn hạn?
     const acc = getCurrentAccount();
     if (acc && acc.rentals && acc.rentals[id]) {
         const exp = Number(acc.rentals[id]) || 0;
         if (exp > Date.now()) return true;
     }
+    if (isSongRented(id)) return true;
     return false;
 }
 
@@ -3608,7 +3632,7 @@ function doDailyCheckin(dayKeyOpt) {
         showNotification('ĐIỂM DANH:', 'Ngày này đã điểm danh rồi', '#ff9800', 'calendar-check');
         return false;
     }
-    const reward = getAdminSettings().checkinReward;
+    const reward = Number(getAdminSettings().checkinReward) || 15;
     const isMakeup = dayKey !== today;
     const MAKEUP_COST = 5;
     if (isMakeup) {
