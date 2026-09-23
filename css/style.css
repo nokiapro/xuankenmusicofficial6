@@ -3063,42 +3063,35 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
 
-/* ========== Scrollbar 7 màu kiểu music2 ==========
-   #f1b586 → #9f81ca → #c20175 → #b33cea → #17adca → #dd4809 → #ad9199
-   Không dùng scrollbar-color (màu đặc) kẻo Chrome bỏ gradient.
+/* ========== Scrollbar 7 màu — đúng music2 ==========
+   QUAN TRỌNG: KHÔNG dùng scrollbar-width / scrollbar-color trên Chrome
+   (Chrome mới sẽ bỏ hẳn ::-webkit-scrollbar → mất CSS custom).
 */
 :root {
-  --xk-scroll-w: 5px;
-  --xk-scroll-track: var(--progress-bg);
-  --xk-scroll-thumb: linear-gradient(
-    180deg,
-    #f1b586 0%,
-    #9f81ca 16%,
-    #c20175 33%,
-    #b33cea 50%,
-    #17adca 66%,
-    #dd4809 83%,
-    #ad9199 100%
-  );
+  --xk-scroll-grad: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
-/* Firefox: chỉ thin, không ép màu đặc (gradient không hỗ trợ) */
-#playlist-content,
-#my-playlist-content,
-.shop-list,
-.shop-tab-panels,
-.extras-modal-body,
-.extras-result,
-.extras-result-modal-body,
-.badges-modal-body,
-.chat-modal-body,
-.global-chat-box,
-.listen-stats,
-.timer-modal,
-.timer-modal-content {
-  scrollbar-width: thin;
+/* Chỉ Firefox mới dùng scrollbar-width (không hỗ trợ webkit pseudo) */
+@supports not selector(::-webkit-scrollbar) {
+  #playlist-content,
+  #my-playlist-content,
+  .shop-list,
+  .shop-tab-panels,
+  .extras-modal-body,
+  .extras-result,
+  .extras-result-modal-body,
+  .badges-modal-body,
+  .chat-modal-body,
+  .global-chat-box,
+  .listen-stats,
+  .timer-modal,
+  .timer-modal-content {
+    scrollbar-width: thin;
+    scrollbar-color: #c20175 transparent;
+  }
 }
 
+/* WebKit / Chrome / Edge / Safari — custom scrollbar 7 màu */
 #playlist-content::-webkit-scrollbar,
 #my-playlist-content::-webkit-scrollbar,
 .shop-list::-webkit-scrollbar,
@@ -3111,8 +3104,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar,
 .listen-stats::-webkit-scrollbar,
 .timer-modal::-webkit-scrollbar {
-  width: 5px !important;
-  height: 5px !important;
+  width: 4px;
+  height: 4px;
 }
 
 #playlist-content::-webkit-scrollbar-track,
@@ -3127,11 +3120,9 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar-track,
 .listen-stats::-webkit-scrollbar-track,
 .timer-modal::-webkit-scrollbar-track {
-  background: transparent !important;
-  background-color: var(--progress-bg) !important;
+  background-color: var(--progress-bg);
 }
 
-/* 7 màu dọc theo thanh kéo (180deg = dễ nhìn trên scrollbar dọc) */
 #playlist-content::-webkit-scrollbar-thumb,
 #my-playlist-content::-webkit-scrollbar-thumb,
 .shop-list::-webkit-scrollbar-thumb,
@@ -3144,28 +3135,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar-thumb,
 .listen-stats::-webkit-scrollbar-thumb,
 .timer-modal::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    #f1b586 0%,
-    #9f81ca 16%,
-    #c20175 33%,
-    #b33cea 50%,
-    #17adca 66%,
-    #dd4809 83%,
-    #ad9199 100%
-  ) !important;
-  background-image: linear-gradient(
-    180deg,
-    #f1b586 0%,
-    #9f81ca 16%,
-    #c20175 33%,
-    #b33cea 50%,
-    #17adca 66%,
-    #dd4809 83%,
-    #ad9199 100%
-  ) !important;
-  background-color: #c20175; /* fallback nếu trình duyệt không vẽ gradient */
-  border-radius: 50px !important;
+  background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+  border-radius: 50px;
 }
 
 /* ===== Result modal (Top / Review / Thời gian) ===== */
