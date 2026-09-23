@@ -3063,13 +3063,26 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
 
-/* ========== Scrollbar đúng kiểu music2 (background-image gradient) ========== */
+/* ========== Scrollbar 7 màu kiểu music2 ==========
+   #f1b586 → #9f81ca → #c20175 → #b33cea → #17adca → #dd4809 → #ad9199
+   Không dùng scrollbar-color (màu đặc) kẻo Chrome bỏ gradient.
+*/
 :root {
-  --xk-scroll-w: 4px;
+  --xk-scroll-w: 5px;
   --xk-scroll-track: var(--progress-bg);
-  --xk-scroll-thumb: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
+  --xk-scroll-thumb: linear-gradient(
+    180deg,
+    #f1b586 0%,
+    #9f81ca 16%,
+    #c20175 33%,
+    #b33cea 50%,
+    #17adca 66%,
+    #dd4809 83%,
+    #ad9199 100%
+  );
 }
 
+/* Firefox: chỉ thin, không ép màu đặc (gradient không hỗ trợ) */
 #playlist-content,
 #my-playlist-content,
 .shop-list,
@@ -3084,7 +3097,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .timer-modal,
 .timer-modal-content {
   scrollbar-width: thin;
-  scrollbar-color: #c20175 transparent;
 }
 
 #playlist-content::-webkit-scrollbar,
@@ -3099,7 +3111,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar,
 .listen-stats::-webkit-scrollbar,
 .timer-modal::-webkit-scrollbar {
-  width: 4px;
+  width: 5px !important;
+  height: 5px !important;
 }
 
 #playlist-content::-webkit-scrollbar-track,
@@ -3114,10 +3127,11 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar-track,
 .listen-stats::-webkit-scrollbar-track,
 .timer-modal::-webkit-scrollbar-track {
-  background-color: var(--progress-bg);
+  background: transparent !important;
+  background-color: var(--progress-bg) !important;
 }
 
-/* Đúng như music2: dùng background-image (không dùng background solid) */
+/* 7 màu dọc theo thanh kéo (180deg = dễ nhìn trên scrollbar dọc) */
 #playlist-content::-webkit-scrollbar-thumb,
 #my-playlist-content::-webkit-scrollbar-thumb,
 .shop-list::-webkit-scrollbar-thumb,
@@ -3130,8 +3144,28 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .global-chat-box::-webkit-scrollbar-thumb,
 .listen-stats::-webkit-scrollbar-thumb,
 .timer-modal::-webkit-scrollbar-thumb {
-  background-image: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
-  border-radius: 50px;
+  background: linear-gradient(
+    180deg,
+    #f1b586 0%,
+    #9f81ca 16%,
+    #c20175 33%,
+    #b33cea 50%,
+    #17adca 66%,
+    #dd4809 83%,
+    #ad9199 100%
+  ) !important;
+  background-image: linear-gradient(
+    180deg,
+    #f1b586 0%,
+    #9f81ca 16%,
+    #c20175 33%,
+    #b33cea 50%,
+    #17adca 66%,
+    #dd4809 83%,
+    #ad9199 100%
+  ) !important;
+  background-color: #c20175; /* fallback nếu trình duyệt không vẽ gradient */
+  border-radius: 50px !important;
 }
 
 /* ===== Result modal (Top / Review / Thời gian) ===== */
