@@ -896,45 +896,113 @@ async function fetchListenData() {
 /** Cộng giây nghe thật theo ngày (thống kê tuần/tháng/năm) — chính xác từng giây */
 let _lastListenTickAt = 0;
 let _listenTimeDirty = false;
+/** Gộp listenTime local + remote: byDay lấy max từng ngày, total = max(total, sum byDay) */
+function mergeListenTimeObj(a, b) {
+    const out = { total: 0, byDay: Object.create(null) };
+    const apply = (src) => {
+        if (!src || typeof src !== 'object') return;
+        const bd = (src.byDay && typeof src.byDay === 'object') ? src.byDay : {};
+        Object.keys(bd).forEach(k => {
+            const n = Number(bd[k]) || 0;
+            out.byDay[k] = Math.max(Number(out.byDay[k]) || 0, n);
+        });
+        out.total = Math.max(Number(out.total) || 0, Number(src.total) || 0);
+    };
+    apply(a);
+    apply(b);
+    let sumDays = 0;
+    Object.keys(out.byDay).forEach(k => { sumDays += Number(out.byDay[k]) || 0; });
+    out.total = Math.max(Number(out.total) || 0, sumDays);
+    return out;
+}
 function flushListenTimeToFirebase(force) {
     try {
-        if (!force && !_listenTimeDirty) return;
-        if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
+        if (!force && !_listenTimeDirty) return Promise.resolve(false);
+        if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return Promise.resolve(false);
         const db = typeof getDb === 'function' ? getDb() : null;
-        const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
-        if (!db || !acc || !acc.listenTime) return;
+        const name = getCurrentUsername();
+        const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
+        const acc = (accounts && accounts[name]) || (typeof getCurrentAccount === 'function' ? getCurrentAccount() : null);
+        if (!db || !acc || !acc.listenTime) return Promise.resolve(false);
         const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || acc.uid || '';
-        if (!uid) return;
-        db.ref(dataPath('users') + '/' + uid + '/listenTime').set(acc.listenTime);
-        _listenTimeDirty = false;
-        window._listenTimeSyncAt = Date.now();
-    } catch (e) {}
+        if (!uid) return Promise.resolve(false);
+        const local = mergeListenTimeObj(null, acc.listenTime);
+        // Transaction merge — không .set() ghi đè mất máy khác / tab khác
+        return db.ref(dataPath('users') + '/' + uid + '/listenTime').transaction((current) => {
+            return mergeListenTimeObj(current, local);
+        }).then((tx) => {
+            if (tx && tx.committed && tx.snapshot) {
+                const merged = mergeListenTimeObj(tx.snapshot.val(), local);
+                acc.listenTime = merged;
+                if (accounts && accounts[name]) {
+                    accounts[name].listenTime = merged;
+                    if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
+                }
+            }
+            _listenTimeDirty = false;
+            window._listenTimeSyncAt = Date.now();
+            return true;
+        }).catch(() => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
 }
+
+/** Cộng nốt giây đang đếm + đẩy Firebase ngay (gọi khi ẩn tab / thoát / pause) */
+function persistListenTimeNow() {
+    try {
+        if (_lastListenTickAt > 0) {
+            const d = (Date.now() - _lastListenTickAt) / 1000;
+            if (d > 0 && d <= 8) recordListenSeconds(d);
+            // Giữ mốc nếu vẫn đang phát (chỉ ẩn tab, chưa pause)
+            if (typeof audio !== 'undefined' && audio && !audio.paused) {
+                _lastListenTickAt = Date.now();
+            } else {
+                _lastListenTickAt = 0;
+            }
+        }
+        return flushListenTimeToFirebase(true);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+window.persistListenTimeNow = persistListenTimeNow;
+window.flushListenTimeToFirebase = flushListenTimeToFirebase;
+
 function recordListenSeconds(deltaSec) {
-    // Cho phép mọi đoạn nghe > 0, kể cả vài phần trăm giây; bỏ đoạn quá dài (tab ẩn / lag)
+    // Chỉ nhận đoạn nghe hợp lệ (0–8s). >8s = tab ẩn / lag → bỏ
     if (!deltaSec || deltaSec <= 0 || deltaSec > 8) return;
     if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
-    if (typeof updateCurrentAccount !== 'function') return;
-    const day = (typeof getTodayKey === 'function') ? getTodayKey() : new Date().toISOString().slice(0, 10);
-    updateCurrentAccount(acc => {
-        if (!acc.listenTime || typeof acc.listenTime !== 'object') acc.listenTime = { total: 0, byDay: {} };
-        if (!acc.listenTime.byDay || typeof acc.listenTime.byDay !== 'object') acc.listenTime.byDay = {};
-        acc.listenTime.total = (Number(acc.listenTime.total) || 0) + deltaSec;
-        acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + deltaSec;
-    });
-    // Theo dõi thời gian nghe trong phiên (cho huy hiệu Marathon)
-    window._sessionListenSec = (Number(window._sessionListenSec) || 0) + deltaSec;
+    const name = getCurrentUsername();
+    if (!name) return;
+    // Mỗi giây → LOCAL (localStorage) ngay lập tức
+    const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
+    if (!accounts || !accounts[name]) return;
+    const acc = accounts[name];
+    if (!acc.listenTime || typeof acc.listenTime !== 'object') acc.listenTime = { total: 0, byDay: {} };
+    if (!acc.listenTime.byDay || typeof acc.listenTime.byDay !== 'object') acc.listenTime.byDay = {};
+    const day = (typeof getTodayKey === 'function') ? getTodayKey() : (() => {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    })();
+    const add = Number(deltaSec) || 0;
+    acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + add;
+    acc.listenTime.total = (Number(acc.listenTime.total) || 0) + add;
+    if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
+
+    // Phiên nghe (huy hiệu Marathon)
+    window._sessionListenSec = (Number(window._sessionListenSec) || 0) + add;
     if (window._sessionListenSec >= 3600 && window.xkExtras && typeof window.xkExtras.unlockAchievement === 'function') {
         window.xkExtras.unlockAchievement('marathon');
     }
     _listenTimeDirty = true;
-    // Sync Firebase thưa (~15s) — vẫn flush ngay khi pause/ended/beforeunload
     if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
+    // Backup định kỳ ~15s (phòng trường hợp không kịp flush khi thoát)
     if (Date.now() - window._listenTimeSyncAt > 15000) {
         flushListenTimeToFirebase(true);
     }
 }
-/** Tick 1 giây khi đang phát — đảm bảo nghe vài giây cũng được cộng đủ */
+/** Tick 1 giây duy nhất khi đang phát — nguồn chính cộng giây nghe */
 setInterval(() => {
     try {
         if (typeof audio === 'undefined' || !audio || audio.paused) {
@@ -1950,24 +2018,7 @@ setInterval(() => {
 }, 1000);
 
 audio.ontimeupdate = () => {
-    // Cộng thời gian nghe thật (thống kê)
-    try {
-        if (!audio.paused && hasUserInteracted && songs[index]) {
-            const now = Date.now();
-            if (_lastListenTickAt > 0) {
-                const d = (now - _lastListenTickAt) / 1000;
-                if (d > 0 && d <= 8) recordListenSeconds(d);
-            }
-            _lastListenTickAt = now;
-        } else {
-            // Khi pause: cộng nốt đoạn cuối rồi reset
-            if (_lastListenTickAt > 0) {
-                const d = (Date.now() - _lastListenTickAt) / 1000;
-                if (d > 0 && d <= 8) recordListenSeconds(d);
-            }
-            _lastListenTickAt = 0;
-        }
-    } catch (e) {}
+    // Thời gian nghe do setInterval 1s xử lý (tránh cộng đôi với ontimeupdate)
 
     // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
     if (demoLockedSongId) return;
@@ -2069,6 +2120,8 @@ audio.onplay = () => {
     requestWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
     hidePlayerLoading();
+    // Bắt đầu đếm thời gian nghe từ lúc play
+    _lastListenTickAt = Date.now();
 };
 
 audio.onpause = () => {
@@ -2077,15 +2130,8 @@ audio.onpause = () => {
     if (art) art.style.animationPlayState = 'paused';
     releaseWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
-    // Cộng nốt giây cuối + đẩy Firebase ngay (nghe vài giây cũng lưu)
-    try {
-        if (_lastListenTickAt > 0) {
-            const d = (Date.now() - _lastListenTickAt) / 1000;
-            if (d > 0 && d <= 8) recordListenSeconds(d);
-            _lastListenTickAt = 0;
-        }
-        flushListenTimeToFirebase(true);
-    } catch (e) {}
+    // Pause → cộng nốt + PUT Firebase ngay
+    persistListenTimeNow();
 };
 
 function escapeHtml(str) {
@@ -2503,16 +2549,19 @@ if (listenCountBtn) {
     };
 }
 
+// Ẩn tab / chuyển app / khóa màn hình → cộng nốt giây + PUT Firebase ngay
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        persistListenTimeNow();
+    }
+});
+// Đóng tab / refresh / thoát trình duyệt
+window.addEventListener('pagehide', () => {
+    persistListenTimeNow();
+});
 window.addEventListener('beforeunload', () => {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    try {
-        if (_lastListenTickAt > 0) {
-            const d = (Date.now() - _lastListenTickAt) / 1000;
-            if (d > 0 && d <= 8) recordListenSeconds(d);
-            _lastListenTickAt = 0;
-        }
-        flushListenTimeToFirebase(true);
-    } catch (e) {}
+    persistListenTimeNow();
 });
 
 window.adjustLyricFontSize = adjustLyricFontSize;

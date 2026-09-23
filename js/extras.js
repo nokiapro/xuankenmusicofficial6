@@ -332,14 +332,20 @@
 
   function sumByDayPeriod(byDay, period) {
     const now = new Date();
+    // So sánh theo ngày lịch (0h local), tránh lệch timezone / nửa ngày
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const weekStart = startOfToday - 6 * 24 * 3600 * 1000; // 7 ngày gồm hôm nay
     let sum = 0;
     Object.keys(byDay || {}).forEach(k => {
       const parts = String(k).split('-');
       if (parts.length < 3) return;
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const y = Number(parts[0]), m = Number(parts[1]) - 1, day = Number(parts[2]);
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(day)) return;
+      const d = new Date(y, m, day);
       if (Number.isNaN(d.getTime())) return;
+      const t = d.getTime();
       if (period === 'week') {
-        if (d >= new Date(now.getTime() - 7 * 24 * 3600 * 1000)) sum += Number(byDay[k]) || 0;
+        if (t >= weekStart && t <= startOfToday) sum += Number(byDay[k]) || 0;
       } else if (period === 'month') {
         if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) sum += Number(byDay[k]) || 0;
       } else {
@@ -1182,8 +1188,8 @@
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    if (h > 0) return h + ' giờ ' + m + ' phút ' + s + ' giây';
-    if (m > 0) return m + ' phút ' + s + ' giây';
+    if (h > 0) return h + ' giờ ' + m + ' phút' + (s > 0 ? ' ' + s + ' giây' : '');
+    if (m > 0) return m + ' phút' + (s > 0 ? ' ' + s + ' giây' : '');
     return s + ' giây';
   }
 
@@ -1191,27 +1197,19 @@
     const acc = getAcc();
     if (!acc || !acc.listenTime) return 0;
     const byDay = (acc.listenTime.byDay && typeof acc.listenTime.byDay === 'object') ? acc.listenTime.byDay : {};
-    const now = new Date();
-    let sum = 0;
-    Object.keys(byDay).forEach(k => {
-      const parts = String(k).split('-');
-      if (parts.length < 3) return;
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      if (Number.isNaN(d.getTime())) return;
-      if (period === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-        if (d >= weekAgo) sum += Number(byDay[k]) || 0;
-      } else if (period === 'month') {
-        if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
-          sum += Number(byDay[k]) || 0;
-        }
-      } else if (period === 'year') {
-        if (d.getFullYear() === now.getFullYear()) {
-          sum += Number(byDay[k]) || 0;
-        }
-      }
-    });
-    return sum;
+    // Dùng chung logic với leaderboard
+    return sumByDayPeriod(byDay, period);
+  }
+
+  /** Tổng nghe: ưu tiên max(total field, tổng byDay) — tránh số 0 sai khi total chưa sync */
+  function getListenTotalSec() {
+    const acc = getAcc();
+    if (!acc || !acc.listenTime) return 0;
+    const total = Number(acc.listenTime.total) || 0;
+    const byDay = (acc.listenTime.byDay && typeof acc.listenTime.byDay === 'object') ? acc.listenTime.byDay : {};
+    let sumDays = 0;
+    Object.keys(byDay).forEach(k => { sumDays += Number(byDay[k]) || 0; });
+    return Math.max(total, sumDays);
   }
 
   function ensureExtrasUi() {
@@ -1320,9 +1318,9 @@
 
     function showListenTime(period) {
       const labels = { week: 'THỜI GIAN · TUẦN', month: 'THỜI GIAN · THÁNG', year: 'THỜI GIAN · NĂM' };
-      const sub = { week: '7 ngày gần nhất', month: 'Tháng này', year: 'Năm nay' };
+      const sub = { week: '7 ngày gần nhất (gồm hôm nay)', month: 'Tháng này', year: 'Năm nay' };
       const sec = sumListenTime(period);
-      const total = (getAcc() && getAcc().listenTime && getAcc().listenTime.total) || 0;
+      const total = getListenTotalSec();
       const body = '<div class="xr-time-wrap">'
         + '<div class="xr-time-card primary"><div class="xr-time-label">' + escapeHtml(sub[period] || '') + '</div>'
         + '<div class="xr-time-val">' + escapeHtml(formatListenDuration(sec)) + '</div></div>'
