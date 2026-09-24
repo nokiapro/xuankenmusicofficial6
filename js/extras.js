@@ -802,7 +802,12 @@
     if (!user) return toast('GIFT', 'Cần đăng nhập username', '#ff4444');
     // Key an toàn cho Firebase (tránh . # $ [ ] /)
     const userKey = (typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(user) : String(user).replace(/[.#$\[\]\/]/g, '_'));
+    const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || '';
     try {
+      const auth = typeof getAuth === 'function' ? getAuth() : null;
+      if (auth && !auth.currentUser) {
+        return toast('GIFT', 'Chưa đăng nhập Firebase — thoát vào lại username/PIN', '#ff4444');
+      }
       const db = typeof getDb === 'function' ? getDb() : null;
       if (!db) return toast('GIFT', 'Không kết nối được', '#ff4444');
       const path = (typeof dataPath === 'function' ? dataPath('giftCodes') : 'giftCodes') + '/' + code;
@@ -815,38 +820,75 @@
       const maxUses = data.maxUses == null ? 1 : Number(data.maxUses); // -1 = vĩnh viễn
       const usedCount = Number(data.usedCount) || 0;
       const usedByMap = (data.usedByMap && typeof data.usedByMap === 'object') ? data.usedByMap : {};
-      // 1 user chỉ nhận 1 lần / mã
-      if (usedByMap[userKey] || usedByMap[user]) return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
+      // 1 user chỉ nhận 1 lần / mã (username key hoặc uid)
+      if (usedByMap[userKey] || usedByMap[user] || (uid && usedByMap[uid])) {
+        return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
+      }
       // maxUses = 1 kiểu cũ: usedBy string
       if (maxUses === 1 && data.usedBy && String(data.usedBy).trim() && !data.usedByMap) {
         return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
       }
       if (maxUses >= 0 && usedCount >= maxUses) {
-        return toast('GIFT', 'Mã đã hết lượt dùng', '#ff9800');
+        return toast('GIFT', 'Mã đã hết lượt dùng (' + usedCount + '/' + maxUses + ')', '#ff9800');
       }
-      const result = await ref.transaction(current => {
-        if (!current) return; // abort
-        const max = current.maxUses == null ? 1 : Number(current.maxUses);
-        const cnt = Number(current.usedCount) || 0;
-        const map = (current.usedByMap && typeof current.usedByMap === 'object') ? { ...current.usedByMap } : {};
-        if (map[userKey] || map[user]) return; // abort — đã nhận
-        if (max === 1 && current.usedBy && String(current.usedBy).trim() && !current.usedByMap) return;
-        if (max >= 0 && cnt >= max) return;
-        map[userKey] = Date.now();
-        current.usedByMap = map;
-        current.usedCount = cnt + 1;
-        current.usedBy = user; // user cuối (hiển thị)
-        current.usedAt = Date.now();
-        return current;
+      // applyLocally=false: tránh lần gọi đầu current=null (cache) làm abort nhầm khi mã vẫn còn lượt
+      const result = await new Promise((resolve, reject) => {
+        ref.transaction(current => {
+          const cur = (current && typeof current === 'object') ? current : (data && typeof data === 'object' ? { ...data } : null);
+          if (!cur) return;
+          const max = cur.maxUses == null ? 1 : Number(cur.maxUses);
+          const cnt = Number(cur.usedCount) || 0;
+          const map = (cur.usedByMap && typeof cur.usedByMap === 'object') ? { ...cur.usedByMap } : {};
+          if (map[userKey] || map[user] || (uid && map[uid])) return;
+          if (max === 1 && cur.usedBy && String(cur.usedBy).trim() && !cur.usedByMap) return;
+          if (max >= 0 && cnt >= max) return;
+          map[userKey] = Date.now();
+          if (uid) map[uid] = Date.now();
+          cur.usedByMap = map;
+          cur.usedCount = cnt + 1;
+          cur.usedBy = user;
+          cur.usedAt = Date.now();
+          return cur;
+        }, (err, committed, snapshot) => {
+          if (err) reject(err);
+          else resolve({ committed, snapshot });
+        }, false);
       });
       if (!result || !result.committed) {
-        return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
+        // Đọc lại để báo đúng lý do (không gộp với "Rules chặn")
+        try {
+          const again = (await ref.once('value')).val() || {};
+          const map2 = (again.usedByMap && typeof again.usedByMap === 'object') ? again.usedByMap : {};
+          if (map2[userKey] || map2[user] || (uid && map2[uid])) {
+            return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
+          }
+          const max2 = again.maxUses == null ? 1 : Number(again.maxUses);
+          const cnt2 = Number(again.usedCount) || 0;
+          if (max2 >= 0 && cnt2 >= max2) {
+            return toast('GIFT', 'Mã đã hết lượt dùng (' + cnt2 + '/' + max2 + ')', '#ff9800');
+          }
+          if (max2 === 1 && again.usedBy && String(again.usedBy).trim() && !again.usedByMap) {
+            return toast('GIFT', 'Mã đã được dùng bởi ' + again.usedBy, '#ff9800');
+          }
+        } catch (e2) {}
+        return toast('GIFT', 'Không nhận được mã — thử lại sau', '#ff9800');
       }
+      // Cộng xu local + Firebase
       if (typeof updateCurrentAccount === 'function') {
         updateCurrentAccount(acc => {
           acc.coins = (acc.coins | 0) + coins;
           acc.giftClaimCount = (Number(acc.giftClaimCount) || 0) + 1;
         });
+      }
+      if (uid) {
+        try {
+          const coinsPath = (typeof dataPath === 'function' ? dataPath('users') : 'users') + '/' + uid + '/coins';
+          await db.ref(coinsPath).transaction(c => (Number(c) || 0) + coins);
+          const giftPath = (typeof dataPath === 'function' ? dataPath('users') : 'users') + '/' + uid + '/giftClaimCount';
+          await db.ref(giftPath).transaction(c => (Number(c) || 0) + 1);
+        } catch (eCoin) {
+          console.warn('[gift] cộng xu Firebase:', eCoin);
+        }
       }
       unlockAchievement('gift_first');
       const gCount = Number((getAcc() || {}).giftClaimCount) || 1;
@@ -854,12 +896,14 @@
       toast('GIFT', '+' + coins + ' XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
       if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
+      const input = $('gift-code-input');
+      if (input) input.value = '';
     } catch (err) {
       const msg = String(err.code || err.message || err);
       if (/PERMISSION|permission/i.test(msg)) {
-        toast('GIFT', 'Rules chặn ghi giftCodes — cập nhật Firebase Rules (cho phép nhận mã)', '#ff4444');
+        toast('GIFT', 'Không có quyền nhận mã — kiểm tra đăng nhập / Firebase Rules', '#ff4444');
       } else {
-        toast('GIFT', 'Lỗi: ' + msg, '#ff4444');
+        toast('GIFT', 'Lỗi: ' + msg.slice(0, 80), '#ff4444');
       }
     }
   }

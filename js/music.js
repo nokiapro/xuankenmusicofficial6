@@ -1570,10 +1570,16 @@ async function fetchLyricWithFallback(lrc1, lrc2) {
 
 function autoScaleSongTitle() {
     if (!songTitleEl) return;
-    const containerWidth = songTitleEl.parentElement?.clientWidth || window.innerWidth - 80;
+    const parent = songTitleEl.parentElement;
+    const containerWidth = (parent && parent.clientWidth) || window.innerWidth - 80;
+    songTitleEl.classList.remove('is-marquee');
+    songTitleEl.style.removeProperty('--scroll-dist');
+    songTitleEl.style.animationDuration = '';
+    songTitleEl.style.transform = '';
     let originalFontSize = 1.4;
     songTitleEl.style.fontSize = originalFontSize + 'rem';
     songTitleEl.style.whiteSpace = 'nowrap';
+    songTitleEl.style.wordBreak = '';
     let currentFontSize = originalFontSize;
     while (songTitleEl.scrollWidth > containerWidth && currentFontSize > 0.7) {
         currentFontSize -= 0.05;
