@@ -1367,8 +1367,7 @@
       const songs = window.songs || [];
       const sorted = [...songs].sort((a, b) => (Number(b.listenCount) || 0) - (Number(a.listenCount) || 0));
       const top = sorted.slice(0, 10);
-      const titles = { week: 'TOP TUẦN', month: 'TOP THÁNG', year: 'TOP NĂM' };
-      const icons = { week: 'trophy', month: 'medal', year: 'crown' };
+      // period chỉ còn alltime (và alias cũ week/month/year) — luôn là tổng lượt nghe
       let rows = '';
       if (!top.length) {
         rows = '<div class="xr-empty">Chưa có dữ liệu lượt nghe</div>';
@@ -1383,8 +1382,8 @@
             + '</div>';
         });
       }
-      const body = '<div class="xr-note">Xếp theo tổng lượt nghe hiện tại</div><div class="xr-list">' + rows + '</div>';
-      openResultModal(titles[period] || 'TOP', icons[period] || 'trophy', body);
+      const body = '<div class="xr-note">Xếp theo tổng lượt nghe (mọi thời điểm)</div><div class="xr-list">' + rows + '</div>';
+      openResultModal('TOP MỌI THỜI ĐIỂM', 'trophy', body);
     }
 
     function userReview(period) {
@@ -1437,9 +1436,9 @@
         if (x === 'countdown') { openEventCountdown(); return; }
         if (x === 'weekly-archive') { openWeeklyArchive(); return; }
         if (x === 'links') { openPartnerLinks(); return; }
-        if (x === 'top-week') topSongsByPeriod('week');
-        if (x === 'top-month') topSongsByPeriod('month');
-        if (x === 'top-year') topSongsByPeriod('year');
+        if (x === 'top-alltime' || x === 'top-week' || x === 'top-month' || x === 'top-year') {
+          topSongsByPeriod('alltime');
+        }
         if (x === 'rev-week') userReview('week');
         if (x === 'rev-month') userReview('month');
         if (x === 'rev-year') userReview('year');
