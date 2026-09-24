@@ -527,6 +527,9 @@ body.dark .album-art {
 
 .song-info-main {
     width: 100%;
+    max-width: 100%;
+    overflow: hidden; /* chặn scrollbar ngang khi tên bài dài */
+    min-width: 0;
 }
 
 .song-title {
@@ -537,14 +540,14 @@ body.dark .album-art {
     letter-spacing: 0px;
     margin-bottom: 8px;
     white-space: nowrap;
-    overflow-x: visible;
-    overflow-y: hidden;
+    overflow: hidden; /* ẩn scrollbar ngang, vẫn co chữ bằng JS */
     text-overflow: clip;
-    -webkit-overflow-scrolling: touch;
     cursor: default;
     max-width: 100%;
+    width: 100%;
     line-height: 1.5;
     padding-bottom: 2px;
+    box-sizing: border-box;
 }
 
 @keyframes titleGradientMove {
