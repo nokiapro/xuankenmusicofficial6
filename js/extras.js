@@ -1067,14 +1067,15 @@
   function tickCountdown(cfg) {
     const root = document.getElementById('cd-clock-live');
     const status = document.getElementById('cd-status-live');
-    if (!root) return;
+    if (!root) return false;
     const left = cfg.at - Date.now();
     const done = left <= 0;
-    const abs = Math.abs(left);
-    const days = Math.floor(abs / 86400000);
-    const hours = Math.floor((abs % 86400000) / 3600000);
-    const mins = Math.floor((abs % 3600000) / 60000);
-    const secs = Math.floor((abs % 60000) / 1000);
+    // Đã đến giờ → khóa 00, không đếm tiếp (tránh đếm âm / đếm ngược sau sự kiện)
+    const remain = done ? 0 : left;
+    const days = Math.floor(remain / 86400000);
+    const hours = Math.floor((remain % 86400000) / 3600000);
+    const mins = Math.floor((remain % 3600000) / 60000);
+    const secs = Math.floor((remain % 60000) / 1000);
     const set = (u, v) => {
       const el = root.querySelector('[data-u="' + u + '"]');
       if (el) el.textContent = formatCdUnit(v);
@@ -1092,6 +1093,7 @@
         status.classList.remove('done');
       }
     }
+    return done;
   }
   async function openEventCountdown() {
     stopCountdownTimer();
@@ -1109,8 +1111,12 @@
         if (modal) lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
       } catch (e) {}
     }
-    tickCountdown(cfg);
-    _cdTimer = setInterval(() => tickCountdown(cfg), 1000);
+    const finished = tickCountdown(cfg);
+    if (!finished) {
+      _cdTimer = setInterval(() => {
+        if (tickCountdown(cfg)) stopCountdownTimer();
+      }, 1000);
+    }
   }
 
   /* ===== Top bài theo tuần (mỗi tuần 1 bảng riêng + khoảng ngày) ===== */
