@@ -1915,6 +1915,201 @@
         document.getElementById('song-search').oninput = e => renderSongs(e.target.value);
         document.getElementById('user-search').oninput = e => renderUsers(e.target.value);
 
+        // —— Xuất / nhập danh sách bài hát (JSON) ——
+        function songToExportObj(s) {
+            return {
+                id: s.id || '',
+                name: s.name || '',
+                artist: s.artist || '',
+                audio: s.audio || '',
+                audioFull: s.audioFull || '',
+                audioFull2: s.audioFull2 || '',
+                albumArt: s.albumArt || '',
+                lrc1: s.lrc1 || '',
+                lrc2: s.lrc2 || '',
+                price: s.price != null ? Number(s.price) : 0,
+                rentPrice: s.rentPrice != null ? Number(s.rentPrice) : null,
+                publishAt: s.publishAt || null,
+                hidden: !!s.hidden,
+                listenCount: Number(s.listenCount) || 0
+            };
+        }
+
+        function downloadJsonFile(filename, dataObj) {
+            const text = JSON.stringify(dataObj, null, 2);
+            const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                a.remove();
+            }, 500);
+        }
+
+        function parseSongsImport(raw) {
+            let data = raw;
+            if (typeof raw === 'string') {
+                const t = raw.trim();
+                if (!t) throw new Error('JSON trống');
+                data = JSON.parse(t);
+            }
+            // Hỗ trợ: mảng [...] hoặc object { id: {...}, ... }
+            let list = [];
+            if (Array.isArray(data)) {
+                list = data;
+            } else if (data && typeof data === 'object') {
+                if (Array.isArray(data.songs)) list = data.songs;
+                else list = Object.keys(data).map(k => {
+                    const v = data[k];
+                    if (v && typeof v === 'object') return { ...v, id: v.id || k };
+                    return null;
+                }).filter(Boolean);
+            } else {
+                throw new Error('Định dạng JSON không hợp lệ (cần mảng hoặc object)');
+            }
+            return list.map(item => {
+                if (!item || typeof item !== 'object') return null;
+                const id = String(item.id || '').trim();
+                if (!id || /[.#$\[\]/]/.test(id)) return null;
+                return {
+                    id,
+                    name: String(item.name || id).trim(),
+                    artist: String(item.artist || '').trim(),
+                    audio: String(item.audio || '').trim(),
+                    audioFull: String(item.audioFull || '').trim() || null,
+                    audioFull2: String(item.audioFull2 || '').trim() || null,
+                    albumArt: String(item.albumArt || '').trim(),
+                    lrc1: String(item.lrc1 || ''),
+                    lrc2: String(item.lrc2 || ''),
+                    price: item.price != null ? Math.max(0, Number(item.price) || 0) : (settingsCache.songPrice || 0),
+                    rentPrice: item.rentPrice != null && item.rentPrice !== '' ? Math.max(0, Number(item.rentPrice) || 0) : null,
+                    publishAt: item.publishAt || null,
+                    hidden: !!item.hidden,
+                    listenCount: Math.max(0, Number(item.listenCount) || 0)
+                };
+            }).filter(s => s && s.id && s.name && s.audio);
+        }
+
+        async function importSongsList(list) {
+            if (!list.length) {
+                toast('Không có bài hợp lệ để nhập (cần id, name, audio)');
+                return;
+            }
+            let updated = 0;
+            let added = 0;
+            // Merge listenCount: giữ max(file, firebase) để không mất lượt nghe
+            for (const song of list) {
+                let liveCount = 0;
+                try {
+                    const snap = await db().ref(dataPath('songs') + '/' + song.id + '/listenCount').once('value');
+                    liveCount = Number(snap.val()) || 0;
+                } catch (e) {}
+                const payload = {
+                    ...song,
+                    listenCount: Math.max(liveCount, Number(song.listenCount) || 0)
+                };
+                const existed = songsCache.some(s => s.id === song.id);
+                await db().ref(dataPath('songs') + '/' + song.id).set(payload);
+                if (existed) updated++;
+                else added++;
+            }
+            await loadSongs();
+            toast('Nhập xong: +' + added + ' mới, cập nhật ' + updated + ' bài (tổng ' + list.length + ')');
+        }
+
+        const exportSongsBtn = document.getElementById('export-songs-btn');
+        if (exportSongsBtn) {
+            exportSongsBtn.onclick = async () => {
+                try {
+                    // Luôn lấy dữ liệu mới từ Firebase trước khi xuất
+                    toast('Đang tải list nhạc...');
+                    const snap = await db().ref(dataPath('songs')).once('value');
+                    const obj = snap.val() || {};
+                    const list = Object.keys(obj).map(id => {
+                        const s = obj[id] || {};
+                        return songToExportObj({
+                            id: String(s.id || id),
+                            name: s.name || id,
+                            artist: s.artist || '',
+                            audio: s.audio || '',
+                            audioFull: s.audioFull || '',
+                            audioFull2: s.audioFull2 || '',
+                            albumArt: s.albumArt || '',
+                            lrc1: s.lrc1 || '',
+                            lrc2: s.lrc2 || '',
+                            price: s.price,
+                            rentPrice: s.rentPrice,
+                            publishAt: s.publishAt || null,
+                            hidden: !!s.hidden,
+                            listenCount: Number(s.listenCount) || 0
+                        });
+                    }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' }));
+
+                    if (!list.length) {
+                        toast('Chưa có bài hát nào để xuất');
+                        return;
+                    }
+
+                    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                    const filename = 'xuanken-songs-' + stamp + '.json';
+                    downloadJsonFile(filename, list);
+                    toast('Đã xuất ' + list.length + ' bài → ' + filename);
+                } catch (e) {
+                    console.error('export songs', e);
+                    toast('Lỗi xuất: ' + (e && e.message ? e.message : e));
+                }
+            };
+        }
+
+        const importSongsBtn = document.getElementById('import-songs-btn');
+        const importSongsFile = document.getElementById('import-songs-file');
+        if (importSongsBtn && importSongsFile) {
+            importSongsBtn.onclick = () => importSongsFile.click();
+            importSongsFile.onchange = async () => {
+                const file = importSongsFile.files && importSongsFile.files[0];
+                importSongsFile.value = '';
+                if (!file) return;
+                try {
+                    const text = await file.text();
+                    const list = parseSongsImport(text);
+                    if (!confirm('Nhập ' + list.length + ' bài từ file "' + file.name + '"?\nBài trùng ID sẽ được cập nhật.')) return;
+                    toast('Đang nhập...');
+                    await importSongsList(list);
+                } catch (e) {
+                    console.error('import songs file', e);
+                    toast('Lỗi nhập file: ' + (e && e.message ? e.message : e));
+                }
+            };
+        }
+
+        const importSongsPasteBtn = document.getElementById('import-songs-paste-btn');
+        if (importSongsPasteBtn) {
+            importSongsPasteBtn.onclick = async () => {
+                const ta = document.getElementById('import-songs-textarea');
+                const raw = (ta && ta.value || '').trim();
+                if (!raw) {
+                    toast('Dán JSON vào ô trước');
+                    if (ta) ta.focus();
+                    return;
+                }
+                try {
+                    const list = parseSongsImport(raw);
+                    if (!confirm('Nhập ' + list.length + ' bài từ ô JSON?\nBài trùng ID sẽ được cập nhật.')) return;
+                    toast('Đang nhập...');
+                    await importSongsList(list);
+                } catch (e) {
+                    console.error('import songs paste', e);
+                    toast('Lỗi JSON: ' + (e && e.message ? e.message : e));
+                }
+            };
+        }
+
+
         document.getElementById('save-settings-btn').onclick = async () => {
             settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
             settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
