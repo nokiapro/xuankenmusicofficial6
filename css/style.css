@@ -4010,6 +4010,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         border-radius: 28px;
         display: flex;
         flex-direction: column;
+        /* header row height dùng chung cho trái (playlist) + phải (top-bar) */
+        --pc-header-h: 58px;
     }
 
     .pc-layout {
@@ -4042,7 +4044,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         position: relative;
     }
 
-    /* Top-bar icons trên cột phải */
+    /* Top-bar icons trên cột phải – cùng chiều cao header trái */
     .pc-right .top-bar-icons {
         position: relative !important;
         top: auto !important;
@@ -4050,8 +4052,13 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         right: auto !important;
         z-index: 20;
         flex-shrink: 0;
-        padding: 14px 16px 10px;
+        height: var(--pc-header-h);
+        min-height: var(--pc-header-h);
+        max-height: var(--pc-header-h);
+        padding: 0 14px;
+        box-sizing: border-box;
         justify-content: space-between;
+        align-items: center;
         gap: 6px;
         pointer-events: auto;
         background: var(--card-bg);
@@ -4083,12 +4090,19 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         pointer-events: auto !important;
     }
 
+    /* Header playlist = cùng chiều cao top-bar */
     .pc-left .playlist-header {
         flex-shrink: 0;
         border-radius: 0;
+        height: var(--pc-header-h);
+        min-height: var(--pc-header-h);
+        max-height: var(--pc-header-h);
+        padding: 0 16px;
+        box-sizing: border-box;
+        align-items: center;
     }
 
-    /* Ẩn nút đóng playlist trên PC (luôn mở) */
+    /* Ẩn nút đóng playlist trên PC (luôn mở mặc định) */
     .pc-left .close-playlist {
         visibility: hidden;
         pointer-events: none;
@@ -4142,8 +4156,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     }
 
     /*
-     * Khi bấm top-bar icons: modal/overlay chỉ phủ nửa trái
-     * (danh sách bài hát), không che cột phải (player).
+     * Panel từ top-bar: thay thế vùng danh sách bài (nửa trái),
+     * không che cột phải. Nền đặc, không blur.
      */
     #my-playlist-overlay.playlist,
     .shop-modal,
@@ -4154,18 +4168,74 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         left: 0 !important;
         width: 50% !important;
         height: 100% !important;
+        max-height: 100% !important;
         border-radius: 28px 0 0 28px !important;
         z-index: 250;
+        background: var(--playlist-bg) !important;
+        opacity: 1 !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        transform: translateY(-105%) !important;
+        visibility: hidden;
+        pointer-events: none;
+        overflow: hidden;
+        display: flex !important;
+        flex-direction: column;
     }
 
-    /* Overlay nền timer: chỉ nửa trái */
-    .timer-overlay {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 50% !important;
-        height: 100% !important;
-        border-radius: 28px 0 0 28px;
+    #my-playlist-overlay.playlist.active,
+    .shop-modal.show,
+    .timer-modal.show,
+    .listen-modal.show {
+        transform: translateY(0) !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        opacity: 1 !important;
+    }
+
+    /* Header trong các panel cũng cùng chiều cao */
+    #my-playlist-overlay .playlist-header,
+    .shop-modal-header,
+    .timer-modal-header,
+    .listen-modal-header {
+        height: var(--pc-header-h);
+        min-height: var(--pc-header-h);
+        max-height: var(--pc-header-h);
+        padding: 0 16px;
+        box-sizing: border-box;
+        flex-shrink: 0;
+        align-items: center;
+    }
+
+    /* Ẩn danh sách bài khi đang mở panel khác */
+    .player-container:has(#my-playlist-overlay.active) .pc-left .playlist,
+    .player-container:has(.shop-modal.show) .pc-left .playlist,
+    .player-container:has(.timer-modal.show) .pc-left .playlist,
+    .player-container:has(.listen-modal.show) .pc-left .playlist {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    /* Timer overlay: không dùng blur full-screen trên PC (tránh lỗi mờ) */
+    .timer-overlay,
+    .timer-overlay.show {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        backdrop-filter: none !important;
+        background: transparent !important;
+    }
+
+    /* Timer modal: nội dung cuộn trong nửa trái */
+    .timer-modal {
+        z-index: 260 !important;
+    }
+    .timer-modal-content {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
+
 
