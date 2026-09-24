@@ -377,10 +377,28 @@
             color: var(--text) !important;
             background: var(--input-bg, var(--bg)) !important;
         }
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+        /* Icon lịch: tối = trắng, sáng = đen */
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator {
             filter: var(--calendar-icon, invert(1));
-            opacity: 0.9;
+            opacity: 1;
             cursor: pointer;
+            background: transparent;
+        }
+        html[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+        html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+        html[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+        html:not([data-theme="light"]) input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+        html:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator,
+        html:not([data-theme="light"]) input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(1.15);
+        }
+        html[data-theme="light"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+        html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+        html[data-theme="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: none;
+            opacity: 0.75;
         }
         input[type="number"] { -moz-appearance: textfield; }
         input[type="number"]::-webkit-outer-spin-button,
@@ -1121,10 +1139,6 @@
                         <input type="number" id="set-registration-count" min="0" step="1" placeholder="0">
                     </div>
                 </div>
-                <p class="muted" style="margin:8px 0 0;font-size:0.72rem;">
-                    Username + PIN dùng Firebase Auth (Email/Password). Tắt đăng ký → chỉ tài khoản đã tạo mới vào được.
-                    Đặt max &gt; 0 để giới hạn tổng số tài khoản mới (vd: 50). Có thể reset bộ đếm thủ công.
-                </p>
                 <div class="row-actions form-actions">
                     <button type="button" class="btn btn-primary" id="save-security-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu cài đặt</button>
                 </div>
@@ -1173,8 +1187,7 @@
             </div>
 
             <div class="card">
-                <h2><i class="fa-solid fa-hourglass-half"></i> Đếm ngược sự kiện</h2>
-                <p class="muted" style="margin:0 0 10px;font-size:0.72rem;">Cấu hình ngày đích — player hiện lịch dương + âm và đồng hồ đếm ngược realtime trong Tiện ích.</p>
+                <h2>Đếm ngược sự kiện</h2>
                 <div class="form-grid">
                     <div class="full">
                         <label>Tiêu đề sự kiện</label>
@@ -1192,8 +1205,7 @@
             </div>
 
             <div class="card">
-                <h2><i class="fa-solid fa-link"></i> Liên kết (Tiện ích)</h2>
-                <p class="muted" style="margin:0 0 10px;font-size:0.72rem;">Mỗi dòng một liên kết: <b>Tiêu đề | https://url.com</b> (có thể thêm | icon lucide, vd: youtube).</p>
+                <h2>Liên kết (Tiện ích)</h2>
                 <div class="form-grid">
                     <div class="full">
                         <label>Danh sách liên kết</label>
@@ -1511,6 +1523,7 @@
             const obj = snap.val() || {};
             songsCache = Object.keys(obj).map(id => ({
                 id: String(obj[id].id || id),
+                _fbKey: String(id),
                 name: obj[id].name || id,
                 artist: obj[id].artist || '',
                 audio: obj[id].audio || '',
@@ -1578,7 +1591,7 @@
                     key: k, // uid (Firebase Auth)
                     uid: u.uid || k,
                     coins: u.coins | 0,
-                    owned: Array.isArray(u.owned) ? u.owned : [],
+                    owned: parseOwnedField(u.owned),
                     lastCheckin: u.lastCheckin || '',
                     createdAt: u.createdAt || 0,
                     rank: u.rank || 'member',
@@ -1590,27 +1603,72 @@
             refreshStats();
         }
 
-        /** Set ID bài đang có trong kho */
+        /** Chuẩn hóa owned từ Firebase (array / object / string) */
+        function parseOwnedField(owned) {
+            if (Array.isArray(owned)) {
+                return owned.map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+            }
+            if (owned && typeof owned === 'object') {
+                const out = [];
+                Object.keys(owned).forEach(k => {
+                    const v = owned[k];
+                    if (v === false || v == null) return;
+                    if (typeof v === 'string' && v.trim()) out.push(v.trim());
+                    else if (v === true || v === 1 || typeof v === 'number') out.push(String(k).trim());
+                    else if (/^\d+$/.test(k) && v != null) out.push(String(v).trim());
+                });
+                return out.filter(Boolean);
+            }
+            if (typeof owned === 'string' && owned.trim()) {
+                return owned.split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+            }
+            return [];
+        }
+
+        /** Set ID bài trong kho (cả id field + key gốc nếu có) */
         function getSongIdSet() {
-            return new Set(songsCache.map(s => String(s.id || '').trim()).filter(Boolean));
+            const set = new Set();
+            songsCache.forEach(s => {
+                const id = String(s.id || '').trim();
+                if (id) {
+                    set.add(id);
+                    set.add(id.toLowerCase());
+                }
+                if (s._fbKey) {
+                    const k = String(s._fbKey).trim();
+                    if (k) {
+                        set.add(k);
+                        set.add(k.toLowerCase());
+                    }
+                }
+            });
+            return set;
+        }
+
+        function ownedIdInCatalog(sid, songIds) {
+            if (!sid) return false;
+            if (songIds.has(sid) || songIds.has(sid.toLowerCase())) return true;
+            return false;
         }
 
         /**
          * Làm sạch mảng owned: bỏ ID trống / không còn trong songs / trùng.
-         * Trả về { cleaned, removed, orphans, dupes }
+         * Trả về { cleaned, removed, orphans, dupes, empty }
          */
         function sanitizeOwnedList(owned, songIds) {
             const ids = songIds || getSongIdSet();
             const seen = new Set();
             const cleaned = [];
             let orphans = 0, dupes = 0, empty = 0;
-            (Array.isArray(owned) ? owned : []).forEach(raw => {
+            parseOwnedField(owned).forEach(raw => {
                 const sid = String(raw == null ? '' : raw).trim();
                 if (!sid) { empty++; return; }
-                if (!ids.has(sid)) { orphans++; return; }
-                if (seen.has(sid)) { dupes++; return; }
-                seen.add(sid);
-                cleaned.push(sid);
+                const canon = sid;
+                const canonLower = sid.toLowerCase();
+                if (!ownedIdInCatalog(sid, ids)) { orphans++; return; }
+                if (seen.has(canonLower)) { dupes++; return; }
+                seen.add(canonLower);
+                cleaned.push(canon);
             });
             return {
                 cleaned,
@@ -1629,7 +1687,7 @@
         function refreshStats() {
             const users = Object.keys(usersCache);
             const songIds = getSongIdSet();
-            let totalCoins = 0, totalOwned = 0, totalRawOwned = 0, totalOrphans = 0, totalDupes = 0;
+            let totalCoins = 0, totalOwned = 0, totalRawOwned = 0, totalOrphans = 0, totalDupes = 0, totalEmpty = 0;
             users.forEach(n => {
                 totalCoins += usersCache[n].coins | 0;
                 const raw = usersCache[n].owned || [];
@@ -1638,8 +1696,10 @@
                 totalOwned += s.cleaned.length;
                 totalOrphans += s.orphans;
                 totalDupes += s.dupes;
+                totalEmpty += s.empty;
             });
             const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
+            // Chỉ hiện "(−N rác)" khi thật sự còn ID mồ côi / trùng sau khi chuẩn hóa
             const junk = totalOrphans + totalDupes;
             const buyLabel = junk > 0
                 ? `Lượt mua <span style="opacity:.65;font-size:0.65em;">(−${junk} rác)</span>`
@@ -1648,7 +1708,7 @@
                 <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
                 <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
                 <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng XK</div></div>
-                <div class="stat" title="Thô: ${totalRawOwned} · Hợp lệ: ${totalOwned} · Mồ côi: ${totalOrphans} · Trùng: ${totalDupes}"><div class="n">${totalOwned}</div><div class="l">${buyLabel}</div></div>
+                <div class="stat" title="Thô: ${totalRawOwned} · Hợp lệ: ${totalOwned} · Mồ côi: ${totalOrphans} · Trùng: ${totalDupes} · Trống: ${totalEmpty}"><div class="n">${totalOwned}</div><div class="l">${buyLabel}</div></div>
                 <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
             `;
         }
@@ -2036,10 +2096,10 @@
                             logEl.scrollTop = logEl.scrollHeight;
                         }
                     }
-                    refreshStats();
-                    renderUsers(document.getElementById('user-search').value);
+                    // Load lại từ Firebase để chắc stats khớp server
+                    try { await loadUsers(); } catch (eLoad) { refreshStats(); renderUsers(document.getElementById('user-search').value); }
                     toast('Đã dọn ' + fixedUsers + ' user, xóa ' + totalRemoved + ' ID rác');
-                    if (logEl) logEl.textContent += '\nXong.';
+                    if (logEl) logEl.textContent += '\nXong. F5 sẽ không còn hiện rác nếu player không đẩy lại ID cũ.';
                 } catch (e) {
                     console.error('cleanup owned', e);
                     toast('Lỗi dọn: ' + (e && e.message ? e.message : e));
