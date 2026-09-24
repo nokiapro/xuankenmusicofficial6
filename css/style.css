@@ -4037,19 +4037,20 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         min-height: 0;
         height: 100%;
-        justify-content: space-between;
+        justify-content: flex-start;
         overflow: hidden;
+        position: relative;
     }
 
-    /* Top-bar icons cố định trên cột trái */
-    .pc-left .top-bar-icons {
+    /* Top-bar icons trên cột phải */
+    .pc-right .top-bar-icons {
         position: relative !important;
         top: auto !important;
         left: auto !important;
         right: auto !important;
         z-index: 20;
         flex-shrink: 0;
-        padding: 14px 12px 10px;
+        padding: 14px 16px 10px;
         justify-content: space-between;
         gap: 6px;
         pointer-events: auto;
@@ -4108,7 +4109,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 28px 28px 16px;
+        padding: 20px 28px 16px;
         gap: 18px;
         overflow: hidden;
     }
@@ -4140,14 +4141,31 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         display: none !important;
     }
 
-    /* My playlist overlay vẫn full player */
-    #my-playlist-overlay.playlist {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 28px;
-        z-index: 200;
+    /*
+     * Khi bấm top-bar icons: modal/overlay chỉ phủ nửa trái
+     * (danh sách bài hát), không che cột phải (player).
+     */
+    #my-playlist-overlay.playlist,
+    .shop-modal,
+    .timer-modal,
+    .listen-modal {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 50% !important;
+        height: 100% !important;
+        border-radius: 28px 0 0 28px !important;
+        z-index: 250;
+    }
+
+    /* Overlay nền timer: chỉ nửa trái */
+    .timer-overlay {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 50% !important;
+        height: 100% !important;
+        border-radius: 28px 0 0 28px;
     }
 }
+

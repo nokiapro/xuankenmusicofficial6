@@ -70,8 +70,22 @@
 
     <div class="player-container" id="player-container" style="display: none;">
         <div class="pc-layout">
-            <!-- Cột trái (PC): top-bar + danh sách bài hát -->
+            <!-- Cột trái (PC): danh sách bài hát luôn mở -->
             <div class="pc-left">
+                <div class="playlist" id="playlist">
+                    <div class="playlist-header" id="playlist-header">
+                        <div class="close-playlist" id="close-playlist-btn">
+                            <i data-lucide="x"></i>
+                        </div>
+                        <div class="playlist-title"><i data-lucide="music"></i><span>DANH SÁCH BÀI HÁT</span></div>
+                        <div style="width: 40px;"></div>
+                    </div>
+                    <div id="playlist-content"></div>
+                </div>
+            </div>
+
+            <!-- Cột phải (PC): top-bar + art + lyric + progress + controls -->
+            <div class="pc-right">
                 <div class="top-bar-icons">
                     <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
                         <i data-lucide="timer"></i>
@@ -96,20 +110,6 @@
                     </div>
                 </div>
 
-                <div class="playlist" id="playlist">
-                    <div class="playlist-header" id="playlist-header">
-                        <div class="close-playlist" id="close-playlist-btn">
-                            <i data-lucide="x"></i>
-                        </div>
-                        <div class="playlist-title"><i data-lucide="music"></i><span>DANH SÁCH BÀI HÁT</span></div>
-                        <div style="width: 40px;"></div>
-                    </div>
-                    <div id="playlist-content"></div>
-                </div>
-            </div>
-
-            <!-- Cột phải (PC): art + lyric + progress + controls -->
-            <div class="pc-right">
                 <div class="header-section">
                     <div class="album-art">
                         <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
@@ -155,6 +155,7 @@
                 </div>
             </div>
         </div>
+
 
 
         <div class="playlist" id="my-playlist-overlay">
