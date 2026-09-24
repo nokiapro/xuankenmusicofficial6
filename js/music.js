@@ -279,6 +279,7 @@ function songsObjectToArray(obj) {
         const s = obj[id] || {};
         return {
             id: String(s.id || id),
+            _fbKey: String(id),
             name: s.name || id,
             artist: s.artist || '',
             audio: s.audio || '',
@@ -649,6 +650,8 @@ async function loadSongsFromFirebase() {
             });
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
+            // Dọn owned local + Firebase: bỏ ID bài đã xóa (tránh admin thấy lại −1 rác)
+            try { scrubOwnedAgainstCatalog(); } catch (e) {}
             initPlayerAfterLoad();
             updateListenStatsModal();
             
@@ -2926,10 +2929,10 @@ function startUserProfileListener(uid) {
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
         const prev = accounts[name];
-        // Owned + pending
-        const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
+        // Owned + pending — lọc ID mồ côi (không còn trong list bài)
+        const remoteOwned = filterOwnedIds(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pending = consumePendingOwned(remoteOwned);
-        mapped.owned = unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned));
+        mapped.owned = filterOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned)));
         // Rentals: max expiry (remote + local + pending)
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
@@ -3023,9 +3026,9 @@ async function fetchUserByUid(uid, usernameHint) {
             mergeRentalsMap(mapped.rentals, prevLocal && prevLocal.rentals),
             pendingRent
         );
-        const remoteOwned = Array.isArray(mapped.owned) ? mapped.owned.map(String) : [];
+        const remoteOwned = filterOwnedIds(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pendingOwned = consumePendingOwned(remoteOwned);
-        mapped.owned = unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned));
+        mapped.owned = filterOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned)));
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
         mapped.achievements = unionIdArrays(mapped.achievements, prevLocal && prevLocal.achievements);
         const preferRemoteList = (remote, local) => {
@@ -3135,6 +3138,66 @@ function unionIdArrays(a, b) {
     return [...out];
 }
 
+/** Catalog ID bài hiện có (id + key Firebase + lowercase) — dùng lọc owned mồ côi */
+function getCatalogSongIdSet() {
+    const set = new Set();
+    const list = (typeof songs !== 'undefined' && Array.isArray(songs)) ? songs : [];
+    list.forEach(s => {
+        if (!s) return;
+        [s.id, s._fbKey].forEach(raw => {
+            const id = String(raw == null ? '' : raw).trim();
+            if (!id) return;
+            set.add(id);
+            set.add(id.toLowerCase());
+        });
+    });
+    return set;
+}
+
+/**
+ * Lọc owned: bỏ ID trống / trùng / không còn trong list bài.
+ * Nếu songs chưa load (catalog rỗng) → chỉ bỏ trống + trùng, giữ nguyên ID.
+ */
+function filterOwnedIds(ids) {
+    const raw = (Array.isArray(ids) ? ids : []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+    const catalog = getCatalogSongIdSet();
+    const seen = new Set();
+    const out = [];
+    raw.forEach(id => {
+        const low = id.toLowerCase();
+        if (seen.has(low)) return;
+        if (catalog.size > 0 && !catalog.has(id) && !catalog.has(low)) return;
+        seen.add(low);
+        out.push(id);
+    });
+    return out;
+}
+
+/** Sau khi có list bài: dọn owned local (+ đẩy Firebase nếu đã Auth) */
+function scrubOwnedAgainstCatalog() {
+    try {
+        if (!getCatalogSongIdSet().size) return;
+        const name = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
+        const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+        if (!acc || !Array.isArray(acc.owned)) return;
+        const before = acc.owned.map(String);
+        const cleaned = filterOwnedIds(before);
+        if (cleaned.length === before.length) {
+            // cùng số lượng nhưng có thể khác thứ tự — so sánh set
+            const b = new Set(before.map(x => x.toLowerCase()));
+            const c = new Set(cleaned.map(x => x.toLowerCase()));
+            if (b.size === c.size && [...b].every(x => c.has(x))) return;
+        }
+        updateCurrentAccount(a => { a.owned = cleaned; });
+        if (name && typeof pushUserToFirebase === 'function') {
+            pushUserToFirebase(name, getCurrentAccount(), { ownedChanged: true });
+        }
+        console.log('[owned] đã lọc ID mồ côi:', before.length, '→', cleaned.length);
+    } catch (e) {
+        console.warn('[owned] scrub', e);
+    }
+}
+
 /** Merge map số: mỗi key lấy max (listenedSongs, checkinDays truthy, v.v.) */
 function mergeNumericMaps(a, b) {
     const out = Object.create(null);
@@ -3159,13 +3222,18 @@ function mergeNumericMaps(a, b) {
 
 async function txUnionArrayField(db, uid, field, localArr) {
     const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
-    const local = (Array.isArray(localArr) ? localArr : []).map(String);
+    let local = (Array.isArray(localArr) ? localArr : []).map(String);
+    // owned: luôn lọc ID không còn trong catalog trước khi union (chống đẩy lại rác sau admin dọn)
+    if (field === 'owned') local = filterOwnedIds(local);
     const tx = await ref.transaction((current) => {
-        const remote = Array.isArray(current) ? current.map(String) : [];
-        return unionIdArrays(remote, local);
+        let remote = Array.isArray(current) ? current.map(String) : [];
+        if (field === 'owned') remote = filterOwnedIds(remote);
+        const merged = unionIdArrays(remote, local);
+        return field === 'owned' ? filterOwnedIds(merged) : merged;
     });
     if (tx.committed) {
-        return Array.isArray(tx.snapshot.val()) ? tx.snapshot.val().map(String) : local;
+        const val = Array.isArray(tx.snapshot.val()) ? tx.snapshot.val().map(String) : local;
+        return field === 'owned' ? filterOwnedIds(val) : val;
     }
     return local;
 }
@@ -3474,7 +3542,7 @@ function loadOwnedSongs() {
 
 function saveOwnedSongs(ids) {
     updateCurrentAccount(acc => {
-        acc.owned = [...new Set((ids || []).map(String))];
+        acc.owned = filterOwnedIds(ids);
     });
 }
 
