@@ -1064,6 +1064,19 @@
                     </table>
                 </div>
             </div>
+            <div class="card" style="margin-top:16px;">
+                <h2>Dọn sở hữu (owned)</h2>
+                <p class="muted" style="margin:0 0 12px;font-size:0.8rem;line-height:1.5;">
+                    Xóa ID bài đã bị xóa khỏi list nhạc, và gộp ID trùng trong mảng <code>owned</code> của từng user.
+                    Thống kê «Lượt mua» chỉ đếm bài còn tồn tại (đã bỏ trùng).
+                </p>
+                <div class="row-actions form-actions" style="border:none;padding-top:0;margin:0;">
+                    <button type="button" class="btn btn-warn" id="cleanup-owned-btn">
+                        <i class="fa-solid fa-broom"></i> Dọn ID mồ côi / trùng
+                    </button>
+                </div>
+                <pre id="cleanup-owned-log" style="margin-top:10px;font-size:0.7rem;max-height:160px;overflow:auto;display:none;white-space:pre-wrap;"></pre>
+            </div>
         </div>
 
         <div class="panel" id="panel-settings">
@@ -1577,19 +1590,65 @@
             refreshStats();
         }
 
+        /** Set ID bài đang có trong kho */
+        function getSongIdSet() {
+            return new Set(songsCache.map(s => String(s.id || '').trim()).filter(Boolean));
+        }
+
+        /**
+         * Làm sạch mảng owned: bỏ ID trống / không còn trong songs / trùng.
+         * Trả về { cleaned, removed, orphans, dupes }
+         */
+        function sanitizeOwnedList(owned, songIds) {
+            const ids = songIds || getSongIdSet();
+            const seen = new Set();
+            const cleaned = [];
+            let orphans = 0, dupes = 0, empty = 0;
+            (Array.isArray(owned) ? owned : []).forEach(raw => {
+                const sid = String(raw == null ? '' : raw).trim();
+                if (!sid) { empty++; return; }
+                if (!ids.has(sid)) { orphans++; return; }
+                if (seen.has(sid)) { dupes++; return; }
+                seen.add(sid);
+                cleaned.push(sid);
+            });
+            return {
+                cleaned,
+                removed: empty + orphans + dupes,
+                orphans,
+                dupes,
+                empty
+            };
+        }
+
+        /** Số bài sở hữu hợp lệ (còn trong kho, không trùng) của 1 user */
+        function validOwnedCount(owned) {
+            return sanitizeOwnedList(owned).cleaned.length;
+        }
+
         function refreshStats() {
             const users = Object.keys(usersCache);
-            let totalCoins = 0, totalOwned = 0;
+            const songIds = getSongIdSet();
+            let totalCoins = 0, totalOwned = 0, totalRawOwned = 0, totalOrphans = 0, totalDupes = 0;
             users.forEach(n => {
                 totalCoins += usersCache[n].coins | 0;
-                totalOwned += (usersCache[n].owned || []).length;
+                const raw = usersCache[n].owned || [];
+                totalRawOwned += raw.length;
+                const s = sanitizeOwnedList(raw, songIds);
+                totalOwned += s.cleaned.length;
+                totalOrphans += s.orphans;
+                totalDupes += s.dupes;
             });
             const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
+            const junk = totalOrphans + totalDupes;
+            const buyLabel = junk > 0
+                ? `Lượt mua <span style="opacity:.65;font-size:0.65em;">(−${junk} rác)</span>`
+                : 'Lượt mua';
             document.getElementById('stats-grid').innerHTML = `
                 <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
                 <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
                 <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng XK</div></div>
-                <div class="stat"><div class="n">${totalOwned}</div><div class="l">Lượt mua</div></div>
+                <div class="stat" title="Thô: ${totalRawOwned} · Hợp lệ: ${totalOwned} · Mồ côi: ${totalOrphans} · Trùng: ${totalDupes}"><div class="n">${totalOwned}</div><div class="l">${buyLabel}</div></div>
                 <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
             `;
         }
@@ -1765,7 +1824,7 @@
                         </select>
                     </td>
                     <td data-label="XK"><input type="number" min="0" value="${a.coins | 0}" data-user="${escapeHtml(name)}" class="coin-input"></td>
-                    <td data-label="Sở hữu">${(a.owned || []).length}</td>
+                    <td data-label="Sở hữu" title="Thô: ${(a.owned || []).length}">${validOwnedCount(a.owned)}</td>
                     <td data-label="Điểm danh">${escapeHtml(a.lastCheckin || '—')}</td>
                     <td data-label="Thao tác">
                         <div class="row-actions">
@@ -1914,6 +1973,83 @@
         document.getElementById('clear-song-form-btn').onclick = () => clearSongForm();
         document.getElementById('song-search').oninput = e => renderSongs(e.target.value);
         document.getElementById('user-search').oninput = e => renderUsers(e.target.value);
+
+        // —— Dọn owned: bỏ ID mồ côi + trùng ——
+        const cleanupOwnedBtn = document.getElementById('cleanup-owned-btn');
+        if (cleanupOwnedBtn) {
+            cleanupOwnedBtn.onclick = async () => {
+                const logEl = document.getElementById('cleanup-owned-log');
+                const songIds = getSongIdSet();
+                if (!songIds.size) {
+                    toast('Chưa load được list bài hát — thử F5');
+                    return;
+                }
+                const names = Object.keys(usersCache);
+                if (!names.length) {
+                    toast('Chưa có user');
+                    return;
+                }
+                // Preview
+                let previewOrphans = 0, previewDupes = 0, usersAffected = 0;
+                names.forEach(n => {
+                    const s = sanitizeOwnedList(usersCache[n].owned, songIds);
+                    if (s.removed > 0) {
+                        usersAffected++;
+                        previewOrphans += s.orphans;
+                        previewDupes += s.dupes;
+                    }
+                });
+                if (usersAffected === 0) {
+                    toast('Không có ID mồ côi / trùng cần dọn');
+                    if (logEl) {
+                        logEl.style.display = 'block';
+                        logEl.textContent = 'OK — owned đã sạch.';
+                    }
+                    return;
+                }
+                if (!confirm(
+                    'Dọn owned cho ' + usersAffected + ' user?\n' +
+                    '· ID mồ côi (bài đã xóa): ' + previewOrphans + '\n' +
+                    '· ID trùng: ' + previewDupes + '\n\n' +
+                    'Thao tác ghi đè mảng owned trên Firebase.'
+                )) return;
+
+                cleanupOwnedBtn.disabled = true;
+                if (logEl) {
+                    logEl.style.display = 'block';
+                    logEl.textContent = 'Đang dọn...\n';
+                }
+                let fixedUsers = 0, totalRemoved = 0;
+                try {
+                    for (const name of names) {
+                        const u = usersCache[name];
+                        const s = sanitizeOwnedList(u.owned, songIds);
+                        if (s.removed === 0) continue;
+                        const key = u.key || sanitizeKey(name);
+                        await db().ref(dataPath('users') + '/' + key + '/owned').set(s.cleaned);
+                        u.owned = s.cleaned;
+                        fixedUsers++;
+                        totalRemoved += s.removed;
+                        if (logEl) {
+                            logEl.textContent += name + ': −' + s.removed +
+                                ' (mồ côi ' + s.orphans + ', trùng ' + s.dupes + ') → còn ' + s.cleaned.length + '\n';
+                            logEl.scrollTop = logEl.scrollHeight;
+                        }
+                    }
+                    refreshStats();
+                    renderUsers(document.getElementById('user-search').value);
+                    toast('Đã dọn ' + fixedUsers + ' user, xóa ' + totalRemoved + ' ID rác');
+                    if (logEl) logEl.textContent += '\nXong.';
+                } catch (e) {
+                    console.error('cleanup owned', e);
+                    toast('Lỗi dọn: ' + (e && e.message ? e.message : e));
+                    if (logEl) logEl.textContent += '\nLỗi: ' + (e && e.message ? e.message : e);
+                } finally {
+                    cleanupOwnedBtn.disabled = false;
+                }
+            };
+        }
+
 
         // —— Xuất / nhập danh sách bài hát (JSON) ——
         function songToExportObj(s) {
