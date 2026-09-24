@@ -169,6 +169,22 @@ body.dark .player-container {
     .player-container { width: 450px; }
 }
 
+/* Wrapper layout – mobile: stack như cũ */
+.pc-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+}
+.pc-left {
+    display: contents; /* top-bar + playlist giữ behavior overlay trên mobile */
+}
+.pc-right {
+    display: contents;
+}
+
 .header-section {
     padding: 55px 24px 30px 24px;
     display: flex;
@@ -3977,3 +3993,161 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   height: 18px !important;
 }
 
+
+/* ========== PC LAYOUT: 2 cột ========== */
+@media (min-width: 900px) {
+    body {
+        padding: 20px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .player-container {
+        width: min(1100px, 96vw) !important;
+        max-width: 1100px !important;
+        height: min(720px, 92vh);
+        max-height: 92vh;
+        border-radius: 28px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pc-layout {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        flex: 1;
+        min-height: 0;
+        height: 100%;
+        width: 100%;
+    }
+
+    .pc-left {
+        display: flex !important;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        border-right: 1px solid var(--border-color);
+        position: relative;
+        overflow: hidden;
+        background: var(--card-bg);
+    }
+
+    .pc-right {
+        display: flex !important;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+        justify-content: space-between;
+        overflow: hidden;
+    }
+
+    /* Top-bar icons cố định trên cột trái */
+    .pc-left .top-bar-icons {
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        z-index: 20;
+        flex-shrink: 0;
+        padding: 14px 12px 10px;
+        justify-content: space-between;
+        gap: 6px;
+        pointer-events: auto;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Playlist luôn mở sẵn bên trái, không overlay */
+    .pc-left .playlist {
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        flex: 1;
+        min-height: 0;
+        transform: none !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        border-radius: 0 !important;
+        z-index: 1;
+        background: var(--playlist-bg);
+        display: flex !important;
+        flex-direction: column;
+    }
+
+    .pc-left .playlist.active {
+        transform: none !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+
+    .pc-left .playlist-header {
+        flex-shrink: 0;
+        border-radius: 0;
+    }
+
+    /* Ẩn nút đóng playlist trên PC (luôn mở) */
+    .pc-left .close-playlist {
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    #playlist-content {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Cột phải: art + lyric + controls */
+    .pc-right .header-section {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 28px 16px;
+        gap: 18px;
+        overflow: hidden;
+    }
+
+    .pc-right .album-art {
+        width: 200px;
+        height: 200px;
+        margin-top: 0;
+        flex-shrink: 0;
+    }
+
+    .pc-right .song-info-main {
+        width: 100%;
+        max-width: 420px;
+    }
+
+    .pc-right .lyric-container {
+        min-height: 52px;
+    }
+
+    .pc-right .controls-bar {
+        flex-shrink: 0;
+        padding: 16px 28px 28px;
+        background: transparent;
+    }
+
+    /* Ẩn nút list trên PC vì playlist đã mở sẵn */
+    #list-btn {
+        display: none !important;
+    }
+
+    /* My playlist overlay vẫn full player */
+    #my-playlist-overlay.playlist {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 28px;
+        z-index: 200;
+    }
+}

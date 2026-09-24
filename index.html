@@ -69,84 +69,93 @@
     </div>
 
     <div class="player-container" id="player-container" style="display: none;">
-        <div class="header-section">
-            <div class="top-bar-icons">
-                <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
-                    <i data-lucide="timer"></i>
+        <div class="pc-layout">
+            <!-- Cột trái (PC): top-bar + danh sách bài hát -->
+            <div class="pc-left">
+                <div class="top-bar-icons">
+                    <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
+                        <i data-lucide="timer"></i>
+                    </div>
+                    <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
+                        <i data-lucide="headphones"></i>
+                    </div>
+                    <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
+                        <i data-lucide="list-plus"></i>
+                    </div>
+                    <div class="btn-icon" id="extras-btn" title="Tiện ích">
+                        <i data-lucide="sparkles"></i>
+                    </div>
+                    <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
+                        <i data-lucide="store"></i>
+                    </div>
+                    <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
+                        <i data-lucide="sun" id="theme-icon"></i>
+                    </div>
+                    <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
+                        <i data-lucide="list-music"></i>
+                    </div>
                 </div>
-                <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
-                    <i data-lucide="headphones"></i>
-                </div>
-                <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
-                    <i data-lucide="list-plus"></i>
-                </div>
-                <div class="btn-icon" id="extras-btn" title="Tiện ích">
-                    <i data-lucide="sparkles"></i>
-                </div>
-                <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
-                    <i data-lucide="store"></i>
-                </div>
-                <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
-                    <i data-lucide="sun" id="theme-icon"></i>
-                </div>
-                <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
-                    <i data-lucide="list-music"></i>
+
+                <div class="playlist" id="playlist">
+                    <div class="playlist-header" id="playlist-header">
+                        <div class="close-playlist" id="close-playlist-btn">
+                            <i data-lucide="x"></i>
+                        </div>
+                        <div class="playlist-title"><i data-lucide="music"></i><span>DANH SÁCH BÀI HÁT</span></div>
+                        <div style="width: 40px;"></div>
+                    </div>
+                    <div id="playlist-content"></div>
                 </div>
             </div>
-            
-            <div class="album-art">
-                <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
-            </div>
-            <div class="song-info-main">
-                <span class="song-title" id="current-title">Sẵn sàng</span>
-                <span class="artist-name" id="current-artist">XuanKen Official</span>
-                <div class="lyric-container" id="lyric-container">
-                    <div class="current-lyric" id="lyric-text"><i data-lucide="smile"></i> Chọn bài hát để phát <i data-lucide="smile"></i></div>
+
+            <!-- Cột phải (PC): art + lyric + progress + controls -->
+            <div class="pc-right">
+                <div class="header-section">
+                    <div class="album-art">
+                        <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
+                    </div>
+                    <div class="song-info-main">
+                        <span class="song-title" id="current-title">Sẵn sàng</span>
+                        <span class="artist-name" id="current-artist">XuanKen Official</span>
+                        <div class="lyric-container" id="lyric-container">
+                            <div class="current-lyric" id="lyric-text"><i data-lucide="smile"></i> Chọn bài hát để phát <i data-lucide="smile"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls-bar">
+                    <div class="progress-wrapper">
+                        <div class="progress-bar-container" id="progress-area">
+                            <div class="progress-filled" id="progress-fill"></div>
+                            <div class="progress-thumb" id="progress-thumb"></div>
+                        </div>
+                        <div class="time-info">
+                            <span id="time-current">00:00</span>
+                            <span id="time-total">00:00</span>
+                        </div>
+                    </div>
+
+                    <div class="main-actions">
+                        <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
+                            <i data-lucide="shuffle"></i>
+                        </div>
+                        <div class="btn-icon" id="prev-btn" title="Bài trước">
+                            <i data-lucide="skip-back"></i>
+                        </div>
+                        <div class="btn-icon play-btn" id="play-pause-btn" title="Phát / Tạm dừng">
+                            <i data-lucide="play" id="play-icon"></i>
+                        </div>
+                        <div class="btn-icon" id="next-btn" title="Bài tiếp">
+                            <i data-lucide="skip-forward"></i>
+                        </div>
+                        <div class="btn-icon" id="repeat-btn" title="Lặp lại">
+                            <i data-lucide="repeat"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="controls-bar">
-            <div class="progress-wrapper">
-                <div class="progress-bar-container" id="progress-area">
-                    <div class="progress-filled" id="progress-fill"></div>
-                    <div class="progress-thumb" id="progress-thumb"></div>
-                </div>
-                <div class="time-info">
-                    <span id="time-current">00:00</span>
-                    <span id="time-total">00:00</span>
-                </div>
-            </div>
-
-            <div class="main-actions">
-                <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
-                    <i data-lucide="shuffle"></i>
-                </div>
-                <div class="btn-icon" id="prev-btn" title="Bài trước">
-                    <i data-lucide="skip-back"></i>
-                </div>
-                <div class="btn-icon play-btn" id="play-pause-btn" title="Phát / Tạm dừng">
-                    <i data-lucide="play" id="play-icon"></i>
-                </div>
-                <div class="btn-icon" id="next-btn" title="Bài tiếp">
-                    <i data-lucide="skip-forward"></i>
-                </div>
-                <div class="btn-icon" id="repeat-btn" title="Lặp lại">
-                    <i data-lucide="repeat"></i>
-                </div>
-            </div>
-        </div>
-
-        <div class="playlist" id="playlist">
-            <div class="playlist-header" id="playlist-header">
-                <div class="close-playlist" id="close-playlist-btn">
-                    <i data-lucide="x"></i>
-                </div>
-                <div class="playlist-title"><i data-lucide="music"></i><span>DANH SÁCH BÀI HÁT</span></div>
-                <div style="width: 40px;"></div> 
-            </div>
-            <div id="playlist-content"></div>
-        </div>
 
         <div class="playlist" id="my-playlist-overlay">
             <div class="playlist-header">
