@@ -1070,7 +1070,7 @@ function withTimeout(promise, ms, label) {
  * - Username không bắt buộc; có user thì cộng XP / listenedSongs
  */
 
-/** Tuần trong tháng: 2026-09-W1 … W5 (theo ngày 1–7, 8–14, …) */
+/** Tuần trong tháng: 2026-09-W1 … W5 (theo ngày 1–7, 8–14, 15–21, 22–28, 29–cuối tháng) */
 function getWeekOfMonthKey(date) {
     const d = date ? new Date(date) : new Date();
     const y = d.getFullYear();
@@ -1078,13 +1078,39 @@ function getWeekOfMonthKey(date) {
     const w = Math.max(1, Math.ceil(d.getDate() / 7));
     return y + '-' + m + '-W' + w;
 }
+/** Khoảng ngày của 1 tuần: { y, m, w, startDay, endDay } */
+function getWeekOfMonthRange(key) {
+    const match = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
+    if (!match) return null;
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    const w = Number(match[3]);
+    if (!y || !m || !w) return null;
+    const lastDay = new Date(y, m, 0).getDate();
+    const startDay = Math.min((w - 1) * 7 + 1, lastDay);
+    const endDay = Math.min(w * 7, lastDay);
+    return { y, m, w, startDay, endDay };
+}
+function formatWeekDateVN(y, m, d) {
+    return String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + '/' + y;
+}
+/** Nhãn tuần kèm khoảng ngày: "Tuần 4 · 22/09/2026 – 28/09/2026" */
 function weekOfMonthLabel(key) {
-    const m = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
-    if (!m) return String(key || '');
-    return 'Tuần ' + m[3] + ' · Tháng ' + Number(m[2]) + '/' + m[1];
+    const r = getWeekOfMonthRange(key);
+    if (!r) return String(key || '');
+    return 'Tuần ' + r.w + ' · ' + formatWeekDateVN(r.y, r.m, r.startDay) + ' – ' + formatWeekDateVN(r.y, r.m, r.endDay);
+}
+/** Chỉ khoảng ngày ngắn: "22/09 – 28/09/2026" */
+function weekOfMonthDateRange(key) {
+    const r = getWeekOfMonthRange(key);
+    if (!r) return '';
+    const sameYearMonth = true;
+    return formatWeekDateVN(r.y, r.m, r.startDay) + ' – ' + formatWeekDateVN(r.y, r.m, r.endDay);
 }
 window.getWeekOfMonthKey = getWeekOfMonthKey;
+window.getWeekOfMonthRange = getWeekOfMonthRange;
 window.weekOfMonthLabel = weekOfMonthLabel;
+window.weekOfMonthDateRange = weekOfMonthDateRange;
 
 async function incrementListenCount(songId, songName, source = 'normal') {
     if (!songId || isUpdatingListen) return false;
@@ -1177,11 +1203,19 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                     db.ref(wPath).transaction(c => (Number(c) || 0) + 1).catch(() => {});
                     // Lưu meta tuần (label) để UI liệt kê
                     const metaPath = (typeof dataPath === 'function' ? dataPath('weeklyListensMeta') : 'weeklyListensMeta') + '/' + wk;
-                    db.ref(metaPath).update({
+                    const range = (typeof getWeekOfMonthRange === 'function') ? getWeekOfMonthRange(wk) : null;
+                    const metaUpdate = {
                         key: wk,
                         label: (typeof weekOfMonthLabel === 'function') ? weekOfMonthLabel(wk) : wk,
                         updatedAt: Date.now()
-                    }).catch(() => {});
+                    };
+                    if (range) {
+                        metaUpdate.dateFrom = formatWeekDateVN(range.y, range.m, range.startDay);
+                        metaUpdate.dateTo = formatWeekDateVN(range.y, range.m, range.endDay);
+                        metaUpdate.startDay = range.startDay;
+                        metaUpdate.endDay = range.endDay;
+                    }
+                    db.ref(metaPath).update(metaUpdate).catch(() => {});
                 } catch (eW) { console.warn('weeklyListens', eW); }
             } else {
                 console.warn('listenCount: Firebase chưa ghi được — đã lưu local + toast');

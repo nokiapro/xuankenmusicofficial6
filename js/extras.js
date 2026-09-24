@@ -1069,17 +1069,44 @@
     _cdTimer = setInterval(() => tickCountdown(cfg), 1000);
   }
 
-  /* ===== Top bài theo tuần (tự động) ===== */
+  /* ===== Top bài theo tuần (mỗi tuần 1 bảng riêng + khoảng ngày) ===== */
   function parseWeekKey(key) {
     const m = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
     if (!m) return null;
     return { y: +m[1], m: +m[2], w: +m[3], key: m[0] };
   }
+  function weekDateRangeFromKey(key) {
+    if (typeof weekOfMonthDateRange === 'function') {
+      const r = weekOfMonthDateRange(key);
+      if (r) return r;
+    }
+    if (typeof getWeekOfMonthRange === 'function') {
+      const r = getWeekOfMonthRange(key);
+      if (r) {
+        const pad = n => String(n).padStart(2, '0');
+        return pad(r.startDay) + '/' + pad(r.m) + '/' + r.y + ' – ' + pad(r.endDay) + '/' + pad(r.m) + '/' + r.y;
+      }
+    }
+    const p = parseWeekKey(key);
+    if (!p) return '';
+    const start = (p.w - 1) * 7 + 1;
+    const endGuess = p.w * 7;
+    const pad = n => String(n).padStart(2, '0');
+    return pad(start) + '/' + pad(p.m) + '/' + p.y + ' – ' + pad(endGuess) + '/' + pad(p.m) + '/' + p.y;
+  }
   function weekLabelFromKey(key) {
     if (typeof weekOfMonthLabel === 'function') return weekOfMonthLabel(key);
     const p = parseWeekKey(key);
     if (!p) return key;
-    return 'Tuần ' + p.w + ' · Tháng ' + p.m + '/' + p.y;
+    const range = weekDateRangeFromKey(key);
+    return range ? ('Tuần ' + p.w + ' · ' + range) : ('Tuần ' + p.w + ' · Tháng ' + p.m + '/' + p.y);
+  }
+  function weekStatusLabel(key, curKey) {
+    if (key === curKey) return 'Đang diễn ra';
+    // key dạng 2026-09-W4 — so sánh chuỗi đủ để biết tuần đã qua
+    if (curKey && key < curKey) return 'Đã kết thúc';
+    if (curKey && key > curKey) return 'Sắp tới';
+    return '';
   }
   async function fetchWeeklyMetaList() {
     try {
@@ -1088,18 +1115,29 @@
       const path = typeof dataPath === 'function' ? dataPath('weeklyListensMeta') : 'weeklyListensMeta';
       const snap = await db.ref(path).once('value');
       const val = snap.val() || {};
+      const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : null;
       const list = Object.keys(val).map(k => {
         const v = val[k] || {};
+        const key = v.key || k;
+        const range = weekDateRangeFromKey(key);
+        const label = weekLabelFromKey(key); // luôn build lại để có khoảng ngày mới
         return {
-          key: v.key || k,
-          label: v.label || weekLabelFromKey(v.key || k),
+          key,
+          label,
+          dateRange: range,
+          status: weekStatusLabel(key, cur),
           updatedAt: Number(v.updatedAt) || 0
         };
       });
-      // luôn thêm tuần hiện tại nếu chưa có
-      const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : null;
+      // luôn thêm tuần hiện tại nếu chưa có (bảng riêng khi sang tuần mới)
       if (cur && !list.some(x => x.key === cur)) {
-        list.push({ key: cur, label: weekLabelFromKey(cur) + ' (hiện tại)', updatedAt: Date.now() });
+        list.push({
+          key: cur,
+          label: weekLabelFromKey(cur),
+          dateRange: weekDateRangeFromKey(cur),
+          status: 'Đang diễn ra',
+          updatedAt: Date.now()
+        });
       }
       list.sort((a, b) => {
         if (a.key < b.key) return 1;
@@ -1138,24 +1176,37 @@
   }
   function renderWeeklyList(weeks) {
     if (!weeks.length) {
-      return '<div class="xr-empty">Chưa có dữ liệu top tuần.<br/><span style="opacity:0.7;font-size:0.8rem">Nghe nhạc sẽ tự ghi nhận từng tuần</span></div>';
+      return '<div class="xr-empty">Chưa có dữ liệu top tuần.<br/><span style="opacity:0.7;font-size:0.8rem">Nghe nhạc sẽ tự ghi nhận từng tuần — hết tuần sẽ có bảng riêng</span></div>';
     }
     const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : '';
     let html = '<div class="wk-list">';
     weeks.forEach((w, i) => {
       const isCur = w.key === cur;
+      const range = w.dateRange || weekDateRangeFromKey(w.key);
+      const status = w.status || weekStatusLabel(w.key, cur);
+      const title = 'Tuần ' + (parseWeekKey(w.key) ? parseWeekKey(w.key).w : '') + (isCur ? ' (hiện tại)' : '');
       html += '<button type="button" class="wk-card' + (isCur ? ' current' : '') + '" data-week="' + escapeHtml(w.key) + '">'
-        + '<div class="wk-badge">' + (isCur ? 'NOW' : ('#' + (i + 1))) + '</div>'
-        + '<div class="wk-info"><div class="wk-title">' + escapeHtml(w.label) + '</div>'
-        + '<div class="wk-sub">' + escapeHtml(w.key) + (isCur ? ' · Đang diễn ra' : '') + '</div></div>'
+        + '<div class="wk-badge">' + (isCur ? 'NOW' : (status === 'Đã kết thúc' ? 'DONE' : ('#' + (i + 1)))) + '</div>'
+        + '<div class="wk-info"><div class="wk-title">' + escapeHtml(title) + '</div>'
+        + '<div class="wk-sub">' + escapeHtml(range || w.key)
+        + (status ? (' · ' + status) : '')
+        + '</div></div>'
         + '<div class="wk-arrow"><i data-lucide="chevron-right"></i></div>'
         + '</button>';
     });
     html += '</div>';
     return html;
   }
-  function renderWeeklyTopRows(rows, label) {
-    let body = '<div class="xr-note">' + escapeHtml(label) + ' · Top 10 lượt nghe</div>';
+  function renderWeeklyTopRows(rows, weekKey) {
+    const range = weekDateRangeFromKey(weekKey);
+    const p = parseWeekKey(weekKey);
+    const cur = typeof getWeekOfMonthKey === 'function' ? getWeekOfMonthKey() : '';
+    const status = weekStatusLabel(weekKey, cur);
+    const titleBits = [];
+    if (p) titleBits.push('Tuần ' + p.w);
+    if (range) titleBits.push(range);
+    if (status) titleBits.push(status);
+    let body = '<div class="xr-note">' + escapeHtml(titleBits.join(' · ')) + ' — Top 10 lượt nghe</div>';
     if (!rows.length) {
       body += '<div class="xr-empty">Tuần này chưa có lượt nghe</div>';
       return body;
@@ -1178,7 +1229,7 @@
     openResultModal('TOP TUẦN', 'list-music', '<div class="xr-empty">Đang tải…</div>');
     const weeks = await fetchWeeklyMetaList();
     openResultModal('TOP TUẦN', 'list-music',
-      '<div class="xr-note">Mỗi tuần tự ghi nhận top bài nghe nhiều nhất</div>' + renderWeeklyList(weeks));
+      '<div class="xr-note">Mỗi tuần một bảng riêng · Hết tuần tự chuyển bảng mới · Hiện khoảng ngày rõ ràng</div>' + renderWeeklyList(weeks));
     bindWeeklyClicks(weeks);
   }
   function bindWeeklyClicks(weeks) {
@@ -1190,10 +1241,12 @@
     modal.querySelectorAll('[data-week]').forEach(btn => {
       btn.onclick = async () => {
         const key = btn.getAttribute('data-week');
-        const label = weekLabelFromKey(key);
-        openResultModal(label, 'trophy', '<div class="xr-empty">Đang tải…</div>');
+        const p = parseWeekKey(key);
+        const range = weekDateRangeFromKey(key);
+        const modalTitle = p ? ('TUẦN ' + p.w) : weekLabelFromKey(key);
+        openResultModal(modalTitle, 'trophy', '<div class="xr-empty">Đang tải…</div>');
         const rows = await fetchWeeklyTop(key);
-        openResultModal(label, 'trophy', renderWeeklyTopRows(rows, label));
+        openResultModal(modalTitle, 'trophy', renderWeeklyTopRows(rows, key));
         if (typeof lucide !== 'undefined') {
           try {
             const m2 = document.getElementById('extras-result-modal');
@@ -1204,7 +1257,7 @@
         if (back) {
           back.onclick = () => {
             openResultModal('TOP TUẦN', 'list-music',
-              '<div class="xr-note">Mỗi tuần tự ghi nhận top bài nghe nhiều nhất</div>' + renderWeeklyList(weeks));
+              '<div class="xr-note">Mỗi tuần một bảng riêng · Hết tuần tự chuyển bảng mới · Hiện khoảng ngày rõ ràng</div>' + renderWeeklyList(weeks));
             bindWeeklyClicks(weeks);
           };
         }
