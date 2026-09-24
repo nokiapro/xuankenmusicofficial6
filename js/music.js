@@ -2389,7 +2389,7 @@ function toggleTimerModal() {
         timerOverlay.classList.remove('show');
         setTimeout(() => {
             if (!timerModal.classList.contains('show')) timerOverlay.style.display = 'none';
-        }, 280);
+        }, 400);
     } else {
         timerOverlay.style.display = 'block';
         void timerOverlay.offsetHeight;
