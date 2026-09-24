@@ -8,11 +8,13 @@
 
   const ACHIEVEMENTS = {
     first_listen: { name: 'Lần nghe đầu', desc: 'Nghe 1 bài qua 5 giây', icon: 'fa-solid fa-headphones' },
+    listens_5: { name: 'Khởi động ấm', desc: '5 bài đã nghe', icon: 'fa-solid fa-play' },
     listens_10: { name: 'Tai nghe bền', desc: '10 bài đã nghe', icon: 'fa-solid fa-radio' },
     listens_25: { name: 'Fan cứng', desc: '25 bài đã nghe', icon: 'fa-solid fa-compact-disc' },
     listens_50: { name: 'Nghiện nhạc', desc: '50 bài đã nghe', icon: 'fa-solid fa-fire' },
     listens_100: { name: 'Huyền thoại nghe', desc: '100 bài đã nghe', icon: 'fa-solid fa-crown' },
     listens_200: { name: 'Không ngủ', desc: '200 bài đã nghe', icon: 'fa-solid fa-moon' },
+    checkin_1: { name: 'Có mặt', desc: 'Điểm danh lần đầu', icon: 'fa-solid fa-calendar-check' },
     checkin_3: { name: 'Bắt đầu đều', desc: 'Streak 3 ngày', icon: 'fa-solid fa-calendar-day' },
     checkin_7: { name: 'Tuần đầy đủ', desc: 'Streak 7 ngày', icon: 'fa-solid fa-calendar-week' },
     checkin_14: { name: 'Hai tuần kiên trì', desc: 'Streak 14 ngày', icon: 'fa-solid fa-dumbbell' },
@@ -30,12 +32,18 @@
     level_20: { name: 'Level 20', desc: 'Đạt level 20', icon: 'fa-solid fa-certificate' },
     level_50: { name: 'Level 50', desc: 'Đạt level 50', icon: 'fa-solid fa-crown' },
     gift_first: { name: 'Quà đầu tay', desc: 'Đổi gift code lần đầu', icon: 'fa-solid fa-gift' },
+    gift_3: { name: 'Săn quà', desc: 'Đổi gift code 3 lần', icon: 'fa-solid fa-gifts' },
     chat_first: { name: 'Lên tiếng', desc: 'Gửi tin chat đầu tiên', icon: 'fa-solid fa-comments' },
+    chat_10: { name: 'Tám chuyện', desc: 'Gửi 10 tin chat', icon: 'fa-solid fa-comment-dots' },
     thumb_buyer: { name: 'Trang trí', desc: 'Mua 1 progress thumb', icon: 'fa-solid fa-palette' },
     playlist_5: { name: 'DJ nghiệp dư', desc: '5 bài trong playlist', icon: 'fa-solid fa-music' },
+    playlist_10: { name: 'Setlist ngon', desc: '10 bài trong playlist', icon: 'fa-solid fa-list' },
     playlist_20: { name: 'DJ chính hiệu', desc: '20 bài trong playlist', icon: 'fa-solid fa-sliders' },
+    fav_5: { name: 'Thả tim', desc: '5 bài yêu thích (tim)', icon: 'fa-solid fa-heart' },
     fav_10: { name: 'Yêu thích', desc: '10 bài yêu thích (tim)', icon: 'fa-solid fa-heart' },
     fav_20: { name: 'Tim máy', desc: '20 bài yêu thích (tim)', icon: 'fa-solid fa-heart' },
+    listen_1h: { name: '1 giờ nhạc', desc: 'Tổng thời gian nghe ≥ 1 giờ', icon: 'fa-solid fa-hourglass-half' },
+    listen_10h: { name: '10 giờ nhạc', desc: 'Tổng thời gian nghe ≥ 10 giờ', icon: 'fa-solid fa-hourglass' },
     secret_333: { name: '3:33', desc: 'Nghe đúng lúc 3:33', icon: 'fa-solid fa-clock', hidden: true },
     marathon: { name: 'Marathon', desc: 'Nghe ≥ 60 phút trong phiên', icon: 'fa-solid fa-person-running' },
     rich: { name: 'Túi đầy', desc: 'Có ≥ 500 XK', icon: 'fa-solid fa-coins' },
@@ -130,7 +138,7 @@
   // ----- 29 / 69 / 70 / 74 Achievements + XP -----
   function unlockAchievement(id) {
     const def = ACHIEVEMENTS[id];
-    if (!def || typeof updateCurrentAccount !== 'function') return;
+    if (!def || typeof updateCurrentAccount !== 'function') return false;
     let got = false;
     updateCurrentAccount(acc => {
       if (!Array.isArray(acc.achievements)) acc.achievements = [];
@@ -142,7 +150,7 @@
       const iconPart = badgeIconHtml(def.icon, 'noti-badge-fa');
       toast('Huy hiệu:', iconPart + ' ' + def.name + (def.hidden ? ' <i class="fa-solid fa-sparkles"></i>' : ''), '#fbbf24');
     }
-    syncUserPartial();
+    return got;
   }
 
   function checkAchievements() {
@@ -150,49 +158,129 @@
     if (!acc) return;
     const listened = acc.listenedSongs ? Object.keys(acc.listenedSongs).length : 0;
     const owned = (acc.owned || []).length;
-    const streak = acc.streak || 0;
-    const level = acc.level || 1;
+    const streak = Number(acc.streak) || 0;
+    const level = Number(acc.level) || 1;
     const coins = acc.coins | 0;
     const favs = (acc.favorites || []).length;
     const pl = (acc.myPlaylist || []).length;
     const thumbs = (acc.ownedThumbs || []).length;
-    const rank = String(acc.rank || 'member').toLowerCase();
+    const rank = String(acc.rank || 'member').toLowerCase().replace(/\s+/g, '_');
+    const giftN = Number(acc.giftClaimCount) || 0;
+    const chatN = Number(acc.chatCount) || 0;
+    const checkinDaysN = acc.checkinDays && typeof acc.checkinDays === 'object'
+      ? Object.keys(acc.checkinDays).length
+      : 0;
+    let listenTotal = 0;
+    if (acc.listenTime) {
+      listenTotal = Number(acc.listenTime.total) || 0;
+      const bd = acc.listenTime.byDay;
+      if (bd && typeof bd === 'object') {
+        let s = 0;
+        Object.keys(bd).forEach(k => { s += Number(bd[k]) || 0; });
+        listenTotal = Math.max(listenTotal, s);
+      }
+    }
+
     if (listened >= 1) unlockAchievement('first_listen');
+    if (listened >= 5) unlockAchievement('listens_5');
     if (listened >= 10) unlockAchievement('listens_10');
     if (listened >= 25) unlockAchievement('listens_25');
     if (listened >= 50) unlockAchievement('listens_50');
     if (listened >= 100) unlockAchievement('listens_100');
     if (listened >= 200) unlockAchievement('listens_200');
+
+    if (checkinDaysN >= 1 || acc.lastCheckin) unlockAchievement('checkin_1');
     if (streak >= 3) unlockAchievement('checkin_3');
     if (streak >= 7) unlockAchievement('checkin_7');
     if (streak >= 14) unlockAchievement('checkin_14');
     if (streak >= 30) unlockAchievement('checkin_30');
+
     if (owned >= 1) unlockAchievement('first_buy');
     if (owned >= 5) unlockAchievement('collector');
     if (owned >= 10) unlockAchievement('collector_10');
     if (owned >= 25) unlockAchievement('collector_25');
     if (owned >= 50) unlockAchievement('collector_50');
+
     if (level >= 5) unlockAchievement('level_5');
     if (level >= 10) unlockAchievement('level_10');
     if (level >= 20) unlockAchievement('level_20');
     if (level >= 50) unlockAchievement('level_50');
+
     if (coins >= 500) unlockAchievement('rich');
     if (coins >= 2000) unlockAchievement('richer');
+
+    if (favs >= 5) unlockAchievement('fav_5');
     if (favs >= 10) unlockAchievement('fav_10');
     if (favs >= 20) unlockAchievement('fav_20');
+
     if (pl >= 5) unlockAchievement('playlist_5');
+    if (pl >= 10) unlockAchievement('playlist_10');
     if (pl >= 20) unlockAchievement('playlist_20');
+
     if (thumbs >= 1) unlockAchievement('thumb_buyer');
-    if (acc.rentals && typeof acc.rentals === 'object' && Object.keys(acc.rentals).length >= 1) unlockAchievement('renter');
-    if (rank === 'vip' || rank === 'super_vip' || rank === 'admin') unlockAchievement('vip_rank');
-    if (rank === 'super_vip' || rank === 'admin') unlockAchievement('super_vip_rank');
+    if (acc.rentals && typeof acc.rentals === 'object' && Object.keys(acc.rentals).length >= 1) {
+      unlockAchievement('renter');
+    }
+
+    if (giftN >= 1) unlockAchievement('gift_first');
+    if (giftN >= 3) unlockAchievement('gift_3');
+    if (chatN >= 1) unlockAchievement('chat_first');
+    if (chatN >= 10) unlockAchievement('chat_10');
+
+    if (listenTotal >= 3600) unlockAchievement('listen_1h');
+    if (listenTotal >= 36000) unlockAchievement('listen_10h');
+
+    if (rank === 'vip' || rank === 'super_vip' || rank === 'admin' || rank === 'owner') {
+      unlockAchievement('vip_rank');
+    }
+    if (rank === 'super_vip' || rank === 'admin' || rank === 'owner') {
+      unlockAchievement('super_vip_rank');
+    }
+
     const h = new Date().getHours();
     if (h >= 0 && h < 4) unlockAchievement('night_owl');
     if (h >= 5 && h < 7) unlockAchievement('early_bird');
     if (h === 3 && new Date().getMinutes() === 33) unlockAchievement('secret_333');
-    // Marathon: nghe ≥ 60 phút trong phiên hiện tại
+
     const sessionSec = Number(window._sessionListenSec) || 0;
     if (sessionSec >= 3600) unlockAchievement('marathon');
+  }
+
+  /** Quét giftCodes một lần — bù huy hiệu nếu đã đổi mã trước đây mà chưa ghi */
+  async function recoverGiftAchievements() {
+    try {
+      const acc = getAcc();
+      if (!acc) return;
+      if ((Number(acc.giftClaimCount) || 0) >= 1) {
+        unlockAchievement('gift_first');
+        return;
+      }
+      if ((acc.achievements || []).includes('gift_first')) return;
+      const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
+      if (!user || typeof getDb !== 'function') return;
+      const db = getDb();
+      if (!db) return;
+      const userKey = (typeof sanitizeUsernameKey === 'function'
+        ? sanitizeUsernameKey(user)
+        : String(user).replace(/[.#$\[\]\/]/g, '_'));
+      const path = (typeof dataPath === 'function' ? dataPath('giftCodes') : 'giftCodes');
+      const snap = await db.ref(path).once('value');
+      const all = snap.val() || {};
+      let count = 0;
+      Object.keys(all).forEach(code => {
+        const g = all[code] || {};
+        const map = (g.usedByMap && typeof g.usedByMap === 'object') ? g.usedByMap : {};
+        if (map[userKey] || map[user]) count += 1;
+        else if (g.usedBy && String(g.usedBy).toLowerCase() === String(user).toLowerCase()) count += 1;
+      });
+      if (count > 0 && typeof updateCurrentAccount === 'function') {
+        updateCurrentAccount(a => {
+          a.giftClaimCount = Math.max(Number(a.giftClaimCount) || 0, count);
+        });
+        unlockAchievement('gift_first');
+        if (count >= 3) unlockAchievement('gift_3');
+      }
+    } catch (e) {}
   }
 
   function playerHost() {
@@ -216,24 +304,34 @@
     } else if (modal.parentElement !== playerHost()) {
       playerHost().appendChild(modal);
     }
-    const list = modal.querySelector('#badges-list');
-    const acc = getAcc() || {};
-    const owned = new Set((acc.achievements || []).map(String));
-    const ids = Object.keys(ACHIEVEMENTS);
-    list.innerHTML = ids.map(id => {
-      const def = ACHIEVEMENTS[id];
-      if (def.hidden && !owned.has(id)) {
-        return '<div class="badge-card locked"><div class="badge-icon"><i class="fa-solid fa-question" aria-hidden="true"></i></div><div class="badge-info"><div class="badge-name">???</div><div class="badge-desc">Huy hiệu ẩn</div></div></div>';
-      }
-      const got = owned.has(id);
-      return '<div class="badge-card' + (got ? ' got' : ' locked') + '">'
-        + '<div class="badge-icon">' + badgeIconHtml(def.icon) + '</div>'
-        + '<div class="badge-info"><div class="badge-name">' + escapeHtml(def.name) + '</div>'
-        + '<div class="badge-desc">' + escapeHtml(def.desc || '') + '</div></div>'
-        + (got ? '<span class="badge-got-tag">Đã nhận</span>' : '<span class="badge-lock-tag">Chưa</span>')
-        + '</div>';
-    }).join('');
+    function renderBadgesList() {
+      const list = modal.querySelector('#badges-list');
+      if (!list) return;
+      const acc = getAcc() || {};
+      const owned = new Set((acc.achievements || []).map(String));
+      const ids = Object.keys(ACHIEVEMENTS);
+      list.innerHTML = ids.map(id => {
+        const def = ACHIEVEMENTS[id];
+        if (def.hidden && !owned.has(id)) {
+          return '<div class="badge-card locked"><div class="badge-icon"><i class="fa-solid fa-question" aria-hidden="true"></i></div><div class="badge-info"><div class="badge-name">???</div><div class="badge-desc">Huy hiệu ẩn</div></div></div>';
+        }
+        const got = owned.has(id);
+        return '<div class="badge-card' + (got ? ' got' : ' locked') + '">'
+          + '<div class="badge-icon">' + badgeIconHtml(def.icon) + '</div>'
+          + '<div class="badge-info"><div class="badge-name">' + escapeHtml(def.name) + '</div>'
+          + '<div class="badge-desc">' + escapeHtml(def.desc || '') + '</div></div>'
+          + (got ? '<span class="badge-got-tag">Đã nhận</span>' : '<span class="badge-lock-tag">Chưa</span>')
+          + '</div>';
+      }).join('');
+    }
+    // Bù huy hiệu đã đạt (playlist, gift, checkin…) rồi vẽ
+    try { checkAchievements(); } catch (e) {}
+    renderBadgesList();
     modal.classList.add('show');
+    recoverGiftAchievements().then(() => {
+      try { checkAchievements(); } catch (e) {}
+      renderBadgesList();
+    }).catch(() => {});
     if (typeof lucide !== 'undefined') {
       try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
     }
@@ -618,25 +716,18 @@
 
 
   async function syncUserPartial() {
+    // Dùng pushUserToFirebase (merge an toàn) — không .update() ghi đè listenTime/checkin
     try {
       const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
-      if (!name || typeof getDb !== 'function') return;
-      const db = getDb();
-      if (!db) return;
+      if (!name || typeof pushUserToFirebase !== 'function') return;
       const acc = getAcc();
       if (!acc) return;
-      const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || (acc && acc.uid) || '';
-      if (!uid) return;
-      await db.ref((typeof dataPath === 'function' ? dataPath('users') : 'users') + '/' + uid).update({
-        xp: Number(acc.xp) || 0,
-        level: Number(acc.level) || 1,
-        seasonXp: Number(acc.seasonXp) || 0,
-        achievements: acc.achievements || [],
-        frame: acc.frame || '',
-        streak: Number(acc.streak) || 0,
-        streakFreeze: Number(acc.streakFreeze) || 0,
-        listenedSongs: acc.listenedSongs || {},
-        listenTime: acc.listenTime || { total: 0, byDay: {} },
+      await pushUserToFirebase(name, acc, {
+        achievementsChanged: true,
+        xpChanged: true,
+        checkinChanged: true,
+        listenedSongsChanged: true,
+        coinsDelta: 0
       });
     } catch (e) {}
   }
@@ -752,9 +843,14 @@
         return toast('GIFT', 'Mã hết lượt / đã dùng / Rules chặn ghi', '#ff9800');
       }
       if (typeof updateCurrentAccount === 'function') {
-        updateCurrentAccount(acc => { acc.coins = (acc.coins | 0) + coins; });
+        updateCurrentAccount(acc => {
+          acc.coins = (acc.coins | 0) + coins;
+          acc.giftClaimCount = (Number(acc.giftClaimCount) || 0) + 1;
+        });
       }
       unlockAchievement('gift_first');
+      const gCount = Number((getAcc() || {}).giftClaimCount) || 1;
+      if (gCount >= 3) unlockAchievement('gift_3');
       toast('GIFT', '+' + coins + ' XK', '#4ade80');
       if (typeof updateShopBalanceUI === 'function') updateShopBalanceUI();
       if (typeof updateUsernameBadge === 'function') updateUsernameBadge();
@@ -1528,7 +1624,13 @@
         rank: String(rank || 'member').slice(0, 31)
       });
       if (input) input.value = '';
+      if (typeof updateCurrentAccount === 'function') {
+        updateCurrentAccount(acc => {
+          acc.chatCount = (Number(acc.chatCount) || 0) + 1;
+        });
+      }
       unlockAchievement('chat_first');
+      if ((Number((getAcc() || {}).chatCount) || 0) >= 10) unlockAchievement('chat_10');
     } catch (err) {
       toast('CHAT', 'Không gửi được: ' + (err.message || err), '#ff4444');
     }
@@ -1544,6 +1646,7 @@
     autoNightMode();
     updateXpUi();
     checkAchievements();
+    setTimeout(() => { try { recoverGiftAchievements(); } catch (e) {} }, 1500);
     handleDeepLink();
     setInterval(showPublishCountdown, 1000);
     setInterval(autoNightMode, 60000);
@@ -1566,6 +1669,6 @@
   else setTimeout(boot, 600);
 
   window.xkExtras = {
-    redeemGiftCode, applyInvite, unlockAchievement, checkAchievements
+    redeemGiftCode, applyInvite, unlockAchievement, checkAchievements, recoverGiftAchievements
   };
 })();

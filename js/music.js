@@ -2746,6 +2746,8 @@ function mapUserProfile(data, name) {
         ownedThumbs: Array.isArray(d.ownedThumbs) ? d.ownedThumbs.map(String) : [],
         activeThumb: d.activeThumb || '',
         inviteBy: d.inviteBy || '',
+        giftClaimCount: Number(d.giftClaimCount) || 0,
+        chatCount: Number(d.chatCount) || 0,
         profiles: Array.isArray(d.profiles) ? d.profiles : []
     };
 }
@@ -2884,6 +2886,8 @@ function startUserProfileListener(uid) {
         mapped.seasonXp = Math.max(Number(prev && prev.seasonXp) || 0, Number(mapped.seasonXp) || 0);
         // streak: lấy max (tránh remote thấp đè local vừa điểm danh)
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prev && prev.streak) || 0);
+        mapped.giftClaimCount = Math.max(Number(mapped.giftClaimCount) || 0, Number(prev && prev.giftClaimCount) || 0);
+        mapped.chatCount = Math.max(Number(mapped.chatCount) || 0, Number(prev && prev.chatCount) || 0);
         if (prev && prev.lastCheckin && (!mapped.lastCheckin || String(prev.lastCheckin) > String(mapped.lastCheckin))) {
             mapped.lastCheckin = prev.lastCheckin;
         }
@@ -2969,6 +2973,8 @@ async function fetchUserByUid(uid, usernameHint) {
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
         mapped.seasonXp = Math.max(Number(mapped.seasonXp) || 0, Number(prevLocal && prevLocal.seasonXp) || 0);
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prevLocal && prevLocal.streak) || 0);
+        mapped.giftClaimCount = Math.max(Number(mapped.giftClaimCount) || 0, Number(prevLocal && prevLocal.giftClaimCount) || 0);
+        mapped.chatCount = Math.max(Number(mapped.chatCount) || 0, Number(prevLocal && prevLocal.chatCount) || 0);
         if (prevLocal && prevLocal.lastCheckin && (!mapped.lastCheckin || String(prevLocal.lastCheckin) > String(mapped.lastCheckin))) {
             mapped.lastCheckin = prevLocal.lastCheckin;
         }
@@ -3226,6 +3232,22 @@ async function pushUserToFirebase(username, account, options) {
         if (opts.inviteChanged || forceAll) {
             if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
         }
+        if (opts.countersChanged || forceAll) {
+            // Max với server — không để máy thấp đè
+            const gLocal = Math.max(0, Number(account.giftClaimCount) || 0);
+            const cLocal = Math.max(0, Number(account.chatCount) || 0);
+            try {
+                await db.ref(dataPath('users') + '/' + uid + '/giftClaimCount').transaction(cur =>
+                    Math.max(Number(cur) || 0, gLocal)
+                );
+                await db.ref(dataPath('users') + '/' + uid + '/chatCount').transaction(cur =>
+                    Math.max(Number(cur) || 0, cLocal)
+                );
+            } catch (e) {
+                scalarPayload.giftClaimCount = gLocal;
+                scalarPayload.chatCount = cLocal;
+            }
+        }
         if (account.createdAt) scalarPayload.createdAt = account.createdAt;
         if (Object.keys(scalarPayload).length) {
             // XP: transaction max
@@ -3329,7 +3351,8 @@ function updateCurrentAccount(mutator) {
         checkin: snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
-        inviteBy: snap(acc.inviteBy || '')
+        inviteBy: snap(acc.inviteBy || ''),
+        counters: snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
     mutator(acc);
     const afterCoins = acc.coins | 0;
@@ -3348,7 +3371,8 @@ function updateCurrentAccount(mutator) {
         checkinChanged: before.checkin !== snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
-        inviteChanged: before.inviteBy !== snap(acc.inviteBy || '')
+        inviteChanged: before.inviteBy !== snap(acc.inviteBy || ''),
+        countersChanged: before.counters !== snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
     saveAllAccounts(accounts);
     pushUserToFirebase(name, acc, opts);
@@ -3509,6 +3533,9 @@ function toggleFavorite(id) {
         else acc.favorites.push(sid);
     });
     renderPlaylist();
+    if (typeof window.xkExtras !== 'undefined' && typeof window.xkExtras.checkAchievements === 'function') {
+        try { window.xkExtras.checkAchievements(); } catch (e) {}
+    }
 }
 
 function loadLikes() {
@@ -3582,6 +3609,10 @@ function toggleMyPlaylistSong(id) {
     showNotification('PLAYLIST:', added ? 'ĐÃ THÊM' : 'ĐÃ XÓA', added ? '#4ade80' : '#ff9800', 'list-plus');
     renderPlaylist();
     if (document.getElementById('my-playlist-overlay')?.classList.contains('active')) renderMyPlaylist();
+    // Mở khóa huy hiệu playlist 5 / 10 / 20
+    if (typeof window.xkExtras !== 'undefined' && typeof window.xkExtras.checkAchievements === 'function') {
+        try { window.xkExtras.checkAchievements(); } catch (e) {}
+    }
 }
 
 function getSongPrice(song) {
@@ -3645,11 +3676,11 @@ function doDailyCheckin(dayKeyOpt) {
     let streakMsg = '';
     updateCurrentAccount(acc => {
         if (!acc.checkinDays || typeof acc.checkinDays !== 'object') acc.checkinDays = {};
-        // seed lastCheckin vào map nếu thiếu
+        // Lưu timestamp (số) — merge Firebase ổn định hơn boolean true
         if (acc.lastCheckin && !acc.checkinDays[acc.lastCheckin]) {
-            acc.checkinDays[acc.lastCheckin] = true;
+            acc.checkinDays[acc.lastCheckin] = Date.now();
         }
-        acc.checkinDays[dayKey] = true;
+        acc.checkinDays[dayKey] = Date.now();
         let streak = Number(acc.streak) || 0;
         if (!isMakeup) {
             const y = new Date(); y.setDate(y.getDate() - 1);
@@ -3675,6 +3706,22 @@ function doDailyCheckin(dayKeyOpt) {
             if (dayKey > (acc.lastCheckin || '')) acc.lastCheckin = dayKey;
         }
     });
+    // Ép đẩy checkin lên Firebase ngay (tránh deploy/xóa local mất điểm danh)
+    try {
+        const name = getCurrentUsername();
+        const accNow = getCurrentAccount();
+        if (name && accNow && typeof pushUserToFirebase === 'function') {
+            pushUserToFirebase(name, accNow, {
+                checkinChanged: true,
+                xpChanged: !isMakeup,
+                coinsDelta: 0,
+                achievementsChanged: false
+            });
+        }
+    } catch (e) {}
+    if (typeof window.xkExtras !== 'undefined' && typeof window.xkExtras.checkAchievements === 'function') {
+        try { window.xkExtras.checkAchievements(); } catch (e) {}
+    }
     const st = (getCurrentAccount() || {}).streak || 1;
     const label = isMakeup
         ? ('Bù ' + dayKey + ': -' + MAKEUP_COST + ' XK')
