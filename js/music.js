@@ -76,14 +76,10 @@ function showPcPlaylist() {
     playlistOverlay.classList.add('active');
     layout.classList.add('playlist-open');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
-    // Scroll sau khi cột mở xong (~0.95s) để layout/offset đúng
-    // Retry vài lần để chắc chắn vào đúng bài đang phát (ngay dưới header)
-    const doScroll = () => {
-        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('auto'); } catch (e) {}
-    };
-    setTimeout(doScroll, 900);
-    setTimeout(doScroll, 1050);
-    setTimeout(doScroll, 1200);
+    // Sau khi cột mở xong (~0.95s) → cuộn mượt chậm tới bài đang phát
+    setTimeout(() => {
+        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('smooth'); } catch (e) {}
+    }, 950);
 }
 
 /** Ẩn danh sách PC (có animation chậm) */
@@ -1541,17 +1537,34 @@ function scrollToActiveTop(behavior) {
     // Chỉ lấy active trong #playlist-content (tránh nhầm modal khác)
     const activeItem = scrollContainer.querySelector('.song-item.active');
     if (!activeItem) return;
-    // Đưa bài đang phát lên đầu vùng list, cách mép trên ~6px (ngay dưới header, không bị che)
+    // Đưa bài đang phát lên đầu vùng list, cách mép trên ~6px (ngay dưới header)
     const gap = 6;
-    try {
-        // block:'start' → item nằm sát mép trên của #playlist-content (dưới header)
-        activeItem.scrollIntoView({ behavior: 'auto', block: 'start', inline: 'nearest' });
-        // Lùi thêm một chút để có khoảng trống phía trên item
-        scrollContainer.scrollTop = Math.max(0, scrollContainer.scrollTop - gap);
-    } catch (e) {
-        const top = activeItem.offsetTop - gap;
-        scrollContainer.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const itemRect = activeItem.getBoundingClientRect();
+    let targetTop = itemRect.top - containerRect.top + scrollContainer.scrollTop - gap;
+    if (!isFinite(targetTop)) targetTop = Math.max(0, activeItem.offsetTop - gap);
+    targetTop = Math.max(0, targetTop);
+
+    // auto = nhảy ngay; còn lại = cuộn mượt chậm (~0.9s) như bản đầu
+    if (behavior === 'auto') {
+        scrollContainer.scrollTop = targetTop;
+        return;
     }
+    const startTop = scrollContainer.scrollTop;
+    const distance = targetTop - startTop;
+    if (Math.abs(distance) < 2) return;
+    const duration = 900; // ms — chậm vừa
+    const startTime = performance.now();
+    function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    function step(now) {
+        const elapsed = now - startTime;
+        const t = Math.min(1, elapsed / duration);
+        scrollContainer.scrollTop = startTop + distance * easeInOutCubic(t);
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
 }
 
 async function requestWakeLock() {
