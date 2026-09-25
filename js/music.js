@@ -44,65 +44,17 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-/** PC (≥900px) */
+/** PC (≥900px): playlist luôn mở sẵn bên trái */
 function isPcLayout() {
     return typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches;
 }
-
-/** Timer tự đóng playlist sau khi mở khi phát bài (PC) */
-let playlistAutoCloseTimer = null;
-
-function clearPlaylistAutoClose() {
-    if (playlistAutoCloseTimer) {
-        clearTimeout(playlistAutoCloseTimer);
-        playlistAutoCloseTimer = null;
-    }
-}
-
-/** PC: bật/tắt layout 2 cột (mở rộng player + hiện cột playlist) */
-function setPcPlaylistExpanded(open) {
-    const pc = document.getElementById('player-container');
-    if (!pc) return;
-    if (open && isPcLayout()) {
-        pc.classList.add('pc-playlist-open');
-    } else {
-        pc.classList.remove('pc-playlist-open');
-    }
-}
-
-/** Đóng playlist (và thu layout PC về 1 cột) */
-function closePlaylistPanel() {
-    clearPlaylistAutoClose();
-    if (playlistOverlay) playlistOverlay.classList.remove('active');
-    setPcPlaylistExpanded(false);
-}
-
-/** Mở playlist với hiệu ứng; trên PC mở 2 cột + tự gập lại sau 10 giây */
-function openPlaylistOnPlay() {
-    if (!playlistOverlay) return;
+function ensurePcPlaylistOpen() {
+    if (!isPcLayout() || !playlistOverlay) return;
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
-    // PC: mở rộng thành 2 cột trước/kèm hiệu ứng sách
-    if (isPcLayout()) setPcPlaylistExpanded(true);
     playlistOverlay.classList.add('active');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
-    setTimeout(scrollToActiveTop, 150);
-    // Chỉ auto-đóng trên PC → gập sách + về 1 cột
-    if (!isPcLayout()) return;
-    clearPlaylistAutoClose();
-    playlistAutoCloseTimer = setTimeout(() => {
-        if (playlistOverlay && isPcLayout()) {
-            playlistOverlay.classList.remove('active');
-            setPcPlaylistExpanded(false);
-        }
-        playlistAutoCloseTimer = null;
-    }, 10000);
-}
-
-/** Giữ tương thích – không còn mở sẵn mặc định trên PC */
-function ensurePcPlaylistOpen() {
-    // no-op: playlist không mở mặc định lúc vào web
 }
 
 // Dữ liệu trên Firebase Realtime Database + Auth (js/firebase-config.js)
@@ -1793,8 +1745,6 @@ function changeSong(i, source = 'normal') {
     hasUserInteracted = true; // next / prev / random / chọn bài
     loadSong(i).then(() => {
         audio.play().catch(e => console.log("CẦN TƯƠNG TÁC TRƯỚC:", e));
-        // PC: mở playlist khi phát bài, 10s sau tự gập lại
-        openPlaylistOnPlay();
         setTimeout(() => {
             updateCurrentSongHighlightAndScroll();
             updateListenStatsModal();
@@ -1806,7 +1756,7 @@ function changeSong(i, source = 'normal') {
 }
 
 function selectSongFromList(i) {
-    // Mobile: đóng overlay. PC: để openPlaylistOnPlay xử lý (mở + auto đóng 10s)
+    // Mobile: đóng overlay. PC: giữ playlist mở sẵn bên trái.
     if (playlistOverlay && !isPcLayout()) playlistOverlay.classList.remove('active');
     // Chọn từ danh sách tổng → thoát chế độ playlist cá nhân
     myPlaylistMode = false;
@@ -1953,6 +1903,9 @@ async function startPlayback() {
         playerContainer.style.transform = 'translateY(0)';
     }
 
+    // PC: mở sẵn danh sách bài hát bên trái
+    ensurePcPlaylistOpen();
+    
     hidePlayerLoading();
     
     // Chờ danh sách bài nếu chưa có
@@ -1966,7 +1919,6 @@ async function startPlayback() {
         const needLoad = !audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index]));
         const playFn = () => {
             audio.play().catch(e => console.log("LỖI PHÁT:", e));
-            openPlaylistOnPlay();
             setTimeout(() => {
                 updateCurrentSongHighlightAndScroll();
                 updateListenStatsModal();
@@ -2023,20 +1975,18 @@ function togglePlay() {
             playerContainer.style.transform = 'translateY(0)';
         }
 
+        // PC: mở sẵn danh sách bài hát bên trái
+        ensurePcPlaylistOpen();
+        
         hasUserInteracted = true;
         
         if (songs.length > 0 && !isLoadingSongs) {
             hidePlayerLoading();
             if (songs[index] && (!audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index])))) {
-                loadSong(index).then(() => {
-                    audio.play().catch(e => console.log("LỖI PHÁT:", e));
-                    openPlaylistOnPlay();
-                }).catch(() => {});
+                loadSong(index);
+                setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
             } else if (songs[index]) {
-                setTimeout(() => {
-                    audio.play().catch(e => console.log("LỖI PHÁT:", e));
-                    openPlaylistOnPlay();
-                }, 100);
+                setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
             }
         } else {
             const loadingDiv = document.getElementById('player-loading');
@@ -2428,10 +2378,7 @@ const listBtn = document.getElementById('list-btn');
 if (listBtn) {
     listBtn.onclick = (e) => {
         e.stopPropagation();
-        // Mở thủ công: không auto-đóng
-        clearPlaylistAutoClose();
         renderPlaylist();
-        if (isPcLayout()) setPcPlaylistExpanded(true);
         if (playlistOverlay) {
             playlistOverlay.classList.add('active');
             refreshModalIcons(playlistOverlay);
@@ -2443,13 +2390,15 @@ if (listBtn) {
 const closePlaylistBtn = document.getElementById('close-playlist-btn');
 if (closePlaylistBtn && playlistOverlay) {
     closePlaylistBtn.onclick = () => {
-        closePlaylistPanel();
+        // Trên PC playlist luôn mở sẵn – không đóng
+        if (isPcLayout()) return;
+        playlistOverlay.classList.remove('active');
     };
 }
 
-// Rời PC (resize nhỏ) → bỏ class 2 cột
+// Khi resize sang PC thì mở playlist
 window.addEventListener('resize', () => {
-    if (!isPcLayout()) setPcPlaylistExpanded(false);
+    if (isPcLayout()) ensurePcPlaylistOpen();
 });
 
 if (shuffleBtn) {
