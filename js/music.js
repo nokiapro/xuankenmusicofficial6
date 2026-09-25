@@ -44,17 +44,44 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-/** PC (≥900px): playlist luôn mở sẵn bên trái */
+/** PC (≥900px) */
 function isPcLayout() {
     return typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches;
 }
-function ensurePcPlaylistOpen() {
-    if (!isPcLayout() || !playlistOverlay) return;
+
+/** Timer tự đóng playlist sau khi mở khi phát bài (PC) */
+let playlistAutoCloseTimer = null;
+
+function clearPlaylistAutoClose() {
+    if (playlistAutoCloseTimer) {
+        clearTimeout(playlistAutoCloseTimer);
+        playlistAutoCloseTimer = null;
+    }
+}
+
+/** Mở playlist với hiệu ứng; trên PC tự gập lại sau 10 giây */
+function openPlaylistOnPlay() {
+    if (!playlistOverlay) return;
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
     playlistOverlay.classList.add('active');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
+    setTimeout(scrollToActiveTop, 150);
+    // Chỉ auto-đóng trên PC
+    if (!isPcLayout()) return;
+    clearPlaylistAutoClose();
+    playlistAutoCloseTimer = setTimeout(() => {
+        if (playlistOverlay && isPcLayout()) {
+            playlistOverlay.classList.remove('active');
+        }
+        playlistAutoCloseTimer = null;
+    }, 10000);
+}
+
+/** Giữ tương thích – không còn mở sẵn mặc định trên PC */
+function ensurePcPlaylistOpen() {
+    // no-op: playlist không mở mặc định lúc vào web
 }
 
 // Dữ liệu trên Firebase Realtime Database + Auth (js/firebase-config.js)
@@ -190,114 +217,22 @@ function applyBranding() {
     }
 }
 
-/** Map tên icon (lucide / ngắn) → class Font Awesome */
-const FA_ICON_MAP = {
-    x: 'fa-solid fa-xmark',
-    music: 'fa-solid fa-music',
-    timer: 'fa-solid fa-stopwatch',
-    headphones: 'fa-solid fa-headphones',
-    'list-plus': 'fa-solid fa-list',
-    sparkles: 'fa-solid fa-sparkles',
-    store: 'fa-solid fa-shop',
-    shop: 'fa-solid fa-shop',
-    sun: 'fa-solid fa-sun',
-    moon: 'fa-solid fa-moon',
-    'list-music': 'fa-solid fa-list-music',
-    smile: 'fa-regular fa-face-smile',
-    play: 'fa-solid fa-play',
-    pause: 'fa-solid fa-pause',
-    heart: 'fa-solid fa-heart',
-    'alarm-clock': 'fa-solid fa-alarm-clock',
-    'trash-2': 'fa-solid fa-trash',
-    trash: 'fa-solid fa-trash',
-    trophy: 'fa-solid fa-trophy',
-    'calendar-days': 'fa-solid fa-calendar-days',
-    calendar: 'fa-solid fa-calendar',
-    'calendar-range': 'fa-solid fa-calendar-week',
-    'calendar-check': 'fa-solid fa-calendar-check',
-    clock: 'fa-solid fa-clock',
-    'clock-3': 'fa-solid fa-clock',
-    library: 'fa-solid fa-book',
-    hourglass: 'fa-solid fa-hourglass-half',
-    link: 'fa-solid fa-link',
-    award: 'fa-solid fa-award',
-    'message-circle': 'fa-solid fa-comments',
-    'arrow-left': 'fa-solid fa-arrow-left',
-    user: 'fa-solid fa-user',
-    image: 'fa-solid fa-image',
-    mic: 'fa-solid fa-microphone',
-    'chevron-right': 'fa-solid fa-chevron-right',
-    'arrow-up-right': 'fa-solid fa-arrow-up-right',
-    shuffle: 'fa-solid fa-shuffle',
-    'skip-back': 'fa-solid fa-backward-step',
-    'skip-forward': 'fa-solid fa-forward-step',
-    repeat: 'fa-solid fa-repeat',
-    'repeat-1': 'fa-solid fa-repeat-1',
-    bell: 'fa-solid fa-bell',
-    check: 'fa-solid fa-check',
-    info: 'fa-solid fa-circle-info',
-    'alert-circle': 'fa-solid fa-circle-exclamation',
-    'refresh-cw': 'fa-solid fa-rotate',
-    'shopping-bag': 'fa-solid fa-bag-shopping',
-    coins: 'fa-solid fa-coins',
-    'plus-circle': 'fa-solid fa-circle-plus',
-    loader: 'fa-solid fa-spinner',
-    list: 'fa-solid fa-list',
-    medal: 'fa-solid fa-medal',
-    crown: 'fa-solid fa-crown',
-    // FA legacy names
-    'fa-headphones': 'fa-solid fa-headphones',
-    'fa-sun': 'fa-solid fa-sun',
-    'fa-moon': 'fa-solid fa-moon',
-    'fa-bell': 'fa-solid fa-bell',
-    'fa-trash-alt': 'fa-solid fa-trash',
-    'fa-stopwatch': 'fa-solid fa-stopwatch',
-    'fa-circle-info': 'fa-solid fa-circle-info',
-    'fa-circle-exclamation': 'fa-solid fa-circle-exclamation',
-    'fa-random': 'fa-solid fa-shuffle',
-    'fa-list': 'fa-solid fa-list',
-    'fa-repeat': 'fa-solid fa-repeat',
-    'fa-repeat-1': 'fa-solid fa-repeat-1'
-};
-
-/** Nút player control (ảnh) — giữ Lucide */
-const LUCIDE_BTN_IDS = new Set(['play-pause-btn', 'shuffle-btn', 'repeat-btn', 'prev-btn', 'next-btn']);
-/** Toast lặp lại / xáo trộn — vẫn icon Lucide theo yêu cầu */
-const LUCIDE_TOAST_ICONS = new Set(['shuffle', 'list', 'repeat', 'repeat-1', 'fa-random', 'fa-list', 'fa-repeat', 'fa-repeat-1']);
-
-function faIconHtml(name, extraClass) {
-    const key = String(name || '').trim();
-    const cls = FA_ICON_MAP[key] || FA_ICON_MAP[key.replace(/^fa-/, '')] || 'fa-solid fa-circle';
-    return '<i class="' + cls + (extraClass ? ' ' + extraClass : '') + '"></i>';
-}
-
-/** Đổi icon: player controls = Lucide; còn lại = Font Awesome */
+// Helper đổi icon Lucide mà không phá animation của nút
 function setLucideIcon(container, iconName) {
     if (!container) return;
-    const id = container.id || '';
-    const keepLucide = LUCIDE_BTN_IDS.has(id) || !!(container.closest && container.closest('.main-actions'));
-    if (keepLucide) {
-        container.innerHTML = '<i data-lucide="' + iconName + '"></i>';
-        if (typeof lucide !== 'undefined') {
-            try { lucide.createIcons({ nodes: [container] }); } catch (e) {}
-        }
-    } else {
-        container.innerHTML = faIconHtml(iconName);
+    // Giữ nguyên container (btn), chỉ thay nội dung icon bên trong
+    container.innerHTML = `<i data-lucide="${iconName}"></i>`;
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ nodes: [container] });
     }
 }
 
 function refreshLucideIcons(container = document) {
     if (typeof lucide !== 'undefined') {
         const nodes = container.querySelectorAll ? Array.from(container.querySelectorAll('[data-lucide]')) : [container];
-        if (nodes.length) {
-            try { lucide.createIcons({ nodes }); } catch (e) {}
-        }
+        if (nodes.length) lucide.createIcons({ nodes });
     }
 }
-
-window.faIconHtml = faIconHtml;
-window.FA_ICON_MAP = FA_ICON_MAP;
-window.LUCIDE_TOAST_ICONS = LUCIDE_TOAST_ICONS;
 
 let listenData = {};
 let isUpdatingListen = false;
@@ -930,24 +865,37 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
 
     noti.style.borderBottomColor = color;
 
-    // Icon toast: Font Awesome — riêng toast lặp/xáo (shuffle/list/repeat) giữ Lucide
+    // Icon: giữ lucide (music6) — màu theo toast
     const iconContainer = noti.querySelector('.notification-icon');
     if (iconContainer) {
-        const raw = String(icon || 'headphones');
-        const short = raw.replace(/^fa-/, '');
-        const useLucide = (typeof LUCIDE_TOAST_ICONS !== 'undefined' && (LUCIDE_TOAST_ICONS.has(raw) || LUCIDE_TOAST_ICONS.has(short)));
-        if (useLucide) {
-            iconContainer.innerHTML = '<i data-lucide="' + short + '"></i>';
-            if (typeof lucide !== 'undefined') {
-                try { lucide.createIcons({ nodes: [iconContainer] }); } catch (e) {}
-            }
-            const svg = iconContainer.querySelector('svg');
-            if (svg) svg.style.color = color;
-        } else {
-            iconContainer.innerHTML = (typeof faIconHtml === 'function') ? faIconHtml(raw) : ('<i class="fa-solid fa-' + short + '"></i>');
-            const iEl = iconContainer.querySelector('i');
-            if (iEl) iEl.style.color = color;
+        // Map icon FA cũ (music2) → lucide nếu cần
+        const iconMap = {
+            'fa-headphones': 'headphones',
+            'headphones': 'headphones',
+            'fa-plus-circle': 'plus-circle',
+            'fa-music': 'music',
+            'fa-circle-exclamation': 'alert-circle',
+            'fa-circle-info': 'info',
+            'fa-circle-notch': 'loader',
+            'fa-random': 'shuffle',
+            'fa-list': 'list',
+            'fa-repeat-1': 'repeat-1',
+            'fa-repeat': 'repeat',
+            'fa-trash-alt': 'trash-2',
+            'fa-bell': 'bell',
+            'fa-stopwatch': 'timer',
+            'fa-sun': 'sun',
+            'fa-moon': 'moon'
+        };
+        const lucideName = iconMap[icon] || String(icon || 'headphones').replace(/^fa-/, '');
+        iconContainer.innerHTML = '<i data-lucide="' + lucideName + '"></i>';
+        if (typeof lucide !== 'undefined') {
+            try { lucide.createIcons({ nodes: [iconContainer] }); } catch (e) {}
         }
+        const svg = iconContainer.querySelector('svg');
+        if (svg) svg.style.color = color;
+        const iEl = iconContainer.querySelector('i');
+        if (iEl) iEl.style.color = color;
     }
 
     // Gradient chữ giống music2 (title + message tách nhau, không bọc content-inner)
@@ -1454,7 +1402,7 @@ function showListenStats() {
         modal = document.createElement('div');
         modal.id = 'listen-stats-modal';
         modal.className = 'listen-modal';
-        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i class="fa-solid fa-xmark"></i></div><div class="listen-title"><i class="fa-solid fa-headphones listen-title-icon"></i><span>THỐNG KÊ LƯỢT NGHE</span></div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
+        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i data-lucide="x"></i></div><div class="listen-title"><i data-lucide="headphones" class="listen-title-icon"></i><span>THỐNG KÊ LƯỢT NGHE</span></div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
         const playerContainer = document.querySelector('.player-container');
         if (playerContainer) playerContainer.appendChild(modal);
         else document.body.appendChild(modal);
@@ -1824,6 +1772,8 @@ function changeSong(i, source = 'normal') {
     hasUserInteracted = true; // next / prev / random / chọn bài
     loadSong(i).then(() => {
         audio.play().catch(e => console.log("CẦN TƯƠNG TÁC TRƯỚC:", e));
+        // PC: mở playlist khi phát bài, 10s sau tự gập lại
+        openPlaylistOnPlay();
         setTimeout(() => {
             updateCurrentSongHighlightAndScroll();
             updateListenStatsModal();
@@ -1835,7 +1785,7 @@ function changeSong(i, source = 'normal') {
 }
 
 function selectSongFromList(i) {
-    // Mobile: đóng overlay. PC: giữ playlist mở sẵn bên trái.
+    // Mobile: đóng overlay. PC: để openPlaylistOnPlay xử lý (mở + auto đóng 10s)
     if (playlistOverlay && !isPcLayout()) playlistOverlay.classList.remove('active');
     // Chọn từ danh sách tổng → thoát chế độ playlist cá nhân
     myPlaylistMode = false;
@@ -1982,9 +1932,6 @@ async function startPlayback() {
         playerContainer.style.transform = 'translateY(0)';
     }
 
-    // PC: mở sẵn danh sách bài hát bên trái
-    ensurePcPlaylistOpen();
-    
     hidePlayerLoading();
     
     // Chờ danh sách bài nếu chưa có
@@ -1998,6 +1945,7 @@ async function startPlayback() {
         const needLoad = !audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index]));
         const playFn = () => {
             audio.play().catch(e => console.log("LỖI PHÁT:", e));
+            openPlaylistOnPlay();
             setTimeout(() => {
                 updateCurrentSongHighlightAndScroll();
                 updateListenStatsModal();
@@ -2054,18 +2002,20 @@ function togglePlay() {
             playerContainer.style.transform = 'translateY(0)';
         }
 
-        // PC: mở sẵn danh sách bài hát bên trái
-        ensurePcPlaylistOpen();
-        
         hasUserInteracted = true;
         
         if (songs.length > 0 && !isLoadingSongs) {
             hidePlayerLoading();
             if (songs[index] && (!audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index])))) {
-                loadSong(index);
-                setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
+                loadSong(index).then(() => {
+                    audio.play().catch(e => console.log("LỖI PHÁT:", e));
+                    openPlaylistOnPlay();
+                }).catch(() => {});
             } else if (songs[index]) {
-                setTimeout(() => audio.play().catch(e => console.log("LỖI PHÁT:", e)), 100);
+                setTimeout(() => {
+                    audio.play().catch(e => console.log("LỖI PHÁT:", e));
+                    openPlaylistOnPlay();
+                }, 100);
             }
         } else {
             const loadingDiv = document.getElementById('player-loading');
@@ -2350,11 +2300,11 @@ function renderPlaylist() {
         return `<div class="song-item ${i === index ? 'active' : ''}" data-idx="${i}">
             <div class="song-item-info" data-play-idx="${i}">
                 <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
-                <div class="song-artist-line text-xs text-gray-500"><i class="fa-solid fa-microphone"></i><span>${escapeHtml(artistName)}</span></div>
+                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
             <div class="song-item-actions">
-                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i class="fa-solid fa-heart" style="${fav ? 'fill:currentColor' : ''}"></i></button>
-                <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i class="fa-solid fa-list"></i></button>
+                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i data-lucide="heart" style="${fav ? 'fill:currentColor' : ''}"></i></button>
+                <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i data-lucide="list-plus"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -2394,10 +2344,10 @@ function renderMyPlaylist() {
         return `<div class="song-item ${i === index ? 'active' : ''}">
             <div class="song-item-info" data-play-idx="${i}">
                 <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
-                <div class="song-artist-line text-xs text-gray-500"><i class="fa-solid fa-microphone"></i><span>${escapeHtml(artistName)}</span></div>
+                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
             <div class="song-item-actions">
-                <button type="button" class="song-act-btn on-pl" data-act="pl-remove" data-id="${escapeHtml(String(id))}" title="Xóa khỏi playlist"><i class="fa-solid fa-trash"></i></button>
+                <button type="button" class="song-act-btn on-pl" data-act="pl-remove" data-id="${escapeHtml(String(id))}" title="Xóa khỏi playlist"><i data-lucide="trash-2"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -2457,6 +2407,8 @@ const listBtn = document.getElementById('list-btn');
 if (listBtn) {
     listBtn.onclick = (e) => {
         e.stopPropagation();
+        // Mở thủ công: không auto-đóng
+        clearPlaylistAutoClose();
         renderPlaylist();
         if (playlistOverlay) {
             playlistOverlay.classList.add('active');
@@ -2469,16 +2421,10 @@ if (listBtn) {
 const closePlaylistBtn = document.getElementById('close-playlist-btn');
 if (closePlaylistBtn && playlistOverlay) {
     closePlaylistBtn.onclick = () => {
-        // Trên PC playlist luôn mở sẵn – không đóng
-        if (isPcLayout()) return;
+        clearPlaylistAutoClose();
         playlistOverlay.classList.remove('active');
     };
 }
-
-// Khi resize sang PC thì mở playlist
-window.addEventListener('resize', () => {
-    if (isPcLayout()) ensurePcPlaylistOpen();
-});
 
 if (shuffleBtn) {
     shuffleBtn.onclick = function() {

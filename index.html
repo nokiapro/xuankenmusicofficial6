@@ -35,7 +35,7 @@
     <div id="toast-msg"></div>
     <div id="custom-notification" class="notification">
         <div class="notification-icon">
-            <i class="fa-solid fa-headphones"></i>
+            <i data-lucide="headphones"></i>
         </div>
         <div class="notification-content">
             <div class="notification-title"></div>
@@ -58,12 +58,12 @@
             <p class="username-pin-hint" id="pin-hint">Nhập đúng 6 chữ số · User mới = đặt PIN mới</p>
             <div id="username-error" class="username-error" style="display:none;"></div>
             <button type="submit" id="username-start-btn" class="username-start-btn">
-                <i class="fa-solid fa-play"></i>
+                <i data-lucide="play"></i>
                 <span>BẮT ĐẦU</span>
             </button>
         </form>
         <div class="hint-decoration">
-            <i class="fa-solid fa-heart"></i> DESIGNER BY XUANKEN OFFICIAL <i class="fa-solid fa-heart"></i>
+            <i data-lucide="heart"></i> DESIGNER BY XUANKEN OFFICIAL <i data-lucide="heart"></i>
         </div>
         <a href="admin/" class="admin-link-hint" onclick="event.stopPropagation()">Admin</a>
     </div>
@@ -75,9 +75,9 @@
                 <div class="playlist" id="playlist">
                     <div class="playlist-header" id="playlist-header">
                         <div class="close-playlist" id="close-playlist-btn">
-                            <i class="fa-solid fa-xmark"></i>
+                            <i data-lucide="x"></i>
                         </div>
-                        <div class="playlist-title"><i class="fa-solid fa-music"></i><span>DANH SÁCH BÀI HÁT</span></div>
+                        <div class="playlist-title"><i data-lucide="music"></i><span>DANH SÁCH BÀI HÁT</span></div>
                         <div style="width: 40px;"></div>
                     </div>
                     <div id="playlist-content"></div>
@@ -88,25 +88,25 @@
             <div class="pc-right">
                 <div class="top-bar-icons">
                     <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
-                        <i class="fa-solid fa-stopwatch"></i>
+                        <i data-lucide="timer"></i>
                     </div>
                     <div class="btn-icon" id="listen-count-btn" title="Lượt nghe">
-                        <i class="fa-solid fa-headphones"></i>
+                        <i data-lucide="headphones"></i>
                     </div>
                     <div class="btn-icon" id="my-playlist-btn" title="Playlist của tôi">
-                        <i class="fa-solid fa-list"></i>
+                        <i data-lucide="list-plus"></i>
                     </div>
                     <div class="btn-icon" id="extras-btn" title="Tiện ích">
-                        <i class="fa-solid fa-sparkles"></i>
+                        <i data-lucide="sparkles"></i>
                     </div>
                     <div class="btn-icon" id="shop-btn" title="Cửa hàng XK">
-                        <i class="fa-solid fa-shop"></i>
+                        <i data-lucide="store"></i>
                     </div>
                     <div class="btn-icon" id="theme-toggle" title="Chế độ sáng/tối">
-                        <i class="fa-solid fa-sun" id="theme-icon"></i>
+                        <i data-lucide="sun" id="theme-icon"></i>
                     </div>
                     <div class="btn-icon" id="list-btn" title="Danh sách bài hát">
-                        <i class="fa-solid fa-list-music"></i>
+                        <i data-lucide="list-music"></i>
                     </div>
                 </div>
 
@@ -118,7 +118,7 @@
                         <span class="song-title" id="current-title">Sẵn sàng</span>
                         <span class="artist-name" id="current-artist">XuanKen Official</span>
                         <div class="lyric-container" id="lyric-container">
-                            <div class="current-lyric" id="lyric-text"><i class="fa-regular fa-face-smile"></i> Chọn bài hát để phát <i class="fa-regular fa-face-smile"></i></div>
+                            <div class="current-lyric" id="lyric-text"><i data-lucide="smile"></i> Chọn bài hát để phát <i data-lucide="smile"></i></div>
                         </div>
                     </div>
                 </div>
@@ -161,14 +161,14 @@
         <div class="playlist" id="my-playlist-overlay">
             <div class="playlist-header">
                 <div class="close-playlist" id="close-my-playlist-btn">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="playlist-title"><i class="fa-solid fa-list"></i><span>PLAYLIST CỦA TÔI</span></div>
+                <div class="playlist-title"><i data-lucide="list-plus"></i><span>PLAYLIST CỦA TÔI</span></div>
                 <div style="width: 40px;"></div>
             </div>
             <div class="my-playlist-toolbar" id="my-playlist-toolbar" style="display:none;">
                 <button type="button" class="my-playlist-playall-btn" id="my-playlist-playall-btn">
-                    <i class="fa-solid fa-play"></i>
+                    <i data-lucide="play"></i>
                     <span>PHÁT TẤT CẢ</span>
                 </button>
             </div>
@@ -179,14 +179,14 @@
         <div id="timer-modal" class="timer-modal">
             <div class="timer-modal-header">
                 <div class="close-timer" id="close-timer-modal">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="timer-title"><i class="fa-solid fa-stopwatch"></i><span>HẸN GIỜ TẮT NHẠC</span></div>
+                <div class="timer-title"><i data-lucide="timer"></i><span>HẸN GIỜ TẮT NHẠC</span></div>
                 <div style="width: 40px;"></div>
             </div>
             <div class="timer-modal-content">
                 <div class="timer-status-box">
-                    <i class="fa-solid fa-alarm-clock"></i>
+                    <i data-lucide="alarm-clock"></i>
                     <div class="timer-status-text" id="timer-status">CHƯA ĐẶT HẸN GIỜ</div>
                 </div>
                 
@@ -201,11 +201,11 @@
                 <input type="number" id="timer-minutes" class="timer-input" placeholder="NHẬP SỐ PHÚT...">
                 
                 <button id="start-timer-btn" class="timer-start-btn">
-                    <i class="fa-solid fa-play"></i> BẮT ĐẦU
+                    <i data-lucide="play"></i> BẮT ĐẦU
                 </button>
                 
                 <button id="cancel-timer-btn" class="timer-cancel-btn">
-                    <i class="fa-solid fa-trash"></i> HỦY HẸN GIỜ
+                    <i data-lucide="trash-2"></i> HỦY HẸN GIỜ
                 </button>
             </div>
         </div>
@@ -215,9 +215,9 @@
         <div id="extras-modal" class="shop-modal extras-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-extras-btn">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="shop-title"><i class="fa-solid fa-sparkles"></i><span>TIỆN ÍCH</span></div>
+                <div class="shop-title"><i data-lucide="sparkles"></i><span>TIỆN ÍCH</span></div>
                 <div style="width:40px;"></div>
             </div>
             <div class="extras-modal-body">
@@ -232,55 +232,55 @@
                 <div class="extras-section">
                     <label class="extras-label">Top bài nghe nhiều</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="top-alltime"><i class="fa-solid fa-trophy"></i><span>Top mọi thời điểm</span></button>
+                        <button type="button" class="extras-action-btn" data-x="top-alltime"><i data-lucide="trophy"></i><span>Top mọi thời điểm</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Review của bạn</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="rev-week"><i class="fa-solid fa-calendar-days"></i><span>Tuần</span></button>
-                        <button type="button" class="extras-action-btn" data-x="rev-month"><i class="fa-solid fa-calendar"></i><span>Tháng</span></button>
-                        <button type="button" class="extras-action-btn" data-x="rev-year"><i class="fa-solid fa-calendar-week"></i><span>Năm</span></button>
+                        <button type="button" class="extras-action-btn" data-x="rev-week"><i data-lucide="calendar-days"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="rev-month"><i data-lucide="calendar"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="rev-year"><i data-lucide="calendar-range"></i><span>Năm</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Thời gian đã nghe</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="time-week"><i class="fa-solid fa-clock"></i><span>Tuần</span></button>
-                        <button type="button" class="extras-action-btn" data-x="time-month"><i class="fa-solid fa-clock"></i><span>Tháng</span></button>
-                        <button type="button" class="extras-action-btn" data-x="time-year"><i class="fa-solid fa-stopwatch"></i><span>Năm</span></button>
+                        <button type="button" class="extras-action-btn" data-x="time-week"><i data-lucide="clock"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="time-month"><i data-lucide="clock-3"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="time-year"><i data-lucide="timer"></i><span>Năm</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Top nghe</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="lb-listen-week"><i class="fa-solid fa-headphones"></i><span>Tuần</span></button>
-                        <button type="button" class="extras-action-btn" data-x="lb-listen-month"><i class="fa-solid fa-headphones"></i><span>Tháng</span></button>
-                        <button type="button" class="extras-action-btn" data-x="lb-listen-year"><i class="fa-solid fa-headphones"></i><span>Năm</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-week"><i data-lucide="headphones"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-month"><i data-lucide="headphones"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-listen-year"><i data-lucide="headphones"></i><span>Năm</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Top sở hữu</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="lb-own-week"><i class="fa-solid fa-book"></i><span>Tuần</span></button>
-                        <button type="button" class="extras-action-btn" data-x="lb-own-month"><i class="fa-solid fa-book"></i><span>Tháng</span></button>
-                        <button type="button" class="extras-action-btn" data-x="lb-own-year"><i class="fa-solid fa-book"></i><span>Năm</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-own-week"><i data-lucide="library"></i><span>Tuần</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-own-month"><i data-lucide="library"></i><span>Tháng</span></button>
+                        <button type="button" class="extras-action-btn" data-x="lb-own-year"><i data-lucide="library"></i><span>Năm</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Sự kiện & Liên kết</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="countdown"><i class="fa-solid fa-hourglass-half"></i><span>Đếm ngược</span></button>
-                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="weekly-archive"><i class="fa-solid fa-list-music"></i><span>Top tuần</span></button>
-                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="links"><i class="fa-solid fa-link"></i><span>Liên kết</span></button>
+                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="countdown"><i data-lucide="hourglass"></i><span>Đếm ngược</span></button>
+                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="weekly-archive"><i data-lucide="list-music"></i><span>Top tuần</span></button>
+                        <button type="button" class="extras-action-btn extras-feat-btn" data-x="links"><i data-lucide="link"></i><span>Liên kết</span></button>
                     </div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Khác</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
-                        <button type="button" class="extras-action-btn" data-x="badges"><i class="fa-solid fa-award"></i><span>Huy hiệu của tôi</span></button>
-                        <button type="button" class="extras-action-btn" data-x="chat"><i class="fa-solid fa-comments"></i><span>Chat toàn web</span></button>
-                        <button type="button" class="extras-action-btn" data-x="checkin"><i class="fa-solid fa-calendar-check"></i><span>Điểm danh</span></button>
+                        <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
+                        <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
+                        <button type="button" class="extras-action-btn" data-x="checkin"><i data-lucide="calendar-check"></i><span>Điểm danh</span></button>
                     </div>
                 </div>
                 <div id="extras-result" class="extras-result"></div>
@@ -292,9 +292,9 @@
         <div id="chat-modal" class="shop-modal chat-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-chat-btn" title="Quay lại">
-                    <i class="fa-solid fa-arrow-left"></i>
+                    <i data-lucide="arrow-left"></i>
                 </div>
-                <div class="shop-title"><i class="fa-solid fa-comments"></i><span>CHAT TOÀN WEB</span></div>
+                <div class="shop-title"><i data-lucide="message-circle"></i><span>CHAT TOÀN WEB</span></div>
                 <div style="width:40px;"></div>
             </div>
             <div class="chat-modal-body">
@@ -311,9 +311,9 @@
         <div id="checkin-modal" class="shop-modal checkin-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-checkin-btn" title="Quay lại">
-                    <i class="fa-solid fa-arrow-left"></i>
+                    <i data-lucide="arrow-left"></i>
                 </div>
-                <div class="shop-title"><i class="fa-solid fa-calendar-check"></i><span>ĐIỂM DANH</span></div>
+                <div class="shop-title"><i data-lucide="calendar-check"></i><span>ĐIỂM DANH</span></div>
                 <div style="width:40px;"></div>
             </div>
             <div class="checkin-modal-body" id="checkin-modal-body"></div>
@@ -323,14 +323,14 @@
         <div id="shop-modal" class="shop-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-shop-btn">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i data-lucide="x"></i>
                 </div>
-                <div class="shop-title"><i class="fa-solid fa-shop"></i><span>CỬA HÀNG XK</span></div>
+                <div class="shop-title"><i data-lucide="store"></i><span>CỬA HÀNG XK</span></div>
                 <div style="width:40px;"></div>
             </div>
             <div class="shop-user-bar" id="shop-user-bar">
                 <div class="shop-user-info">
-                    <div class="shop-user-avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="shop-user-avatar"><i data-lucide="user"></i></div>
                     <div class="shop-user-meta">
                         <div class="shop-user-name-row">
                             <span class="rank-badge" id="shop-rank-badge" style="display:none;"></span>
@@ -345,10 +345,10 @@
             </div>
 <div class="shop-tab-bar">
                 <button type="button" class="shop-tab active" data-shop-tab="music" id="shop-tab-music">
-                    <i class="fa-solid fa-music"></i> Mua nhạc
+                    <i data-lucide="music"></i> Mua nhạc
                 </button>
                 <button type="button" class="shop-tab" data-shop-tab="thumb" id="shop-tab-thumb">
-                    <i class="fa-solid fa-image"></i> Mua thumb
+                    <i data-lucide="image"></i> Mua thumb
                 </button>
             </div>
             <div class="shop-tab-panels">

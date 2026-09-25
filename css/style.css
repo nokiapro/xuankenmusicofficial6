@@ -715,7 +715,7 @@ body.dark .album-art {
     background: var(--playlist-bg);
     z-index: 150;
     transform: translateY(-105%);
-    /* Đóng: chậm hơn */
+    /* Đóng: chậm hơn (mobile giữ trượt dọc như cũ) */
     transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear 0.52s;
     display: flex;
@@ -4043,6 +4043,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         position: relative;
         overflow: hidden;
         background: var(--card-bg);
+        perspective: 1400px;
+        perspective-origin: left center;
     }
 
     .pc-right {
@@ -4076,29 +4078,46 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         border-bottom: 1px solid var(--border-color);
     }
 
-    /* Playlist luôn mở sẵn bên trái, không overlay */
+    /* Playlist trên PC: mở/gập như quyển sách (xoay quanh gáy trái) */
     .pc-left .playlist {
-        position: relative !important;
-        top: auto !important;
-        left: auto !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
-        height: auto !important;
-        flex: 1;
+        height: 100% !important;
+        flex: none;
         min-height: 0;
-        transform: none !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
+        transform: rotateY(-92deg) !important;
+        transform-origin: left center !important;
+        transform-style: preserve-3d;
+        backface-visibility: hidden;
+        opacity: 0;
+        visibility: hidden !important;
+        pointer-events: none !important;
         border-radius: 0 !important;
         z-index: 1;
         background: var(--playlist-bg);
         display: flex !important;
         flex-direction: column;
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+        /* Đóng: chậm, mượt như gập sách */
+        transition: transform 0.58s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.4s ease,
+                    visibility 0s linear 0.58s,
+                    box-shadow 0.58s ease !important;
     }
 
     .pc-left .playlist.active {
-        transform: none !important;
+        transform: rotateY(0deg) !important;
+        opacity: 1;
         visibility: visible !important;
         pointer-events: auto !important;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+        /* Mở: như mở trang sách */
+        transition: transform 0.45s cubic-bezier(0.22, 0.8, 0.2, 1),
+                    opacity 0.3s ease,
+                    visibility 0s linear 0s,
+                    box-shadow 0.45s ease !important;
     }
 
     /* Header playlist = cùng chiều cao top-bar */
@@ -4113,10 +4132,10 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         align-items: center;
     }
 
-    /* Ẩn nút đóng playlist trên PC (luôn mở mặc định) */
+    /* Hiện nút đóng playlist trên PC */
     .pc-left .close-playlist {
-        visibility: hidden;
-        pointer-events: none;
+        visibility: visible;
+        pointer-events: auto;
     }
 
     #playlist-content {
@@ -4161,9 +4180,9 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         background: transparent;
     }
 
-    /* Ẩn nút list trên PC vì playlist đã mở sẵn */
+    /* Hiện nút list trên PC để mở lại danh sách khi đã gập */
     #list-btn {
-        display: none !important;
+        display: flex !important;
     }
 
     /*
