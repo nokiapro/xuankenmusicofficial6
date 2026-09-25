@@ -4014,9 +4014,9 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     }
 
     .player-container {
-        width: 450px !important;
+        width: 640px !important;
         max-width: 450px !important;
-        height: min(620px, 80vh);
+        height: min(560px, 80vh);
         max-height: 80vh;
         border-radius: 28px;
         display: flex;
