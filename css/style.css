@@ -1773,6 +1773,7 @@ body.dark .hint-decoration {
     .hint-decoration { font-size: 0.7rem; bottom: 25px; }
 }
 
+/* Toast giống music2 */
 .notification {
     position: fixed;
     top: 0;
@@ -1781,8 +1782,8 @@ body.dark .hint-decoration {
     background: var(--card-bg);
     backdrop-filter: blur(20px);
     border-radius: 0 0 24px 24px;
-    padding: 12px 16px 12px 14px;
-    max-width: min(92vw, 520px);
+    padding: 12px 24px;
+    max-width: 90%;
     width: auto;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     border-bottom: 3px solid #4ade80;
@@ -1791,12 +1792,11 @@ body.dark .hint-decoration {
     visibility: hidden;
     transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     pointer-events: none;
     white-space: nowrap;
-    overflow: hidden;
 }
 
 .notification.show {
@@ -1828,31 +1828,11 @@ body.dark .hint-decoration {
 }
 
 .notification-content {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
     overflow: hidden;
-    max-width: 100%;
-}
-
-.notification-content-inner {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    white-space: nowrap;
-    will-change: transform;
-}
-
-.notification-content.is-marquee .notification-content-inner {
-    animation: notiMarquee 8s linear infinite;
-}
-
-@keyframes notiMarquee {
-    0% { transform: translateX(0); }
-    15% { transform: translateX(0); }
-    85% { transform: translateX(calc(-100% + var(--noti-view-w, 200px))); }
-    100% { transform: translateX(calc(-100% + var(--noti-view-w, 200px))); }
 }
 
 .notification-title {
@@ -1861,9 +1841,8 @@ body.dark .hint-decoration {
     color: var(--text-primary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    display: inline;
-    margin-right: 0;
-    flex-shrink: 0;
+    display: inline-block;
+    margin-right: 8px;
 }
 
 .notification-message {
@@ -1873,44 +1852,31 @@ body.dark .hint-decoration {
     overflow: visible;
 }
 
-/* Giống music2: span message + gradient text */
-.notification-message span,
-.notification-message .noti-msg-grad {
+.notification-message span {
     display: inline-block;
     white-space: nowrap;
     transform-origin: left center;
     transition: transform 0.1s ease;
-}
-
-/* Bắt buộc giữ color:transparent — tránh body.dark đè mất gradient */
-.notification-message .noti-msg-grad,
-.notification-message span[style*="background-clip"] {
     color: transparent !important;
     -webkit-text-fill-color: transparent;
 }
 
-.notification-message svg {
-    width: 14px !important;
-    height: 14px !important;
-    min-width: 14px !important;
-    min-height: 14px !important;
-    display: inline-block;
-    vertical-align: middle;
-    margin: 0 3px;
-}
-
-/* Sao FA / icon huy hiệu trong toast */
+/* Sao FA trong toast (giống music2) — ::before không ăn background-clip nên set màu riêng */
 .notification-message i.fa-star,
-.notification-message .fa-star,
-.notification-message i.noti-badge-fa,
-.notification-message .noti-badge-fa {
-    font-size: 0.9em;
+.notification-message .fa-star {
+    font-size: 0.95em;
     margin: 0 4px;
     vertical-align: middle;
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    background-clip: unset !important;
+    color: #ffd89b !important;
+    -webkit-text-fill-color: #ffd89b !important;
 }
-.notification-message i.noti-badge-fa {
-    color: #fbbf24;
-    -webkit-text-fill-color: #fbbf24;
+body:not(.dark) .notification-message i.fa-star,
+body:not(.dark) .notification-message .fa-star {
+    color: #e11d48 !important;
+    -webkit-text-fill-color: #e11d48 !important;
 }
 
 body.dark .notification {
@@ -1955,16 +1921,13 @@ body.dark .notification-message span[style*="background-clip"] {
     
     .notification-title {
         font-size: 0.75rem;
-    }
-
-    .notification-content-inner {
-        gap: 4px;
+        margin-right: 6px;
     }
 }
 
 @media (max-width: 360px) {
     .notification {
-        padding: 8px 10px;
+        padding: 10px 14px;
         border-radius: 0 0 16px 16px;
     }
     

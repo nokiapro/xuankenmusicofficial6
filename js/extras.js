@@ -294,8 +294,8 @@
       modal.id = 'badges-modal';
       modal.className = 'shop-modal badges-modal';
       modal.innerHTML = '<div class="shop-modal-header">'
-        + '<div class="close-shop" id="close-badges-btn" title="Quay lại"><i data-lucide="arrow-left"></i></div>'
-        + '<div class="shop-title"><i data-lucide="award"></i><span>HUY HIỆU</span></div>'
+        + '<div class="close-shop" id="close-badges-btn" title="Quay lại"><i class="fa-solid fa-arrow-left"></i></div>'
+        + '<div class="shop-title"><i class="fa-solid fa-award"></i><span>HUY HIỆU</span></div>'
         + '<div style="width:40px;"></div></div>'
         + '<div class="badges-modal-body" id="badges-list"></div>';
       playerHost().appendChild(modal);
@@ -365,8 +365,8 @@
       modal.id = 'extras-result-modal';
       modal.className = 'shop-modal extras-result-modal';
       modal.innerHTML = '<div class="shop-modal-header">'
-        + '<div class="close-shop" id="close-result-btn" title="Quay lại"><i data-lucide="arrow-left"></i></div>'
-        + '<div class="shop-title"><i data-lucide="sparkles" id="result-modal-icon"></i><span id="result-modal-title">KẾT QUẢ</span></div>'
+        + '<div class="close-shop" id="close-result-btn" title="Quay lại"><i class="fa-solid fa-arrow-left"></i></div>'
+        + '<div class="shop-title"><i class="fa-solid fa-sparkles"></i><span id="result-modal-title">KẾT QUẢ</span></div>'
         + '<div style="width:40px;"></div></div>'
         + '<div class="extras-result-modal-body" id="extras-result-modal-body"></div>';
       playerHost().appendChild(modal);
@@ -378,7 +378,7 @@
     if (titleEl) titleEl.textContent = title || 'KẾT QUẢ';
     const iconWrap = modal.querySelector('.shop-title');
     if (iconWrap) {
-      iconWrap.innerHTML = '<i data-lucide="' + (icon || 'sparkles') + '"></i><span id="result-modal-title">' +
+      iconWrap.innerHTML = ((typeof faIconHtml === 'function') ? faIconHtml(icon || 'sparkles') : ('<i class="fa-solid fa-sparkles"></i>')) + '<span id="result-modal-title'>' +
         (title || 'KẾT QUẢ').replace(/</g, '&lt;') + '</span>';
     }
     const body = modal.querySelector('#extras-result-modal-body');
@@ -1049,7 +1049,7 @@
       +         '<span class="cd-lunar-badge">Âm lịch</span>'
       +         '<span class="cd-lunar-txt">Ngày ' + escapeHtml(String(lunar.day)) + ' · ' + escapeHtml(lunarMonthTxt) + ' · ' + escapeHtml(String(lunar.year)) + '</span>'
       +       '</div>'
-      +       '<div class="cd-cal-time"><i data-lucide="clock"></i> ' + hh + ':' + mm + '</div>'
+      +       '<div class="cd-cal-time"><i class="fa-solid fa-clock"></i> ' + hh + ':' + mm + '</div>'
       +     '</div>'
       +   '</div>'
       +   '<div class="cd-clock" id="cd-clock-live">'
@@ -1241,7 +1241,7 @@
         + '<div class="wk-sub">' + escapeHtml(range || w.key)
         + (status ? (' · ' + status) : '')
         + '</div></div>'
-        + '<div class="wk-arrow"><i data-lucide="chevron-right"></i></div>'
+        + '<div class="wk-arrow"><i class="fa-solid fa-chevron-right"></i></div>'
         + '</button>';
     });
     html += '</div>';
@@ -1268,11 +1268,11 @@
         + '<span class="xr-rank">' + (i + 1) + '</span>'
         + '<div class="xr-info"><div class="xr-name">' + escapeHtml(s.name) + '</div>'
         + '<div class="xr-sub">' + escapeHtml(s.artist || s.id) + '</div></div>'
-        + '<span class="xr-val"><i data-lucide="headphones"></i> ' + s.count + '</span>'
+        + '<span class="xr-val"><i class="fa-solid fa-headphones"></i> ' + s.count + '</span>'
         + '</div>';
     });
     body += '</div>';
-    body += '<button type="button" class="wk-back-btn" id="wk-back-btn"><i data-lucide="arrow-left"></i> Về danh sách tuần</button>';
+    body += '<button type="button" class="wk-back-btn" id="wk-back-btn"><i class="fa-solid fa-arrow-left"></i> Về danh sách tuần</button>';
     return body;
   }
   async function openWeeklyArchive() {
@@ -1361,10 +1361,10 @@
       const title = escapeHtml(L.title || ('Link ' + (i + 1)));
       const url = escapeHtml(L.url || '#');
       html += '<a class="lk-card" href="' + url + '" target="_blank" rel="noopener noreferrer">'
-        + '<div class="lk-icon"><i data-lucide="' + escapeHtml(icon) + '"></i></div>'
+        + '<div class="lk-icon">' + ((typeof faIconHtml === 'function') ? faIconHtml(icon) : ('<i class="fa-solid fa-link"></i>')) + '</div>'
         + '<div class="lk-body"><div class="lk-title">' + title + '</div>'
         + '<div class="lk-url">' + url + '</div></div>'
-        + '<div class="lk-go"><i data-lucide="arrow-up-right"></i></div>'
+        + '<div class="lk-go"><i class="fa-solid fa-arrow-up-right"></i></div>'
         + '</a>';
     });
     html += '</div>';
@@ -1481,7 +1481,7 @@
             + '<span class="xr-rank">' + (i + 1) + '</span>'
             + '<div class="xr-info"><div class="xr-name">' + escapeHtml(s.name || s.id) + '</div>'
             + '<div class="xr-sub">' + escapeHtml(s.artist || '') + '</div></div>'
-            + '<span class="xr-val"><i data-lucide="headphones"></i> ' + (s.listenCount || 0) + '</span>'
+            + '<span class="xr-val"><i class="fa-solid fa-headphones"></i> ' + (s.listenCount || 0) + '</span>'
             + '</div>';
         });
       }

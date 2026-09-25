@@ -190,22 +190,114 @@ function applyBranding() {
     }
 }
 
-// Helper đổi icon Lucide mà không phá animation của nút
+/** Map tên icon (lucide / ngắn) → class Font Awesome */
+const FA_ICON_MAP = {
+    x: 'fa-solid fa-xmark',
+    music: 'fa-solid fa-music',
+    timer: 'fa-solid fa-stopwatch',
+    headphones: 'fa-solid fa-headphones',
+    'list-plus': 'fa-solid fa-list',
+    sparkles: 'fa-solid fa-sparkles',
+    store: 'fa-solid fa-shop',
+    shop: 'fa-solid fa-shop',
+    sun: 'fa-solid fa-sun',
+    moon: 'fa-solid fa-moon',
+    'list-music': 'fa-solid fa-list-music',
+    smile: 'fa-regular fa-face-smile',
+    play: 'fa-solid fa-play',
+    pause: 'fa-solid fa-pause',
+    heart: 'fa-solid fa-heart',
+    'alarm-clock': 'fa-solid fa-alarm-clock',
+    'trash-2': 'fa-solid fa-trash',
+    trash: 'fa-solid fa-trash',
+    trophy: 'fa-solid fa-trophy',
+    'calendar-days': 'fa-solid fa-calendar-days',
+    calendar: 'fa-solid fa-calendar',
+    'calendar-range': 'fa-solid fa-calendar-week',
+    'calendar-check': 'fa-solid fa-calendar-check',
+    clock: 'fa-solid fa-clock',
+    'clock-3': 'fa-solid fa-clock',
+    library: 'fa-solid fa-book',
+    hourglass: 'fa-solid fa-hourglass-half',
+    link: 'fa-solid fa-link',
+    award: 'fa-solid fa-award',
+    'message-circle': 'fa-solid fa-comments',
+    'arrow-left': 'fa-solid fa-arrow-left',
+    user: 'fa-solid fa-user',
+    image: 'fa-solid fa-image',
+    mic: 'fa-solid fa-microphone',
+    'chevron-right': 'fa-solid fa-chevron-right',
+    'arrow-up-right': 'fa-solid fa-arrow-up-right',
+    shuffle: 'fa-solid fa-shuffle',
+    'skip-back': 'fa-solid fa-backward-step',
+    'skip-forward': 'fa-solid fa-forward-step',
+    repeat: 'fa-solid fa-repeat',
+    'repeat-1': 'fa-solid fa-repeat-1',
+    bell: 'fa-solid fa-bell',
+    check: 'fa-solid fa-check',
+    info: 'fa-solid fa-circle-info',
+    'alert-circle': 'fa-solid fa-circle-exclamation',
+    'refresh-cw': 'fa-solid fa-rotate',
+    'shopping-bag': 'fa-solid fa-bag-shopping',
+    coins: 'fa-solid fa-coins',
+    'plus-circle': 'fa-solid fa-circle-plus',
+    loader: 'fa-solid fa-spinner',
+    list: 'fa-solid fa-list',
+    medal: 'fa-solid fa-medal',
+    crown: 'fa-solid fa-crown',
+    // FA legacy names
+    'fa-headphones': 'fa-solid fa-headphones',
+    'fa-sun': 'fa-solid fa-sun',
+    'fa-moon': 'fa-solid fa-moon',
+    'fa-bell': 'fa-solid fa-bell',
+    'fa-trash-alt': 'fa-solid fa-trash',
+    'fa-stopwatch': 'fa-solid fa-stopwatch',
+    'fa-circle-info': 'fa-solid fa-circle-info',
+    'fa-circle-exclamation': 'fa-solid fa-circle-exclamation',
+    'fa-random': 'fa-solid fa-shuffle',
+    'fa-list': 'fa-solid fa-list',
+    'fa-repeat': 'fa-solid fa-repeat',
+    'fa-repeat-1': 'fa-solid fa-repeat-1'
+};
+
+/** Nút player control (ảnh) — giữ Lucide */
+const LUCIDE_BTN_IDS = new Set(['play-pause-btn', 'shuffle-btn', 'repeat-btn', 'prev-btn', 'next-btn']);
+/** Toast lặp lại / xáo trộn — vẫn icon Lucide theo yêu cầu */
+const LUCIDE_TOAST_ICONS = new Set(['shuffle', 'list', 'repeat', 'repeat-1', 'fa-random', 'fa-list', 'fa-repeat', 'fa-repeat-1']);
+
+function faIconHtml(name, extraClass) {
+    const key = String(name || '').trim();
+    const cls = FA_ICON_MAP[key] || FA_ICON_MAP[key.replace(/^fa-/, '')] || 'fa-solid fa-circle';
+    return '<i class="' + cls + (extraClass ? ' ' + extraClass : '') + '"></i>';
+}
+
+/** Đổi icon: player controls = Lucide; còn lại = Font Awesome */
 function setLucideIcon(container, iconName) {
     if (!container) return;
-    // Giữ nguyên container (btn), chỉ thay nội dung icon bên trong
-    container.innerHTML = `<i data-lucide="${iconName}"></i>`;
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons({ nodes: [container] });
+    const id = container.id || '';
+    const keepLucide = LUCIDE_BTN_IDS.has(id) || !!(container.closest && container.closest('.main-actions'));
+    if (keepLucide) {
+        container.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+        if (typeof lucide !== 'undefined') {
+            try { lucide.createIcons({ nodes: [container] }); } catch (e) {}
+        }
+    } else {
+        container.innerHTML = faIconHtml(iconName);
     }
 }
 
 function refreshLucideIcons(container = document) {
     if (typeof lucide !== 'undefined') {
         const nodes = container.querySelectorAll ? Array.from(container.querySelectorAll('[data-lucide]')) : [container];
-        if (nodes.length) lucide.createIcons({ nodes });
+        if (nodes.length) {
+            try { lucide.createIcons({ nodes }); } catch (e) {}
+        }
     }
 }
+
+window.faIconHtml = faIconHtml;
+window.FA_ICON_MAP = FA_ICON_MAP;
+window.LUCIDE_TOAST_ICONS = LUCIDE_TOAST_ICONS;
 
 let listenData = {};
 let isUpdatingListen = false;
@@ -477,7 +569,7 @@ async function checkForUpdates() {
                     const head = wasScheduled ? 'ADMIN ĐÃ ĐĂNG BÀI MỚI:' : 'BÀI HÁT MỚI:';
                     showNotification(
                         head,
-                        `<i class="fa-regular fa-star"></i> ${sid} <i class="fa-regular fa-star"></i>`,
+                        '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
                         '#4ade80',
                         'sparkles'
                     );
@@ -775,37 +867,39 @@ function getArtistGradientByTheme() {
 }
 
 function autoScaleNotificationMessage() {
+    // Giống music2: scale message span nếu dài hơn khung
     const noti = document.getElementById('custom-notification');
     if (!noti || !noti.classList.contains('show')) return;
 
     const content = noti.querySelector('.notification-content');
-    if (!content) return;
+    const msgEl = noti.querySelector('.notification-message');
+    if (!content || !msgEl) return;
 
-    const inner = content.querySelector('.notification-content-inner') || content;
     content.classList.remove('is-marquee');
     content.style.maxWidth = '';
     content.style.transform = 'none';
-    if (inner && inner.style) {
-        inner.style.animationDuration = '';
-    }
+
+    const targetElement = msgEl.querySelector('span') || msgEl;
+    targetElement.style.transform = 'none';
 
     const isMobile = window.innerWidth <= 768;
     const isSmallMobile = window.innerWidth <= 480;
-    const maxToastW = Math.min(window.innerWidth * 0.92, isSmallMobile ? 340 : (isMobile ? 420 : 520));
-    const iconW = 36;
-    const maxContentW = Math.max(140, maxToastW - iconW - 28);
-    content.style.maxWidth = maxContentW + 'px';
+    let paddingReduce = 15;
+    if (isSmallMobile) paddingReduce = 25;
+    else if (isMobile) paddingReduce = 20;
 
-    // Chữ dài → chạy ngang (marquee) thay vì scale nhỏ
-    const totalW = inner.scrollWidth || content.scrollWidth;
-    if (totalW > maxContentW + 4) {
-        content.style.setProperty('--noti-view-w', maxContentW + 'px');
-        content.classList.add('is-marquee');
-        // Tốc độ ~40px/s, tối thiểu 6s
-        const duration = Math.max(6, (totalW - maxContentW) / 40 + 3);
-        if (inner && inner.style) {
-            inner.style.animationDuration = duration + 's';
-        }
+    const containerWidth = content.clientWidth || Math.min(window.innerWidth * 0.9, 520);
+    const textWidth = targetElement.scrollWidth || msgEl.scrollWidth;
+
+    if (textWidth > containerWidth - paddingReduce) {
+        let scale = (containerWidth - paddingReduce) / textWidth;
+        const minScale = isSmallMobile ? 0.75 : (isMobile ? 0.7 : 0.5);
+        scale = scale * 0.95;
+        const finalScale = Math.max(scale, minScale);
+        targetElement.style.transform = 'scale(' + finalScale + ')';
+        targetElement.style.transformOrigin = 'left center';
+    } else {
+        targetElement.style.transform = 'none';
     }
 }
 
@@ -835,31 +929,46 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     }
 
     noti.style.borderBottomColor = color;
+
+    // Icon toast: Font Awesome — riêng toast lặp/xáo (shuffle/list/repeat) giữ Lucide
     const iconContainer = noti.querySelector('.notification-icon');
     if (iconContainer) {
-        iconContainer.innerHTML = `<i data-lucide="${icon}"></i>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [iconContainer] });
-        const svg = iconContainer.querySelector('svg');
-        if (svg) svg.style.color = color;
-    }
-
-    // Gradient chữ toast giống music2 (luôn bọc, kể cả có icon sao)
-    let formattedMessage = message;
-    if (typeof message === 'string') {
-        const gradient = getGradientByTheme();
-        // Nếu đã có span gradient sẵn thì giữ nguyên
-        if (!message.includes('noti-msg-grad') && !message.includes('background-clip: text')) {
-            formattedMessage = `<span class="noti-msg-grad" style="font-weight:700;background:${gradient};background-size:200% 200%;-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:0.5px;font-size:inherit;display:inline-block;white-space:nowrap;animation:titleGradientMove 3s ease infinite;">${message}</span>`;
+        const raw = String(icon || 'headphones');
+        const short = raw.replace(/^fa-/, '');
+        const useLucide = (typeof LUCIDE_TOAST_ICONS !== 'undefined' && (LUCIDE_TOAST_ICONS.has(raw) || LUCIDE_TOAST_ICONS.has(short)));
+        if (useLucide) {
+            iconContainer.innerHTML = '<i data-lucide="' + short + '"></i>';
+            if (typeof lucide !== 'undefined') {
+                try { lucide.createIcons({ nodes: [iconContainer] }); } catch (e) {}
+            }
+            const svg = iconContainer.querySelector('svg');
+            if (svg) svg.style.color = color;
+        } else {
+            iconContainer.innerHTML = (typeof faIconHtml === 'function') ? faIconHtml(raw) : ('<i class="fa-solid fa-' + short + '"></i>');
+            const iEl = iconContainer.querySelector('i');
+            if (iEl) iEl.style.color = color;
         }
     }
 
+    // Gradient chữ giống music2 (title + message tách nhau, không bọc content-inner)
+    let formattedMessage = message;
+    if (typeof message === 'string' && !message.includes('<span')) {
+        const gradient = (typeof getGradientByTheme === 'function') ? getGradientByTheme() : 'linear-gradient(90deg,#fff,#a78bfa,#fff)';
+        formattedMessage = '<span style="font-weight:700;background:' + gradient + ';-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:0.5px;font-size:inherit;display:inline-block;white-space:nowrap;">' + message + '</span>';
+    }
+
+    // HTML structure giống music2: .notification-title + .notification-message
     const content = noti.querySelector('.notification-content');
     if (content) {
         content.classList.remove('is-marquee');
-        content.innerHTML = `<div class="notification-content-inner"><span class="notification-title">${title}</span><span class="notification-message">${formattedMessage}</span></div>`;
-    } else {
-        const titleEl = noti.querySelector('.notification-title');
-        const msgEl = noti.querySelector('.notification-message');
+        // Khôi phục structure chuẩn nếu từng bị ghi đè
+        let titleEl = content.querySelector('.notification-title');
+        let msgEl = content.querySelector('.notification-message');
+        if (!titleEl || !msgEl || content.querySelector('.notification-content-inner')) {
+            content.innerHTML = '<div class="notification-title"></div><div class="notification-message"></div>';
+            titleEl = content.querySelector('.notification-title');
+            msgEl = content.querySelector('.notification-message');
+        }
         if (titleEl) titleEl.innerHTML = title;
         if (msgEl) msgEl.innerHTML = formattedMessage;
     }
@@ -894,7 +1003,7 @@ function showToastMsg(msg, isListen = false) {
         const match = msg.match(/\+1 LISTEN: "(.+)" \((.+)\)/);
         if (match) {
             const songId = match[2] || match[1];
-            showNotification('+1 LISTEN:', `<i class="fa-regular fa-star"></i> ${songId} <i class="fa-regular fa-star"></i>`, '#4ade80', 'headphones');
+            showNotification('+1 LISTEN:', '<i class="fa-regular fa-star"></i> ' + songId + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'fa-headphones');
         } else {
             showNotification('THÔNG BÁO:', msg, '#4ade80', 'info');
         }
@@ -1132,11 +1241,12 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
 
         try {
+            // Giống music2 y hệt
             showNotification(
                 '+1 LISTEN:',
                 '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
                 '#4ade80',
-                'headphones'
+                'fa-headphones'
             );
         } catch (e) {
             console.warn('toast listen fail', e);
@@ -1344,7 +1454,7 @@ function showListenStats() {
         modal = document.createElement('div');
         modal.id = 'listen-stats-modal';
         modal.className = 'listen-modal';
-        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i data-lucide="x"></i></div><div class="listen-title"><i data-lucide="headphones" class="listen-title-icon"></i><span>THỐNG KÊ LƯỢT NGHE</span></div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
+        modal.innerHTML = `<div class="listen-modal-header"><div class="close-listen" id="close-listen-modal"><i class="fa-solid fa-xmark"></i></div><div class="listen-title"><i class="fa-solid fa-headphones listen-title-icon"></i><span>THỐNG KÊ LƯỢT NGHE</span></div><div style="width:40px"></div></div><div class="listen-stats" id="listen-stats-content"><div style="text-align:center;padding:40px">ĐANG TẢI...</div></div><div class="listen-total" id="listen-total-stats"></div>`;
         const playerContainer = document.querySelector('.player-container');
         if (playerContainer) playerContainer.appendChild(modal);
         else document.body.appendChild(modal);
@@ -2240,11 +2350,11 @@ function renderPlaylist() {
         return `<div class="song-item ${i === index ? 'active' : ''}" data-idx="${i}">
             <div class="song-item-info" data-play-idx="${i}">
                 <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
-                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
+                <div class="song-artist-line text-xs text-gray-500"><i class="fa-solid fa-microphone"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
             <div class="song-item-actions">
-                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i data-lucide="heart" style="${fav ? 'fill:currentColor' : ''}"></i></button>
-                <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i data-lucide="list-plus"></i></button>
+                <button type="button" class="song-act-btn ${fav ? 'on-fav' : ''}" data-act="fav" data-id="${escapeHtml(id)}" title="Yêu thích"><i class="fa-solid fa-heart" style="${fav ? 'fill:currentColor' : ''}"></i></button>
+                <button type="button" class="song-act-btn ${inPl ? 'on-pl' : ''}" data-act="pl" data-id="${escapeHtml(id)}" title="Thêm playlist"><i class="fa-solid fa-list"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -2284,10 +2394,10 @@ function renderMyPlaylist() {
         return `<div class="song-item ${i === index ? 'active' : ''}">
             <div class="song-item-info" data-play-idx="${i}">
                 <div class="item-title text-sm uppercase font-bold">${escapeHtml(s.name)}</div>
-                <div class="song-artist-line text-xs text-gray-500"><i data-lucide="mic"></i><span>${escapeHtml(artistName)}</span></div>
+                <div class="song-artist-line text-xs text-gray-500"><i class="fa-solid fa-microphone"></i><span>${escapeHtml(artistName)}</span></div>
             </div>
             <div class="song-item-actions">
-                <button type="button" class="song-act-btn on-pl" data-act="pl-remove" data-id="${escapeHtml(String(id))}" title="Xóa khỏi playlist"><i data-lucide="trash-2"></i></button>
+                <button type="button" class="song-act-btn on-pl" data-act="pl-remove" data-id="${escapeHtml(String(id))}" title="Xóa khỏi playlist"><i class="fa-solid fa-trash"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -3921,7 +4031,7 @@ function buySong(songId) {
         acc.owned = [...new Set(acc.owned)];
     });
     markPendingOwned(songId);
-    // Toast: 2 ngôi sao 2 bên ID
+    // Toast: 2 ngôi sao FA 2 bên ID (giống music2)
     showNotification(
         'MUA THÀNH CÔNG:',
         '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
