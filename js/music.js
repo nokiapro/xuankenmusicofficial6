@@ -44,17 +44,61 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-/** PC (≥900px): playlist luôn mở sẵn bên trái */
+/** PC (≥900px) */
 function isPcLayout() {
     return typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches;
 }
-function ensurePcPlaylistOpen() {
+function isPcPlaylistOpen() {
+    const layout = document.querySelector('.pc-layout');
+    return !!(layout && layout.classList.contains('playlist-open'));
+}
+/**
+ * Auto playlist PC:
+ * - Hiện khi còn ≤10s cuối bài A
+ * - Giữ nguyên qua hết A sang bài B
+ * - Đến khi bài B chạy được ≥10s thì mới ẩn
+ */
+let pcPlaylistPhase = 'idle'; // idle | showing_end_of_a | waiting_10s_of_b
+let pcPlaylistTriggerIndex = -1; // index bài A (bài kích hoạt hiện)
+let pcPlaylistNextIndex = -1;    // index bài B (bài sau A)
+let pcPlaylistAutoHideTimer = null;
+
+/** Hiện danh sách PC: fade/slide từ phải → trái, chậm */
+function showPcPlaylist() {
     if (!isPcLayout() || !playlistOverlay) return;
+    const layout = document.querySelector('.pc-layout');
+    if (!layout) return;
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
+    layout.style.transition = '';
+    if (playlistOverlay) playlistOverlay.style.transition = '';
     playlistOverlay.classList.add('active');
+    layout.classList.add('playlist-open');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
+    setTimeout(() => {
+        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop(); } catch (e) {}
+    }, 250);
+}
+
+/** Ẩn danh sách PC (có animation chậm) */
+function hidePcPlaylist() {
+    if (!isPcLayout()) return;
+    if (pcPlaylistAutoHideTimer) {
+        clearTimeout(pcPlaylistAutoHideTimer);
+        pcPlaylistAutoHideTimer = null;
+    }
+    const layout = document.querySelector('.pc-layout');
+    if (layout) layout.classList.remove('playlist-open');
+    if (playlistOverlay) playlistOverlay.classList.remove('active');
+    pcPlaylistPhase = 'idle';
+    pcPlaylistTriggerIndex = -1;
+    pcPlaylistNextIndex = -1;
+}
+
+/** Giữ tương thích chỗ gọi cũ */
+function ensurePcPlaylistOpen() {
+    /* no-op */
 }
 
 // Dữ liệu trên Firebase Realtime Database + Auth (js/firebase-config.js)
@@ -1689,6 +1733,18 @@ async function loadSong(i) {
     isChanging = true;
     index = i;
     const song = songs[index];
+
+    // Đổi bài: nếu đang hiện vì 10s cuối bài A → giữ mở, chuyển sang chờ 10s của bài B
+    if (pcPlaylistPhase === 'showing_end_of_a' && isPcPlaylistOpen()) {
+        pcPlaylistPhase = 'waiting_10s_of_b';
+        pcPlaylistNextIndex = i;
+    } else if (pcPlaylistPhase !== 'waiting_10s_of_b') {
+        // Không trong chu kỳ auto → ẩn nếu đang mở tay / trạng thái lạ
+        // (giữ nguyên nếu user đang xem list thủ công cũng ok, nhưng reset phase)
+        pcPlaylistPhase = 'idle';
+        pcPlaylistTriggerIndex = -1;
+        pcPlaylistNextIndex = -1;
+    }
     
     if (songTitleEl) {
         songTitleEl.innerText = song.name;
@@ -1756,7 +1812,7 @@ function changeSong(i, source = 'normal') {
 }
 
 function selectSongFromList(i) {
-    // Mobile: đóng overlay. PC: giữ playlist mở sẵn bên trái.
+    // Mobile: đóng overlay. PC: loadSong sẽ ẩn danh sách (chỉ hiện lại khi ≤10s cuối).
     if (playlistOverlay && !isPcLayout()) playlistOverlay.classList.remove('active');
     // Chọn từ danh sách tổng → thoát chế độ playlist cá nhân
     myPlaylistMode = false;
@@ -1903,9 +1959,6 @@ async function startPlayback() {
         playerContainer.style.transform = 'translateY(0)';
     }
 
-    // PC: mở sẵn danh sách bài hát bên trái
-    ensurePcPlaylistOpen();
-    
     hidePlayerLoading();
     
     // Chờ danh sách bài nếu chưa có
@@ -1975,9 +2028,6 @@ function togglePlay() {
             playerContainer.style.transform = 'translateY(0)';
         }
 
-        // PC: mở sẵn danh sách bài hát bên trái
-        ensurePcPlaylistOpen();
-        
         hasUserInteracted = true;
         
         if (songs.length > 0 && !isLoadingSongs) {
@@ -2175,6 +2225,36 @@ audio.ontimeupdate = () => {
     
     // Cộng lượt: currentTime ≥ 5s
     tryRecordListenCount();
+
+    // PC auto playlist:
+    // 1) Còn ≤10s cuối bài A → hiện list, phase = showing_end_of_a
+    // 2) Sang bài B (loadSong) → phase = waiting_10s_of_b, VẪN giữ list
+    // 3) Bài B chạy được ≥10s → ẩn list
+    if (isPcLayout() && dur && isFinite(dur) && dur > 0) {
+        const remaining = dur - cur;
+        if (pcPlaylistPhase === 'idle' || pcPlaylistPhase === 'showing_end_of_a') {
+            // Chưa sang bài B: hiện khi còn ≤10s của bài hiện tại
+            if (!audio.paused && remaining <= 10 && remaining > 0.05 && dur > 12) {
+                if (pcPlaylistPhase !== 'showing_end_of_a' || pcPlaylistTriggerIndex !== index) {
+                    pcPlaylistPhase = 'showing_end_of_a';
+                    pcPlaylistTriggerIndex = index;
+                    pcPlaylistNextIndex = -1;
+                    showPcPlaylist();
+                }
+            } else if (remaining > 10.5 && pcPlaylistPhase === 'showing_end_of_a' && pcPlaylistTriggerIndex === index) {
+                // User tua về trước khi chưa hết bài A → ẩn, cho hiện lại sau
+                hidePcPlaylist();
+            }
+        } else if (pcPlaylistPhase === 'waiting_10s_of_b') {
+            // Đang giữ list từ bài A → ẩn khi bài B (index === next) chạy ≥10s
+            if (index === pcPlaylistNextIndex && cur >= 10) {
+                hidePcPlaylist();
+            } else if (index !== pcPlaylistNextIndex && index !== pcPlaylistTriggerIndex) {
+                // Nhảy sang bài khác (không phải B) → ẩn
+                hidePcPlaylist();
+            }
+        }
+    }
     
     if (isRepeatOne && dur && (dur - cur) <= 0.15 && !isLoopingHandled && dur > 0) {
         if (demoLockedSongId) return;
@@ -2195,6 +2275,7 @@ audio.ontimeupdate = () => {
 };
 
 audio.onended = () => {
+    // Hết bài: KHÔNG ẩn list ở đây — giữ đến khi bài B chạy đủ 10s (xử lý trong ontimeupdate / loadSong)
     // File demo ngắn kết thúc / hết 60s → dừng, không nhảy bài random
     if (demoLockedSongId || (songs[index] && !isSongOwned(songs[index].id))) {
         audio.pause();
@@ -2378,6 +2459,11 @@ const listBtn = document.getElementById('list-btn');
 if (listBtn) {
     listBtn.onclick = (e) => {
         e.stopPropagation();
+        if (isPcLayout()) {
+            if (isPcPlaylistOpen()) hidePcPlaylist();
+            else showPcPlaylist();
+            return;
+        }
         renderPlaylist();
         if (playlistOverlay) {
             playlistOverlay.classList.add('active');
@@ -2390,15 +2476,20 @@ if (listBtn) {
 const closePlaylistBtn = document.getElementById('close-playlist-btn');
 if (closePlaylistBtn && playlistOverlay) {
     closePlaylistBtn.onclick = () => {
-        // Trên PC playlist luôn mở sẵn – không đóng
-        if (isPcLayout()) return;
+        if (isPcLayout()) {
+            hidePcPlaylist();
+            return;
+        }
         playlistOverlay.classList.remove('active');
     };
 }
 
-// Khi resize sang PC thì mở playlist
+// Resize: nếu rời PC thì bỏ class playlist-open
 window.addEventListener('resize', () => {
-    if (isPcLayout()) ensurePcPlaylistOpen();
+    if (!isPcLayout()) {
+        const layout = document.querySelector('.pc-layout');
+        if (layout) layout.classList.remove('playlist-open');
+    }
 });
 
 if (shuffleBtn) {
