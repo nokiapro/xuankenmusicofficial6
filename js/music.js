@@ -63,7 +63,7 @@ let pcPlaylistTriggerIndex = -1; // index bài A (bài kích hoạt hiện)
 let pcPlaylistNextIndex = -1;    // index bài B (bài sau A)
 let pcPlaylistAutoHideTimer = null;
 
-/** Hiện danh sách PC: fade/slide từ phải → trái, chậm */
+/** Hiện danh sách PC: slideInRightBlur 0.6s */
 function showPcPlaylist() {
     if (!isPcLayout() || !playlistOverlay) return;
     const layout = document.querySelector('.pc-layout');
@@ -71,18 +71,22 @@ function showPcPlaylist() {
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
-    layout.style.transition = '';
-    if (playlistOverlay) playlistOverlay.style.transition = '';
+    // Bỏ class animation cũ
+    playlistOverlay.classList.remove('element-out-right-blur');
+    // Mở cột + chạy animation slide in + blur
     playlistOverlay.classList.add('active');
     layout.classList.add('playlist-open');
+    // Force reflow để animation chạy lại nếu mở lần 2
+    void playlistOverlay.offsetWidth;
+    playlistOverlay.classList.add('element-in-right-blur');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
-    // Sau khi cột mở xong (~0.95s) → cuộn mượt chậm tới bài đang phát
+    // Sau animation 0.6s → cuộn mượt tới bài đang phát
     setTimeout(() => {
         try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('smooth'); } catch (e) {}
-    }, 950);
+    }, 650);
 }
 
-/** Ẩn danh sách PC (có animation chậm) */
+/** Ẩn danh sách PC: slideOutRightBlur 0.6s rồi mới thu cột */
 function hidePcPlaylist() {
     if (!isPcLayout()) return;
     if (pcPlaylistAutoHideTimer) {
@@ -90,11 +94,37 @@ function hidePcPlaylist() {
         pcPlaylistAutoHideTimer = null;
     }
     const layout = document.querySelector('.pc-layout');
-    if (layout) layout.classList.remove('playlist-open');
-    if (playlistOverlay) playlistOverlay.classList.remove('active');
-    pcPlaylistPhase = 'idle';
-    pcPlaylistTriggerIndex = -1;
-    pcPlaylistNextIndex = -1;
+    if (!playlistOverlay || !layout) {
+        if (layout) layout.classList.remove('playlist-open');
+        pcPlaylistPhase = 'idle';
+        pcPlaylistTriggerIndex = -1;
+        pcPlaylistNextIndex = -1;
+        return;
+    }
+    // Đang ẩn rồi thì thôi
+    if (!layout.classList.contains('playlist-open') && !playlistOverlay.classList.contains('element-in-right-blur')) {
+        pcPlaylistPhase = 'idle';
+        pcPlaylistTriggerIndex = -1;
+        pcPlaylistNextIndex = -1;
+        return;
+    }
+    playlistOverlay.classList.remove('element-in-right-blur');
+    void playlistOverlay.offsetWidth;
+    playlistOverlay.classList.add('element-out-right-blur');
+    let done = false;
+    const onEnd = () => {
+        if (done) return;
+        done = true;
+        playlistOverlay.removeEventListener('animationend', onEnd);
+        playlistOverlay.classList.remove('element-out-right-blur', 'active');
+        layout.classList.remove('playlist-open');
+        pcPlaylistPhase = 'idle';
+        pcPlaylistTriggerIndex = -1;
+        pcPlaylistNextIndex = -1;
+    };
+    playlistOverlay.addEventListener('animationend', onEnd);
+    // Fallback nếu animationend không fire
+    setTimeout(onEnd, 700);
 }
 
 /** Giữ tương thích chỗ gọi cũ */
