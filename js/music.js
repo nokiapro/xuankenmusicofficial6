@@ -76,9 +76,13 @@ function showPcPlaylist() {
     playlistOverlay.classList.add('active');
     layout.classList.add('playlist-open');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
+    // Scroll sau khi cột đã mở xong (~0.95s) để offset/layout đúng, không loạn
     setTimeout(() => {
-        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop(); } catch (e) {}
-    }, 250);
+        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('auto'); } catch (e) {}
+    }, 200);
+    setTimeout(() => {
+        try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('smooth'); } catch (e) {}
+    }, 1000);
 }
 
 /** Ẩn danh sách PC (có animation chậm) */
@@ -1530,15 +1534,24 @@ function getRandomPastel() {
     return { bg: `hsl(${h}, 70%, 94%)`, accent: `hsl(${h}, 60%, 40%)` };
 }
 
-function scrollToActiveTop() {
-    const activeItem = document.querySelector('.song-item.active');
-    if (!activeItem) return;
+function scrollToActiveTop(behavior) {
     const scrollContainer = document.getElementById('playlist-content');
     if (!scrollContainer) return;
-    const header = document.querySelector('.playlist-header');
-    const headerHeight = header ? header.offsetHeight : 65;
-    const targetScroll = activeItem.offsetTop - headerHeight - 4;
-    scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+    // Ưu tiên item active trong playlist chính (không lấy nhầm item ở modal khác)
+    const activeItem = scrollContainer.querySelector('.song-item.active')
+        || document.querySelector('#playlist-content .song-item.active')
+        || document.querySelector('.song-item.active');
+    if (!activeItem) return;
+    const useSmooth = behavior !== 'auto';
+    try {
+        // scrollIntoView ổn định hơn offsetTop khi cột đang animate width
+        activeItem.scrollIntoView({ behavior: useSmooth ? 'smooth' : 'auto', block: 'center', inline: 'nearest' });
+    } catch (e) {
+        const header = document.querySelector('#playlist .playlist-header') || document.querySelector('.playlist-header');
+        const headerHeight = header ? header.offsetHeight : 58;
+        const targetScroll = activeItem.offsetTop - headerHeight - 8;
+        scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: useSmooth ? 'smooth' : 'auto' });
+    }
 }
 
 async function requestWakeLock() {

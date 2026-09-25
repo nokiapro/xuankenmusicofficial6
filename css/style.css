@@ -4014,8 +4014,8 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     }
 
     .player-container {
-        width: min(1100px, 96vw) !important;
-        max-width: 1100px !important;
+        width: 450px !important;
+        max-width: 450px !important;
         height: min(720px, 92vh);
         max-height: 92vh;
         border-radius: 28px;
@@ -4023,6 +4023,17 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         /* header row height dùng chung cho trái (playlist) + phải (top-bar) */
         --pc-header-h: 58px;
+        transition: width 0.95s cubic-bezier(0.4, 0, 0.2, 1),
+                    max-width 0.95s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* 2 cột (playlist hoặc panel trái) → 900px */
+    .player-container:has(.pc-layout.playlist-open),
+    .player-container:has(#my-playlist-overlay.active),
+    .player-container:has(.shop-modal.show),
+    .player-container:has(.timer-modal.show),
+    .player-container:has(.listen-modal.show) {
+        width: 900px !important;
+        max-width: 900px !important;
     }
 
     /* Mặc định 1 cột (chỉ player). Có class playlist-open → 2 cột */
@@ -4036,6 +4047,13 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         transition: grid-template-columns 0.95s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .pc-layout.playlist-open {
+        grid-template-columns: 1fr 1fr;
+    }
+    /* Panel trái (playlist của tôi / shop / timer / listen) cũng chiếm nửa trái */
+    .player-container:has(#my-playlist-overlay.active) .pc-layout,
+    .player-container:has(.shop-modal.show) .pc-layout,
+    .player-container:has(.timer-modal.show) .pc-layout,
+    .player-container:has(.listen-modal.show) .pc-layout {
         grid-template-columns: 1fr 1fr;
     }
 
