@@ -59,21 +59,42 @@ function clearPlaylistAutoClose() {
     }
 }
 
-/** Mở playlist với hiệu ứng; trên PC tự gập lại sau 10 giây */
+/** PC: bật/tắt layout 2 cột (mở rộng player + hiện cột playlist) */
+function setPcPlaylistExpanded(open) {
+    const pc = document.getElementById('player-container');
+    if (!pc) return;
+    if (open && isPcLayout()) {
+        pc.classList.add('pc-playlist-open');
+    } else {
+        pc.classList.remove('pc-playlist-open');
+    }
+}
+
+/** Đóng playlist (và thu layout PC về 1 cột) */
+function closePlaylistPanel() {
+    clearPlaylistAutoClose();
+    if (playlistOverlay) playlistOverlay.classList.remove('active');
+    setPcPlaylistExpanded(false);
+}
+
+/** Mở playlist với hiệu ứng; trên PC mở 2 cột + tự gập lại sau 10 giây */
 function openPlaylistOnPlay() {
     if (!playlistOverlay) return;
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
+    // PC: mở rộng thành 2 cột trước/kèm hiệu ứng sách
+    if (isPcLayout()) setPcPlaylistExpanded(true);
     playlistOverlay.classList.add('active');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
     setTimeout(scrollToActiveTop, 150);
-    // Chỉ auto-đóng trên PC
+    // Chỉ auto-đóng trên PC → gập sách + về 1 cột
     if (!isPcLayout()) return;
     clearPlaylistAutoClose();
     playlistAutoCloseTimer = setTimeout(() => {
         if (playlistOverlay && isPcLayout()) {
             playlistOverlay.classList.remove('active');
+            setPcPlaylistExpanded(false);
         }
         playlistAutoCloseTimer = null;
     }, 10000);
@@ -2410,6 +2431,7 @@ if (listBtn) {
         // Mở thủ công: không auto-đóng
         clearPlaylistAutoClose();
         renderPlaylist();
+        if (isPcLayout()) setPcPlaylistExpanded(true);
         if (playlistOverlay) {
             playlistOverlay.classList.add('active');
             refreshModalIcons(playlistOverlay);
@@ -2421,10 +2443,14 @@ if (listBtn) {
 const closePlaylistBtn = document.getElementById('close-playlist-btn');
 if (closePlaylistBtn && playlistOverlay) {
     closePlaylistBtn.onclick = () => {
-        clearPlaylistAutoClose();
-        playlistOverlay.classList.remove('active');
+        closePlaylistPanel();
     };
 }
+
+// Rời PC (resize nhỏ) → bỏ class 2 cột
+window.addEventListener('resize', () => {
+    if (!isPcLayout()) setPcPlaylistExpanded(false);
+});
 
 if (shuffleBtn) {
     shuffleBtn.onclick = function() {
