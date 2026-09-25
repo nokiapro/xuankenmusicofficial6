@@ -1539,19 +1539,19 @@ function scrollToActiveTop(behavior) {
     if (!scrollContainer) return;
     // Ưu tiên item active trong playlist chính (không lấy nhầm item ở modal khác)
     const activeItem = scrollContainer.querySelector('.song-item.active')
-        || document.querySelector('#playlist-content .song-item.active')
-        || document.querySelector('.song-item.active');
+        || document.querySelector('#playlist-content .song-item.active');
     if (!activeItem) return;
     const useSmooth = behavior !== 'auto';
-    try {
-        // scrollIntoView ổn định hơn offsetTop khi cột đang animate width
-        activeItem.scrollIntoView({ behavior: useSmooth ? 'smooth' : 'auto', block: 'center', inline: 'nearest' });
-    } catch (e) {
-        const header = document.querySelector('#playlist .playlist-header') || document.querySelector('.playlist-header');
-        const headerHeight = header ? header.offsetHeight : 58;
-        const targetScroll = activeItem.offsetTop - headerHeight - 8;
-        scrollContainer.scrollTo({ top: Math.max(0, targetScroll), behavior: useSmooth ? 'smooth' : 'auto' });
+    // Đưa bài đang phát lên đầu vùng list, cách mép trên một khoảng nhỏ (như bản trước)
+    const gap = 8;
+    let top = activeItem.offsetTop - gap;
+    // Fallback khi layout đang animate (offsetTop chưa ổn)
+    if (!isFinite(top) || (top === 0 && activeItem.previousElementSibling)) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const itemRect = activeItem.getBoundingClientRect();
+        top = (itemRect.top - containerRect.top) + scrollContainer.scrollTop - gap;
     }
+    scrollContainer.scrollTo({ top: Math.max(0, top), behavior: useSmooth ? 'smooth' : 'auto' });
 }
 
 async function requestWakeLock() {
