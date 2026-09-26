@@ -797,7 +797,7 @@ body.dark .album-art {
 .my-playlist-toolbar {
     display: flex;
     justify-content: center;
-    padding: 10px 16px 14px;
+    padding: 8px 16px 10px;
     flex-shrink: 0;
     border-top: 1px solid var(--border-color);
     background: var(--playlist-header-bg);
@@ -806,19 +806,19 @@ body.dark .album-art {
 .my-playlist-playall-btn {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
+    gap: 6px;
+    padding: 7px 16px;
     border: none;
     border-radius: 999px;
     background: linear-gradient(135deg, #ff0040, #8c00ff);
     color: #fff;
     font-weight: 700;
-    font-size: 0.78rem;
-    letter-spacing: 0.8px;
+    font-size: 0.7rem;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
     cursor: pointer;
     font-family: inherit;
-    box-shadow: 0 6px 18px rgba(140, 0, 255, 0.25);
+    box-shadow: 0 4px 14px rgba(140, 0, 255, 0.22);
     transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
@@ -828,10 +828,10 @@ body.dark .album-art {
 
 .my-playlist-playall-btn svg,
 .my-playlist-playall-btn [data-lucide] {
-    width: 16px !important;
-    height: 16px !important;
-    min-width: 16px;
-    min-height: 16px;
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px;
+    min-height: 14px;
 }
 
 #my-playlist-content {

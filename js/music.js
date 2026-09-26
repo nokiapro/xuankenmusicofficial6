@@ -2400,10 +2400,16 @@ function updatePlaylistStatsFooter() {
     const footer = document.getElementById('playlist-stats-footer');
     if (!footer) return;
     const total = (songs && songs.length) ? songs.length : 0;
+    // Chỉ đếm ID còn tồn tại trong danh sách bài (bỏ ID cũ / đã xóa khỏi list)
+    const songIds = new Set((songs || []).map(s => String(s.id)));
     let favCount = 0;
     let plCount = 0;
-    try { favCount = loadFavorites().length; } catch (e) {}
-    try { plCount = loadMyPlaylist().length; } catch (e) {}
+    try {
+        favCount = loadFavorites().filter(id => songIds.has(String(id))).length;
+    } catch (e) {}
+    try {
+        plCount = loadMyPlaylist().filter(id => songIds.has(String(id))).length;
+    } catch (e) {}
     if (totalEl) totalEl.textContent = String(total);
     if (favEl) favEl.textContent = String(favCount);
     if (plEl) plEl.textContent = String(plCount);
