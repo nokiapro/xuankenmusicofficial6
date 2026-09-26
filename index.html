@@ -81,6 +81,11 @@
                         <div style="width: 40px;"></div>
                     </div>
                     <div id="playlist-content"></div>
+                    <div class="playlist-stats-footer" id="playlist-stats-footer">
+                        <span class="ps-item" title="Tổng bài hát"><i data-lucide="music-2"></i> <b id="ps-total">0</b></span>
+                        <span class="ps-item" title="Đã yêu thích"><i data-lucide="heart"></i> <b id="ps-fav">0</b></span>
+                        <span class="ps-item" title="Trong playlist của tôi"><i data-lucide="list-plus"></i> <b id="ps-pl">0</b></span>
+                    </div>
                 </div>
             </div>
 
@@ -166,13 +171,13 @@
                 <div class="playlist-title"><i data-lucide="list-plus"></i><span>PLAYLIST CỦA TÔI</span></div>
                 <div style="width: 40px;"></div>
             </div>
+            <div id="my-playlist-content"></div>
             <div class="my-playlist-toolbar" id="my-playlist-toolbar" style="display:none;">
                 <button type="button" class="my-playlist-playall-btn" id="my-playlist-playall-btn">
                     <i data-lucide="play"></i>
                     <span>PHÁT TẤT CẢ</span>
                 </button>
             </div>
-            <div id="my-playlist-content"></div>
         </div>
 
         <div id="timer-overlay" class="timer-overlay"></div>
@@ -328,6 +333,18 @@
                 <div class="shop-title"><i data-lucide="store"></i><span>CỬA HÀNG XK</span></div>
                 <div style="width:40px;"></div>
             </div>
+            <div class="shop-tab-bar">
+                <button type="button" class="shop-tab active" data-shop-tab="music" id="shop-tab-music">
+                    <i data-lucide="music"></i> Mua nhạc
+                </button>
+                <button type="button" class="shop-tab" data-shop-tab="thumb" id="shop-tab-thumb">
+                    <i data-lucide="image"></i> Mua thumb
+                </button>
+            </div>
+            <div class="shop-tab-panels">
+                <div class="shop-list shop-tab-panel active" id="shop-list" data-panel="music"></div>
+                <div class="shop-list shop-tab-panel" id="shop-thumb-list" data-panel="thumb"></div>
+            </div>
             <div class="shop-user-bar" id="shop-user-bar">
                 <div class="shop-user-info">
                     <div class="shop-user-avatar"><i data-lucide="user"></i></div>
@@ -342,18 +359,6 @@
                     <i class="fa-solid fa-coins"></i>
                     <span id="shop-coin-count">0</span> XK
                 </div>
-            </div>
-<div class="shop-tab-bar">
-                <button type="button" class="shop-tab active" data-shop-tab="music" id="shop-tab-music">
-                    <i data-lucide="music"></i> Mua nhạc
-                </button>
-                <button type="button" class="shop-tab" data-shop-tab="thumb" id="shop-tab-thumb">
-                    <i data-lucide="image"></i> Mua thumb
-                </button>
-            </div>
-            <div class="shop-tab-panels">
-                <div class="shop-list shop-tab-panel active" id="shop-list" data-panel="music"></div>
-                <div class="shop-list shop-tab-panel" id="shop-thumb-list" data-panel="thumb"></div>
             </div>
         </div>
     </div>

@@ -2393,11 +2393,33 @@ function escapeHtml(str) {
     });
 }
 
+function updatePlaylistStatsFooter() {
+    const totalEl = document.getElementById('ps-total');
+    const favEl = document.getElementById('ps-fav');
+    const plEl = document.getElementById('ps-pl');
+    const footer = document.getElementById('playlist-stats-footer');
+    if (!footer) return;
+    const total = (songs && songs.length) ? songs.length : 0;
+    let favCount = 0;
+    let plCount = 0;
+    try { favCount = loadFavorites().length; } catch (e) {}
+    try { plCount = loadMyPlaylist().length; } catch (e) {}
+    if (totalEl) totalEl.textContent = String(total);
+    if (favEl) favEl.textContent = String(favCount);
+    if (plEl) plEl.textContent = String(plCount);
+    try {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ nodes: Array.from(footer.querySelectorAll('[data-lucide]')) });
+        }
+    } catch (e) {}
+}
+
 function renderPlaylist() {
     const list = document.getElementById('playlist-content');
     if (!list) return;
     if (!songs || !songs.length) {
         list.innerHTML = '<div style="text-align:center;padding:40px">ĐANG TẢI DANH SÁCH...</div>';
+        updatePlaylistStatsFooter();
         return;
     }
     list.innerHTML = songs.map((s, i) => {
@@ -2432,6 +2454,7 @@ function renderPlaylist() {
             else if (act === 'pl') toggleMyPlaylistSong(id);
         };
     });
+    updatePlaylistStatsFooter();
 }
 
 function renderMyPlaylist() {
