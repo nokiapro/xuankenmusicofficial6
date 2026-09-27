@@ -128,7 +128,6 @@
             .wrap { padding: 24px 24px 48px; }
         }
 
-        /* ===== Header ===== */
         .header {
             display: flex;
             align-items: center;
@@ -217,8 +216,6 @@
             }
         }
 
-
-        /* ===== Cards ===== */
         .card {
             background: var(--card);
             border: 1px solid var(--border);
@@ -253,7 +250,6 @@
             color: var(--text);
         }
 
-        /* ===== Stats ===== */
         .grid-stats {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -293,7 +289,6 @@
             .stat .n { font-size: 1.45rem; }
         }
 
-        /* ===== Tabs ===== */
         .tabs {
             display: flex;
             gap: 6px;
@@ -339,7 +334,6 @@
         .panel { display: none; }
         .panel.active { display: block; }
 
-        /* ===== Form ===== */
         input, textarea, select {
             width: 100%;
             background: var(--input-bg, #121218);
@@ -348,7 +342,7 @@
             border-radius: 10px;
             padding: 12px 14px;
             font-family: inherit;
-            font-size: 16px; /* tránh zoom iOS */
+            font-size: 16px;
             min-height: var(--touch);
             transition: border-color 0.2s;
         }
@@ -377,7 +371,6 @@
             color: var(--text) !important;
             background: var(--input-bg, var(--bg)) !important;
         }
-        /* Icon lịch: tối = trắng, sáng = đen */
         input[type="datetime-local"]::-webkit-calendar-picker-indicator,
         input[type="date"]::-webkit-calendar-picker-indicator,
         input[type="time"]::-webkit-calendar-picker-indicator {
@@ -443,7 +436,6 @@
             line-height: 1.35;
         }
 
-        /* ===== Buttons ===== */
         .btn {
             display: inline-flex;
             align-items: center;
@@ -500,7 +492,6 @@
             .row-actions.form-actions .btn { flex: 0 0 auto; }
         }
 
-        /* ===== Tables → cards on mobile ===== */
         .table-wrap {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -514,7 +505,6 @@
             font-size: 0.82rem;
             table-layout: auto;
         }
-        /* Desktop: căn đều, cột thao tác sát phải, tên bài chiếm phần còn lại */
         @media (min-width: 720px) {
             #panel-songs table,
             #panel-users table {
@@ -528,7 +518,6 @@
                 padding: 12px 10px;
                 vertical-align: middle;
             }
-            /* Songs: ID | Tên | Ca sĩ | Nghe | Giá | TT | Thao tác */
             #panel-songs th:nth-child(1),
             #panel-songs td:nth-child(1) { width: 7%; }
             #panel-songs th:nth-child(2),
@@ -547,7 +536,6 @@
                 justify-content: flex-end;
                 flex-wrap: nowrap;
             }
-            /* Users: Username | Hạng | XK | Sở hữu | Điểm danh | Thao tác */
             #panel-users th:nth-child(1),
             #panel-users td:nth-child(1) { width: 16%; }
             #panel-users th:nth-child(2),
@@ -582,7 +570,6 @@
         }
         tr:last-child td { border-bottom: none; }
 
-        /* Mobile card layout for tables */
         @media (max-width: 719px) {
             .table-wrap { overflow: visible; margin: 0; padding: 0; }
             table thead { display: none; }
@@ -631,7 +618,6 @@
                 min-height: 40px;
                 font-size: 0.75rem;
             }
-            /* hide empty muted colspan cells look */
             table td[colspan] {
                 display: block;
                 text-align: center;
@@ -639,7 +625,6 @@
             table td[colspan]::before { display: none; }
         }
 
-        /* ===== Pagination ===== */
         .pagination {
             display: flex;
             align-items: center;
@@ -684,7 +669,6 @@
             margin: 0 4px;
         }
 
-        /* ===== Search ===== */
         .search {
             width: 100%;
             margin-bottom: 14px;
@@ -694,7 +678,6 @@
             padding-left: 42px;
         }
 
-        /* ===== Login ===== */
         #login-screen.wrap {
             display: flex;
             align-items: center;
@@ -760,7 +743,6 @@
             border: 1px solid rgba(255,68,68,0.2);
         }
 
-        /* ===== Misc ===== */
         .muted { color: var(--muted); font-size: 0.8rem; }
         .toast {
             white-space: nowrap;
@@ -842,7 +824,6 @@
             .coin-input, .rank-select { max-width: 140px; }
         }
     
-        /* admin scrollbar — giống list bài player */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 50px; }
         ::-webkit-scrollbar-thumb {
@@ -851,7 +832,6 @@
         }
         * { scrollbar-width: thin; scrollbar-color: #c20175 #1a1a1a22; }
     
-        /* Tabs + pagination: cùng style nút header (pill) */
         .tabs {
             display: flex;
             gap: 8px;
@@ -920,7 +900,6 @@
     </style>
 
     <script>
-    // Ẩn đuôi .html trên URL (GitHub Pages / static hosting)
     (function () {
         try {
             var path = location.pathname;
@@ -1378,7 +1357,6 @@
         };
 
         let songsCache = [];
-        /** ID gốc khi đang sửa (null = thêm mới). Đổi ID → rename, không tạo bản trùng. */
         let editingSongId = null;
         let usersCache = {};
         let settingsCache = { ...DEFAULT_SETTINGS };
@@ -1386,10 +1364,6 @@
         const SONGS_PER_PAGE = 10;
         let songsFilter = '';
 
-        /**
-         * Admin dùng Firebase App RIÊNG ("xk-admin") — Auth tách biệt với Player.
-         * Tránh: vào Admin → Auth default bị đổi thành admin → quay lại Player bị lẫn UID thành viên.
-         */
         function getAdminApp() {
             if (typeof firebase === 'undefined') return null;
             try {
@@ -1413,7 +1387,6 @@
             return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
         }
 
-        /** Đường dẫn Firebase — luôn root. sitePrefix chỉ dùng localStorage phía client. */
         function dataPath(key) {
             return String(key || '').replace(/^\/+|\/+$/g, '');
         }
@@ -1503,7 +1476,6 @@
                 }
             } catch (e) { console.warn('load countdown/links', e); }
 
-            // Load admin email allowlist (riêng path settings/adminEmails)
             try {
                 const ae = await db().ref('settings/adminEmails').once('value');
                 const val = ae.val();
@@ -1538,7 +1510,6 @@
                 publishAt: obj[id].publishAt || null,
                 hidden: !!obj[id].hidden
             }));
-            // Sắp xếp theo bảng chữ cái (tên bài, rồi ID)
             songsCache.sort((a, b) => {
                 const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
                 if (na !== 0) return na;
@@ -1548,7 +1519,6 @@
             refreshStats();
         }
 
-        /** Username / rank dành riêng cho admin — không hiện trong list player */
         const RESERVED_ADMIN_NAMES = ['tối thượng', 'toi thuong', 'toithuong', 'administrator', 'admin', 'xuanken admin'];
 
         function isReservedAdminName(name) {
@@ -1562,10 +1532,8 @@
             if (isReservedAdminName(name)) return true;
             if (String(u.rank || '').toLowerCase() === 'toi_thuong') return true;
             if (u.isAdmin === true || u.adminOnly === true) return true;
-            // Email thật (không phải @xuanken.user) = tài khoản Admin Auth, không phải player
             const em = String(u.email || u.loginEmail || '').trim().toLowerCase();
             if (em && !em.endsWith('@xuanken.user') && em.includes('@')) return true;
-            // UID đang đăng nhập Admin hiện tại
             try {
                 const _aa = getAdminAuth(); const cur = _aa && _aa.currentUser;
                 if (cur && (cur.uid === key || cur.uid === u.uid)) return true;
@@ -1582,13 +1550,12 @@
                 const u = obj[k] || {};
                 if (isAdminOnlyProfile(u, k)) {
                     skippedAdmin++;
-                    return; // không lẫn admin vào list player
+                    return;
                 }
                 const name = u.username || k;
-                // Tránh đè nếu trùng username (giữ bản có username rõ)
                 if (usersCache[name] && usersCache[name].uid && !u.username) return;
                 usersCache[name] = {
-                    key: k, // uid (Firebase Auth)
+                    key: k,
                     uid: u.uid || k,
                     coins: u.coins | 0,
                     owned: parseOwnedField(u.owned),
@@ -1603,7 +1570,6 @@
             refreshStats();
         }
 
-        /** Chuẩn hóa owned từ Firebase (array / object / string) */
         function parseOwnedField(owned) {
             if (Array.isArray(owned)) {
                 return owned.map(x => String(x == null ? '' : x).trim()).filter(Boolean);
@@ -1625,7 +1591,6 @@
             return [];
         }
 
-        /** Set ID bài trong kho (cả id field + key gốc nếu có) */
         function getSongIdSet() {
             const set = new Set();
             songsCache.forEach(s => {
@@ -1651,10 +1616,6 @@
             return false;
         }
 
-        /**
-         * Làm sạch mảng owned: bỏ ID trống / không còn trong songs / trùng.
-         * Trả về { cleaned, removed, orphans, dupes, empty }
-         */
         function sanitizeOwnedList(owned, songIds) {
             const ids = songIds || getSongIdSet();
             const seen = new Set();
@@ -1679,7 +1640,6 @@
             };
         }
 
-        /** Số bài sở hữu hợp lệ (còn trong kho, không trùng) của 1 user */
         function validOwnedCount(owned) {
             return sanitizeOwnedList(owned).cleaned.length;
         }
@@ -1699,7 +1659,6 @@
                 totalEmpty += s.empty;
             });
             const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
-            // Chỉ hiện "(−N rác)" khi thật sự còn ID mồ côi / trùng sau khi chuẩn hóa
             const junk = totalOrphans + totalDupes;
             const buyLabel = junk > 0
                 ? `Lượt mua <span style="opacity:.65;font-size:0.65em;">(−${junk} rác)</span>`
@@ -1726,7 +1685,6 @@
             document.getElementById('s-art').value = song.albumArt || '';
             document.getElementById('s-lrc1').value = song.lrc1 || '';
             document.getElementById('s-lrc2').value = song.lrc2 || '';
-            // publishAt ISO → datetime-local
             const pub = song.publishAt ? new Date(song.publishAt) : null;
             if (pub && !Number.isNaN(pub.getTime())) {
                 const pad = n => String(n).padStart(2, '0');
@@ -1765,7 +1723,6 @@
                 el.innerHTML = '';
                 return;
             }
-            // 1 hàng: ‹ 1 2 3 … n ›  (tự giới hạn số nút theo độ rộng)
             const maxButtons = window.innerWidth < 480 ? 3 : (window.innerWidth < 700 ? 5 : 7);
             let html = `<button type="button" data-page="prev" ${songsPage <= 1 ? 'disabled' : ''}>‹</button>`;
             let start = Math.max(1, songsPage - Math.floor(maxButtons / 2));
@@ -1976,17 +1933,14 @@
                 const d = new Date(pubLocal);
                 if (!Number.isNaN(d.getTime())) publishAt = d.toISOString();
             }
-            // ID gốc khi đang sửa (để rename nếu đổi ID)
             const originalId = editingSongId;
             const isRename = originalId && originalId !== id;
 
-            // Nếu đổi ID mà ID mới đã tồn tại → chặn
             if (isRename && songsCache.some(s => s.id === id)) {
                 toast('ID mới "' + id + '" đã tồn tại — chọn ID khác');
                 return;
             }
 
-            // Đọc listenCount từ bài gốc (khi sửa/đổi ID) hoặc từ ID hiện tại (khi thêm)
             const countSourceId = originalId || id;
             let liveCount = 0;
             try {
@@ -2011,10 +1965,8 @@
                 listenCount: Math.max(liveCount, cacheCount, 0)
             };
 
-            // Ghi bài (ID mới hoặc giữ nguyên)
             await db().ref(dataPath('songs') + '/' + id).set(payload);
 
-            // Đổi ID → xóa bản cũ (chỉ 1 bài, không nhân bản)
             if (isRename) {
                 await db().ref(dataPath('songs') + '/' + originalId).remove();
                 toast('Đã đổi ID ' + originalId + ' → ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
@@ -2024,7 +1976,6 @@
 
             editingSongId = null;
             await loadSongs();
-            // Giữ form đúng bài vừa lưu (đang edit tiếp được)
             const saved = songsCache.find(s => s.id === id);
             if (saved) fillSongForm(saved);
             else clearSongForm();
@@ -2034,7 +1985,6 @@
         document.getElementById('song-search').oninput = e => renderSongs(e.target.value);
         document.getElementById('user-search').oninput = e => renderUsers(e.target.value);
 
-        // —— Dọn owned: bỏ ID mồ côi + trùng ——
         const cleanupOwnedBtn = document.getElementById('cleanup-owned-btn');
         if (cleanupOwnedBtn) {
             cleanupOwnedBtn.onclick = async () => {
@@ -2049,7 +1999,6 @@
                     toast('Chưa có user');
                     return;
                 }
-                // Preview
                 let previewOrphans = 0, previewDupes = 0, usersAffected = 0;
                 names.forEach(n => {
                     const s = sanitizeOwnedList(usersCache[n].owned, songIds);
@@ -2096,7 +2045,6 @@
                             logEl.scrollTop = logEl.scrollHeight;
                         }
                     }
-                    // Load lại từ Firebase để chắc stats khớp server
                     try { await loadUsers(); } catch (eLoad) { refreshStats(); renderUsers(document.getElementById('user-search').value); }
                     toast('Đã dọn ' + fixedUsers + ' user, xóa ' + totalRemoved + ' ID rác');
                     if (logEl) logEl.textContent += '\nXong. F5 sẽ không còn hiện rác nếu player không đẩy lại ID cũ.';
@@ -2110,8 +2058,6 @@
             };
         }
 
-
-        // —— Xuất / nhập danh sách bài hát (JSON) ——
         function songToExportObj(s) {
             return {
                 id: s.id || '',
@@ -2154,7 +2100,6 @@
                 if (!t) throw new Error('JSON trống');
                 data = JSON.parse(t);
             }
-            // Hỗ trợ: mảng [...] hoặc object { id: {...}, ... }
             let list = [];
             if (Array.isArray(data)) {
                 list = data;
@@ -2198,7 +2143,6 @@
             }
             let updated = 0;
             let added = 0;
-            // Merge listenCount: giữ max(file, firebase) để không mất lượt nghe
             for (const song of list) {
                 let liveCount = 0;
                 try {
@@ -2222,7 +2166,6 @@
         if (exportSongsBtn) {
             exportSongsBtn.onclick = async () => {
                 try {
-                    // Luôn lấy dữ liệu mới từ Firebase trước khi xuất
                     toast('Đang tải list nhạc...');
                     const snap = await db().ref(dataPath('songs')).once('value');
                     const obj = snap.val() || {};
@@ -2305,7 +2248,6 @@
             };
         }
 
-
         document.getElementById('save-settings-btn').onclick = async () => {
             settingsCache.songPrice = Math.max(0, parseInt(document.getElementById('set-song-price').value, 10) || 0);
             settingsCache.checkinReward = Math.max(0, parseInt(document.getElementById('set-checkin').value, 10) || 0);
@@ -2326,7 +2268,6 @@
             if (document.getElementById('set-site-title')) settingsCache.siteTitle = (document.getElementById('set-site-title').value || '').trim();
             settingsCache.siteIcon = (document.getElementById('set-site-icon').value || '').trim() || DEFAULT_SETTINGS.siteIcon;
             settingsCache.sitePrefix = (document.getElementById('set-site-prefix').value || '').trim().replace(/^\/+|\/+$/g, '').replace(/[.#$\[\]]/g, '_');
-            // update (không set) để không xóa countdown / partnerLinks / flash / …
             await db().ref('settings').update({
                 songPrice: settingsCache.songPrice,
                 checkinReward: settingsCache.checkinReward,
@@ -2340,7 +2281,6 @@
             });
             applyBranding();
             toast('Đã lưu cài đặt Firebase');
-            // Reload data theo prefix mới
             try {
                 await loadSongs();
                 await loadUsers();
@@ -2348,7 +2288,6 @@
                 console.warn('Reload after prefix change', e);
             }
         };
-
 
         const factoryBtn = document.getElementById('factory-reset-btn');
         if (factoryBtn) factoryBtn.onclick = async () => {
@@ -2551,7 +2490,6 @@
             });
         });
 
-
         function applySiteBranding() {
             try {
                 const name = (settingsCache && settingsCache.siteName) || 'XuanKen Admin';
@@ -2633,7 +2571,6 @@
             });
         };
 
-
         function parsePartnerLinksText(raw) {
             const lines = String(raw || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
             const out = [];
@@ -2682,7 +2619,6 @@
             toast(list.length ? ('Đã lưu ' + list.length + ' liên kết') : 'Đã xóa hết liên kết');
         };
 
-        // ----- Gift codes -----
         async function loadGiftCodes() {
             const el = document.getElementById('gift-list');
             if (!el) return;
@@ -2770,7 +2706,6 @@
             }
         };
 
-        // Progress thumbs
         async function loadThumbAdmin() {
             const el = document.getElementById('thumb-admin-list');
             if (!el) return;
@@ -2836,11 +2771,7 @@
             document.getElementById('thumb-new-url').value = '';
             loadThumbAdmin();
         };
-        /* tab switch đã bind ở switchAdminTab — không gắn trùng */
 
-
-        
-        /** Đặt PIN player (Auth password của email username@xuanken.user) */
         async function adminSetPlayerPin(username, newPin) {
             const name = String(username || '').trim();
             if (!name || !/^[0-9]{6}$/.test(newPin)) throw new Error('PIN không hợp lệ');
@@ -2851,16 +2782,7 @@
             const cfg = window.FIREBASE_CONFIG || {};
             const apiKey = cfg.apiKey;
             if (!apiKey) throw new Error('Thiếu API key');
-            // Đăng nhập tạm trên app phụ bằng PIN cũ không có → dùng Identity Toolkit update cần idToken
-            // Cách: tạo phiên trên app "xk-pin" bằng signIn — nếu admin biết không có PIN cũ, dùng REST accounts:update với localId (cần admin SDK).
-            // Fallback thực tế: dùng signInWithEmailAndPassword nếu PIN hiện tại trùng? Không.
-            // Dùng REST: accounts:signInWithPassword thất bại → thử update qua token admin (không được).
-            // Giải pháp client: signUp sẽ fail nếu tồn tại. 
-            // → Dùng Firebase Auth REST "accounts:update" với idToken lấy bằng cách:
-            // Admin không thể. Thử API setAccountInfo với localId + password (một số project cho phép nếu rule IAM).
-            // Ghi loginPin trên DB (player sẽ ưu tiên PIN này nếu Auth chưa kịp đổi)
             await db().ref(dataPath('users') + '/' + uid).update({ loginPin: newPin, loginPinAt: Date.now() });
-            // Thử REST legacy setAccountInfo (một số project cho phép)
             let apiOk = false;
             try {
                 const res = await fetch('https://www.googleapis.com/identitytoolkit/v3/relyingparty/setAccountInfo?key=' + encodeURIComponent(apiKey), {
@@ -2881,13 +2803,11 @@
                 if (!data2.error) apiOk = true;
             } catch (e) {}
             if (!apiOk) {
-                // Auth password chưa đổi được từ client — loginPin đã lưu; player login sẽ dùng loginPin
                 console.warn('Auth API không đổi được password — đã lưu loginPin trên DB');
             }
             return true;
         }
 
-        /** Theme dark/light admin */
         function applyAdminTheme(theme) {
             const t = theme === 'light' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', t);
@@ -2936,10 +2856,8 @@
             if (!user) throw new Error('no-email');
             const email = String(user.email || '').trim().toLowerCase();
             if (!email || !email.includes('@')) throw new Error('no-email');
-            // Tài khoản player ảo không được vào admin
             if (email.endsWith('@xuanken.user')) throw new Error('player-email');
 
-            // Allowlist (nếu có và không rỗng) — bắt buộc khớp
             try {
                 const snap = await db().ref('settings/adminEmails').once('value');
                 const val = snap.val();
@@ -2951,7 +2869,6 @@
                     throw new Error('not-in-allowlist');
                 }
             } catch (e) {
-                // permission_denied / network → vẫn cho vào nếu đã là email thật (auth ok)
                 if (e && (e.message === 'not-in-allowlist' || e.message === 'player-email' || e.message === 'no-email')) {
                     throw e;
                 }
@@ -2973,7 +2890,6 @@
             try {
                 await loadUsers();
             } catch (e) { console.warn('loadUsers', e); }
-            // Cập nhật email trên header
             try {
                 const auth = getAdminAuth();
                 const u = auth && auth.currentUser;
@@ -3041,7 +2957,6 @@
             }
             try {
                 await auth.signInWithEmailAndPassword(email, pass);
-                // onAuthStateChanged sẽ gọi assertAdminAccess + showApp
             } catch (err) {
                 console.warn('Admin login error:', err);
                 setLoginError(firebaseAuthErrorMessage(err));
@@ -3104,7 +3019,6 @@
                 setLoginError('Firebase Auth chưa sẵn sàng. Kiểm tra firebase-config.js và tải lại trang.');
                 return;
             }
-            // Persistence riêng cho app admin (không đụng player)
             try {
                 if (firebase.auth.Auth && firebase.auth.Auth.Persistence) {
                     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function () {});

@@ -1,4 +1,3 @@
-// Firebase config — XuanKen Music
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyChU4i-6QN7ttYEPGnMNnfKbHXWdBR5NHo",
     authDomain: "music6-dfd59.firebaseapp.com",
@@ -9,7 +8,6 @@ const FIREBASE_CONFIG = {
     appId: "1:360247162639:web:8167752f11cccd6d9bb07a"
 };
 
-// Khởi tạo (compat SDK)
 if (typeof firebase !== 'undefined') {
     if (!firebase.apps.length) {
         firebase.initializeApp(FIREBASE_CONFIG);
@@ -17,7 +15,6 @@ if (typeof firebase !== 'undefined') {
     window.fbDB = firebase.database();
     try {
         window.fbAuth = firebase.auth();
-        // Giữ phiên đăng nhập trên trình duyệt
         if (firebase.auth.Auth && firebase.auth.Auth.Persistence) {
             window.fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function () {});
         }

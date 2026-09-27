@@ -1,8 +1,3 @@
-/**
- * XuanKen Music — extras pack (gọn)
- * Banner · Broadcast · Flash · Gift · Badges/XP · Chat · Checkin
- * Leaderboards · Countdown · Top tuần · Liên kết · Hotkeys · Media session
- */
 (function () {
   'use strict';
 
@@ -54,9 +49,7 @@
 
   function badgeIconHtml(iconClass, extraClass) {
     const cls = String(iconClass || 'fa-solid fa-award').trim();
-    // Đã là HTML sẵn
     if (cls.indexOf('<') >= 0) return cls;
-    // Emoji cũ (fallback)
     if (!/^fa[srb]?\s|^fa-solid|^fa-regular|^fa-light|^fa-brands/.test(cls) && !cls.startsWith('fa-')) {
       return '<span class="badge-emoji">' + cls + '</span>';
     }
@@ -77,7 +70,6 @@
     return d.getFullYear() + '-S' + (Math.floor(d.getMonth() / 3) + 1);
   }
 
-  // ----- 13 Banner + 94 Broadcast -----
   function applyBanner() {
     const s = typeof getAdminSettings === 'function' ? getAdminSettings() : {};
     let el = $('site-banner');
@@ -117,7 +109,6 @@
     } catch (e) {}
   }
 
-  // ----- 32 Flash sale badge -----
   function flashBadge() {
     const s = typeof getAdminSettings === 'function' ? getAdminSettings() : {};
     const pct = Number(s.flashSalePercent) || 0;
@@ -135,7 +126,6 @@
     } else if (el) el.style.display = 'none';
   }
 
-  // ----- 29 / 69 / 70 / 74 Achievements + XP -----
   function unlockAchievement(id) {
     const def = ACHIEVEMENTS[id];
     if (!def || typeof updateCurrentAccount !== 'function') return false;
@@ -246,7 +236,6 @@
     if (sessionSec >= 3600) unlockAchievement('marathon');
   }
 
-  /** Quét giftCodes một lần — bù huy hiệu nếu đã đổi mã trước đây mà chưa ghi */
   async function recoverGiftAchievements() {
     try {
       const acc = getAcc();
@@ -324,7 +313,6 @@
           + '</div>';
       }).join('');
     }
-    // Bù huy hiệu đã đạt (playlist, gift, checkin…) rồi vẽ
     try { checkAchievements(); } catch (e) {}
     renderBadgesList();
     modal.classList.add('show');
@@ -340,14 +328,12 @@
   function openChatModal() {
     const modal = document.getElementById('chat-modal');
     if (!modal) return;
-    // Đảm bảo nằm trong player
     const host = playerHost();
     if (modal.parentElement !== host) host.appendChild(modal);
     modal.classList.add('show');
     if (typeof lucide !== 'undefined') {
       try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
     }
-    // Scroll chat xuống cuối
     const box = document.getElementById('global-chat-box');
     if (box) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
   }
@@ -357,7 +343,6 @@
     if (modal) modal.classList.remove('show');
   }
 
-  /** Modal kết quả (Top / Review / Thời gian) — khung player + nút quay lại */
   function openResultModal(title, icon, bodyHtml) {
     let modal = document.getElementById('extras-result-modal');
     if (!modal) {
@@ -388,7 +373,6 @@
       try { lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) }); } catch (e) {}
     }
   }
-
 
   let _usersCache = null;
   let _usersCacheAt = 0;
@@ -430,9 +414,8 @@
 
   function sumByDayPeriod(byDay, period) {
     const now = new Date();
-    // So sánh theo ngày lịch (0h local), tránh lệch timezone / nửa ngày
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const weekStart = startOfToday - 6 * 24 * 3600 * 1000; // 7 ngày gồm hôm nay
+    const weekStart = startOfToday - 6 * 24 * 3600 * 1000;
     let sum = 0;
     Object.keys(byDay || {}).forEach(k => {
       const parts = String(k).split('-');
@@ -478,7 +461,6 @@
   }
 
   async function showOwnLeaderboard(period) {
-    // Owned không có breakdown theo tuần — dùng tổng sở hữu; period chỉ là nhãn UI
     const titles = { week: 'TOP SỞ HỮU · TUẦN', month: 'TOP SỞ HỮU · THÁNG', year: 'TOP SỞ HỮU · NĂM' };
     openResultModal(titles[period] || 'TOP SỞ HỮU', 'library', '<div class="xr-empty">Đang tải…</div>');
     const users = await fetchAllUsersLite();
@@ -497,9 +479,6 @@
       '<div class="xr-note">Xếp theo số bài đã mua (tổng)</div><div class="xr-list">' + rows + '</div>');
   }
 
-
-  /* ===== Điểm danh lịch (dương + âm) ===== */
-  // Âm lịch VN — thuật toán Hồ Ngọc Đức (rút gọn)
   function _jdFromDate(dd, mm, yy) {
     const a = Math.floor((14 - mm) / 12);
     const y = yy + 4800 - a;
@@ -674,8 +653,6 @@
         + '</button>';
     }
 
-    
-    // Đủ 6 hàng (42 ô) để grid giãn đều, không trống lệch
     const totalCells = startPad + daysInMonth;
     const need = Math.max(0, 42 - totalCells);
     for (let i = 0; i < need; i++) cells += '<div class="ci-cell empty"></div>';
@@ -716,7 +693,6 @@
 
 
   async function syncUserPartial() {
-    // Dùng pushUserToFirebase (merge an toàn) — không .update() ghi đè listenTime/checkin
     try {
       const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
       if (!name || typeof pushUserToFirebase !== 'function') return;
@@ -745,7 +721,6 @@
     el.style.display = 'block';
   }
 
-  // ----- 51 Keyboard shortcuts -----
   function initHotkeys() {
     document.addEventListener('keydown', (e) => {
       const tag = (e.target && e.target.tagName) || '';
@@ -772,7 +747,6 @@
     });
   }
 
-  // ----- 85 Media Session -----
   function updateMediaSession() {
     if (!('mediaSession' in navigator)) return;
     try {
@@ -792,15 +766,11 @@
     } catch (e) {}
   }
 
-
-
-  // ----- 33 Gift code -----
   async function redeemGiftCode(code) {
     code = String(code || '').trim().toUpperCase().replace(/\s+/g, '').replace(/[.#$\[\]\/]/g, '');
     if (!code) return toast('GIFT', 'Nhập mã', '#ff9800');
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
     if (!user) return toast('GIFT', 'Cần đăng nhập username', '#ff4444');
-    // Key an toàn cho Firebase (tránh . # $ [ ] /)
     const userKey = (typeof sanitizeUsernameKey === 'function' ? sanitizeUsernameKey(user) : String(user).replace(/[.#$\[\]\/]/g, '_'));
     const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || '';
     try {
@@ -820,18 +790,15 @@
       const maxUses = data.maxUses == null ? 1 : Number(data.maxUses); // -1 = vĩnh viễn
       const usedCount = Number(data.usedCount) || 0;
       const usedByMap = (data.usedByMap && typeof data.usedByMap === 'object') ? data.usedByMap : {};
-      // 1 user chỉ nhận 1 lần / mã (username key hoặc uid)
       if (usedByMap[userKey] || usedByMap[user] || (uid && usedByMap[uid])) {
         return toast('GIFT', 'Bạn đã nhận mã này rồi', '#ff9800');
       }
-      // maxUses = 1 kiểu cũ: usedBy string
       if (maxUses === 1 && data.usedBy && String(data.usedBy).trim() && !data.usedByMap) {
         return toast('GIFT', 'Mã đã được dùng bởi ' + data.usedBy, '#ff9800');
       }
       if (maxUses >= 0 && usedCount >= maxUses) {
         return toast('GIFT', 'Mã đã hết lượt dùng (' + usedCount + '/' + maxUses + ')', '#ff9800');
       }
-      // applyLocally=false: tránh lần gọi đầu current=null (cache) làm abort nhầm khi mã vẫn còn lượt
       const result = await new Promise((resolve, reject) => {
         ref.transaction(current => {
           const cur = (current && typeof current === 'object') ? current : (data && typeof data === 'object' ? { ...data } : null);
@@ -855,7 +822,6 @@
         }, false);
       });
       if (!result || !result.committed) {
-        // Đọc lại để báo đúng lý do (không gộp với "Rules chặn")
         try {
           const again = (await ref.once('value')).val() || {};
           const map2 = (again.usedByMap && typeof again.usedByMap === 'object') ? again.usedByMap : {};
@@ -873,7 +839,6 @@
         } catch (e2) {}
         return toast('GIFT', 'Không nhận được mã — thử lại sau', '#ff9800');
       }
-      // Cộng xu local + Firebase
       if (typeof updateCurrentAccount === 'function') {
         updateCurrentAccount(acc => {
           acc.coins = (acc.coins | 0) + coins;
@@ -908,7 +873,6 @@
     }
   }
 
-
   async function applyInvite(code) {
     code = String(code || '').trim();
     const user = typeof getCurrentUsername === 'function' && getCurrentUsername();
@@ -936,9 +900,6 @@
     } catch (e) {}
   }
 
-
-
-  // ----- 84 Night mode -----
   function autoNightMode() {
     const h = new Date().getHours();
     if (h >= 23 || h < 6) {
@@ -948,8 +909,6 @@
     }
   }
 
-
-  // ----- 98 Countdown for scheduled songs -----
   function showPublishCountdown() {
     const songs = window.songs;
     if (!songs) return;
@@ -974,10 +933,6 @@
     el.textContent = 'Sắp ra mắt: ' + (soon.name || soon.id) + ' · ' + h + 'h ' + m + 'm ' + sec + 's';
   }
 
-
-
-
-  // ----- ?song= deep link -----
   function handleDeepLink() {
     const params = new URLSearchParams(location.search);
     if (params.get('checkin') === '1') {
@@ -998,8 +953,6 @@
     }
   }
 
-
-  /* ===== Đếm ngược sự kiện (admin cấu hình) ===== */
   let _cdTimer = null;
   function stopCountdownTimer() {
     if (_cdTimer) { clearInterval(_cdTimer); _cdTimer = null; }
@@ -1070,7 +1023,6 @@
     if (!root) return false;
     const left = cfg.at - Date.now();
     const done = left <= 0;
-    // Đã đến giờ → khóa 00, không đếm tiếp (tránh đếm âm / đếm ngược sau sự kiện)
     const remain = done ? 0 : left;
     const days = Math.floor(remain / 86400000);
     const hours = Math.floor((remain % 86400000) / 3600000);
@@ -1119,7 +1071,6 @@
     }
   }
 
-  /* ===== Top bài theo tuần (mỗi tuần 1 bảng riêng + khoảng ngày) ===== */
   function parseWeekKey(key) {
     const m = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
     if (!m) return null;
@@ -1153,7 +1104,6 @@
   }
   function weekStatusLabel(key, curKey) {
     if (key === curKey) return 'Đang diễn ra';
-    // key dạng 2026-09-W4 — so sánh chuỗi đủ để biết tuần đã qua
     if (curKey && key < curKey) return 'Đã kết thúc';
     if (curKey && key > curKey) return 'Sắp tới';
     return '';
@@ -1170,7 +1120,7 @@
         const v = val[k] || {};
         const key = v.key || k;
         const range = weekDateRangeFromKey(key);
-        const label = weekLabelFromKey(key); // luôn build lại để có khoảng ngày mới
+        const label = weekLabelFromKey(key);
         return {
           key,
           label,
@@ -1179,7 +1129,6 @@
           updatedAt: Number(v.updatedAt) || 0
         };
       });
-      // luôn thêm tuần hiện tại nếu chưa có (bảng riêng khi sang tuần mới)
       if (cur && !list.some(x => x.key === cur)) {
         list.push({
           key: cur,
@@ -1315,7 +1264,6 @@
     });
   }
 
-  /* ===== Liên kết (admin cấu hình) ===== */
   async function loadPartnerLinks() {
     try {
       const db = typeof getDb === 'function' ? getDb() : null;
@@ -1377,11 +1325,6 @@
     }
   }
 
-  // ----- Extras panel UI -----
-
-
-
-  
   function formatListenDuration(sec) {
     sec = Math.max(0, Math.floor(Number(sec) || 0));
     const h = Math.floor(sec / 3600);
@@ -1396,11 +1339,9 @@
     const acc = getAcc();
     if (!acc || !acc.listenTime) return 0;
     const byDay = (acc.listenTime.byDay && typeof acc.listenTime.byDay === 'object') ? acc.listenTime.byDay : {};
-    // Dùng chung logic với leaderboard
     return sumByDayPeriod(byDay, period);
   }
 
-  /** Tổng nghe: ưu tiên max(total field, tổng byDay) — tránh số 0 sai khi total chưa sync */
   function getListenTotalSec() {
     const acc = getAcc();
     if (!acc || !acc.listenTime) return 0;
@@ -1470,7 +1411,6 @@
       const songs = window.songs || [];
       const sorted = [...songs].sort((a, b) => (Number(b.listenCount) || 0) - (Number(a.listenCount) || 0));
       const top = sorted.slice(0, 10);
-      // period chỉ còn alltime (và alias cũ week/month/year) — luôn là tổng lượt nghe
       let rows = '';
       if (!top.length) {
         rows = '<div class="xr-empty">Chưa có dữ liệu lượt nghe</div>';
@@ -1617,7 +1557,6 @@
             ev.stopPropagation();
             const wrap = btn.closest('.chat-msg');
             const uname = btn.getAttribute('data-chat-user') || '';
-            // Hiện / ẩn thời gian gửi
             const timeEl = wrap && wrap.querySelector('.chat-msg-time');
             if (timeEl) {
               const open = timeEl.hasAttribute('hidden');
@@ -1625,13 +1564,11 @@
               else timeEl.setAttribute('hidden', '');
               btn.classList.toggle('time-open', open);
             }
-            // Chèn @username vào ô nhập (tag)
             if (uname && uname !== '?') {
               const input = $('global-chat-input');
               if (input) {
                 const tag = '@' + uname;
                 const cur = String(input.value || '');
-                // Không chèn trùng nếu đã có tag đó ở cuối
                 if (!new RegExp('@' + uname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(cur)) {
                   input.value = (cur.replace(/\s+$/, '') + (cur.trim() ? ' ' : '') + tag + ' ').replace(/^\s+/, '');
                 }
@@ -1674,7 +1611,6 @@
     const rank = (acc.rank || 'member').toLowerCase();
     const isAdmin = rank === 'admin' || rank === 'owner' || rank === 'mod';
 
-    // Admin mute commands
     if (isAdmin && text.startsWith('/')) {
       const parts = text.split(/\\s+/);
       const cmd = (parts[0] || '').toLowerCase();
@@ -1738,7 +1674,6 @@
     }
   }
 
-
   function boot() {
     ensureExtrasUi();
     applyBanner();
@@ -1753,15 +1688,12 @@
     setInterval(showPublishCountdown, 1000);
     setInterval(autoNightMode, 60000);
     setInterval(flashBadge, 30000);
-    // Media session on song change
     const audio = document.querySelector('audio');
     if (audio) {
       audio.addEventListener('play', updateMediaSession);
       audio.addEventListener('loadedmetadata', updateMediaSession);
     }
-    // Hook profile on successful login
     const _orig = window.loginWithUsername;
-    // save profile when username set
     setInterval(() => {
       updateXpUi();
       }, 5000);

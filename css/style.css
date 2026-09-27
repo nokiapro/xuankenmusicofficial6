@@ -17,7 +17,6 @@
     --song-item-hover: rgba(0, 0, 0, 0.04);
     --input-bg: #fafafa;
     --modal-bg: rgba(255, 255, 255, 0.98);
-    /* Gradient icon như music2 */
     --icon-gradient: linear-gradient(135deg, #ff0040, #8c00ff, #ff0040);
     --icon-gradient-hover: linear-gradient(135deg, #ff6b6b, #c2185b, #ff6b6b);
     --icon-gradient-active: linear-gradient(135deg, #ff0040, #ffd700, #ff0040);
@@ -44,7 +43,6 @@ body.dark {
     --icon-gradient: linear-gradient(135deg, #ffd89b, #c7e9fb, #ffd89b);
     --icon-gradient-hover: linear-gradient(135deg, #fbc2eb, #a6c1ee, #fbc2eb);
     --icon-gradient-active: linear-gradient(135deg, #ffd89b, #ff6b6b, #ffd89b);
-    /* Lucide active ~ màu cam hồng như music2 (gradient active) */
     --icon-active-stroke: #ff6b6b;
 }
 
@@ -54,7 +52,6 @@ body.dark {
     box-sizing: border-box;
 }
 
-/* Lucide icons styling - icon nhỏ gọn hơn cho vừa nút */
 i[data-lucide],
 .btn-icon svg,
 .notification-icon svg,
@@ -112,7 +109,6 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Tắt transition khi đổi theme để tránh nháy nút (giữ nguyên animation của notification) */
 body.no-transition,
 body.no-transition *:not(.notification):not(.notification *) {
     transition: none !important;
@@ -169,7 +165,6 @@ body.dark .player-container {
     .player-container { width: 450px; }
 }
 
-/* Wrapper layout – mobile: stack như cũ */
 .pc-layout {
     display: flex;
     flex-direction: column;
@@ -179,7 +174,7 @@ body.dark .player-container {
     position: relative;
 }
 .pc-left {
-    display: contents; /* top-bar + playlist giữ behavior overlay trên mobile */
+    display: contents;
 }
 .pc-right {
     display: contents;
@@ -275,13 +270,11 @@ body.dark .player-container {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* SVG không chặn sự kiện click / animation của nút */
 .btn-icon svg {
     pointer-events: none;
     flex-shrink: 0;
 }
 
-/* Gradient chạy trên icon FA (và text) như music2 */
 .btn-icon i,
 .play-btn i,
 #repeat-btn i {
@@ -316,7 +309,6 @@ body.dark .player-container {
     animation: gradientShift 1s ease infinite;
 }
 
-/* Lucide SVG — màu rõ trên cả light/dark */
 .btn-icon svg {
     stroke: #444444;
     color: #444444;
@@ -338,7 +330,6 @@ body.dark .btn-icon:hover svg {
     color: #ffffff;
 }
 
-/* Icon đang BẬT — giống music2: nền btn-active + animation đổi màu (Lucide SVG) */
 .btn-icon.active {
     background: var(--btn-active-bg) !important;
     box-shadow: none;
@@ -357,7 +348,6 @@ body.dark .btn-icon.active svg {
     animation: iconActiveShiftDark 1s ease infinite !important;
 }
 
-/* Play đang phát */
 .play-btn.playing {
     background: var(--btn-active-bg) !important;
     box-shadow: none;
@@ -375,7 +365,6 @@ body.dark .play-btn.playing svg {
     animation: iconActiveShiftDark 1s ease infinite !important;
 }
 
-/* music2: gradientShift trên FA; Lucide dùng đổi stroke giữa 2 đầu gradient active */
 @keyframes gradientShift {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -411,7 +400,6 @@ body.dark .play-btn.playing svg {
     height: 100%;
 }
 
-/* Hover chỉ khi chuột thật (tránh hover “dính” trên cảm ứng trông như đang ấn) */
 @media (hover: hover) and (pointer: fine) {
     .btn-icon:hover {
         transform: scale(1.08);
@@ -449,13 +437,11 @@ body.dark .play-btn.playing svg {
     }
 }
 
-/* Chỉ khi thật sự nhấn mới thu nhỏ — không dùng trên :hover */
 .btn-icon:active {
     transform: scale(0.92);
 }
 
 .play-btn {
-    /* Giống các nút khác, chỉ hơi to hơn một chút */
     width: 50px;
     height: 50px;
     transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
@@ -528,7 +514,7 @@ body.dark .album-art {
 .song-info-main {
     width: 100%;
     max-width: 100%;
-    overflow: hidden; /* chặn scrollbar ngang khi tên bài dài */
+    overflow: hidden;
     min-width: 0;
 }
 
@@ -540,7 +526,7 @@ body.dark .album-art {
     letter-spacing: 0px;
     margin-bottom: 8px;
     white-space: nowrap;
-    overflow: hidden; /* ẩn scrollbar ngang, vẫn co chữ bằng JS */
+    overflow: hidden;
     text-overflow: clip;
     cursor: default;
     max-width: 100%;
@@ -715,7 +701,6 @@ body.dark .album-art {
     background: var(--playlist-bg);
     z-index: 150;
     transform: translateY(-105%);
-    /* Đóng: chậm hơn */
     transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear 0.52s;
     display: flex;
@@ -730,7 +715,6 @@ body.dark .album-art {
     transform: translateY(0);
     visibility: visible;
     pointer-events: auto;
-    /* Mở: nhanh vừa */
     transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
                 visibility 0s linear 0s;
 }
@@ -847,7 +831,6 @@ body.dark .album-art {
     min-height: 0;
 }
 
-/* Footer thống kê danh sách bài hát */
 .playlist-stats-footer {
     display: flex;
     align-items: center;
@@ -999,7 +982,6 @@ body.dark .song-item.active {
     color: #8c00ff;
 }
 
-/* Dòng nghệ sĩ + icon mic */
 .song-artist-line {
     display: flex;
     align-items: center;
@@ -1122,7 +1104,6 @@ body.dark .song-item.active {
     transform: translateY(-100%);
     visibility: hidden;
     pointer-events: none;
-    /* Đóng: chậm hơn */
     transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear 0.52s,
                 background 0.3s ease;
@@ -1138,7 +1119,6 @@ body.dark .song-item.active {
     transform: translateY(0);
     visibility: visible;
     pointer-events: auto;
-    /* Mở: nhanh vừa */
     transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
                 visibility 0s linear 0s,
                 background 0.3s ease;
@@ -1278,7 +1258,6 @@ body.dark .song-item.active {
     transition: all 0.25s;
     background: var(--input-bg);
     color: var(--text-primary);
-    /* Ẩn mũi tên tăng/giảm (spinner) của input number */
     -moz-appearance: textfield;
     appearance: textfield;
 }
@@ -1365,7 +1344,6 @@ body.dark .song-item.active {
     border-radius: 50px;
 }
 
-/* Active hẹn giờ = cùng nền với nút xáo trộn / repeat */
 #open-timer-btn.active {
     background: var(--btn-active-bg) !important;
     color: var(--text-primary) !important;
@@ -1398,7 +1376,6 @@ body.dark #open-timer-btn.active svg {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    /* Đóng: chậm hơn */
     transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.45s ease,
                 visibility 0s linear 0.52s;
@@ -1412,7 +1389,6 @@ body.dark #open-timer-btn.active svg {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    /* Mở: nhanh vừa */
     transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
                 opacity 0.32s ease,
                 visibility 0s linear 0s;
@@ -1817,7 +1793,6 @@ body.dark .hint-decoration {
     .hint-decoration { font-size: 0.7rem; bottom: 25px; }
 }
 
-/* Toast giống music2 */
 .notification {
     position: fixed;
     top: 0;
@@ -1905,7 +1880,6 @@ body.dark .hint-decoration {
     -webkit-text-fill-color: transparent;
 }
 
-/* Sao FA trong toast (giống music2) — ::before không ăn background-clip nên set màu riêng */
 .notification-message i.fa-star,
 .notification-message .fa-star {
     font-size: 0.95em;
@@ -1980,7 +1954,6 @@ body.dark .notification-message span[style*="background-clip"] {
     }
 }
 
-/* ========== CỬA HÀNG XK ========== */
 .shop-modal {
     position: absolute;
     top: 0;
@@ -1993,7 +1966,6 @@ body.dark .notification-message span[style*="background-clip"] {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    /* Đóng: chậm hơn — áp dụng cả extras / shop / chat / checkin / badges / result */
     transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.45s ease,
                 visibility 0s linear 0.52s;
@@ -2008,13 +1980,11 @@ body.dark .notification-message span[style*="background-clip"] {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    /* Mở: nhanh vừa */
     transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
                 opacity 0.32s ease,
                 visibility 0s linear 0s;
 }
 
-/* Panel lồng trong Tiện ích: z-index cao hơn panel cha để slide đè lên */
 .shop-modal.badges-modal,
 .shop-modal.extras-result-modal,
 .shop-modal.chat-modal,
@@ -2147,7 +2117,6 @@ body.dark .notification-message span[style*="background-clip"] {
     line-height: 1.2;
 }
 
-/* Rank badges */
 .rank-badge {
     display: inline-flex;
     align-items: center;
@@ -2399,7 +2368,6 @@ body.dark .notification-message span[style*="background-clip"] {
     letter-spacing: 0.3px;
 }
 
-/* Username gate */
 .username-form {
     display: flex;
     flex-direction: column;
@@ -2456,8 +2424,6 @@ body.dark .username-input::placeholder {
     box-shadow: 0 0 0 3px rgba(140,0,255,0.25), 0 8px 24px rgba(0,0,0,0.12);
 }
 
-
-/* PIN boxes — giống upload.xuanken.name.vn, chỉ 6 số */
 .pin-boxes {
     display: flex;
     gap: 6px;
@@ -2632,7 +2598,6 @@ body.dark .admin-link-hint {
     box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
 }
 
-/* Badge user + xu — căn cao bằng hàng icon trên */
 .user-badge {
     position: absolute;
     top: 15px;
@@ -2676,7 +2641,6 @@ body.dark .user-badge {
     max-width: 140px;
 }
 
-/* ===== Extras pack ===== */
 .site-banner {
   position: fixed; top: 0; left: 0; right: 0; z-index: 9990;
   background: linear-gradient(90deg, #ff0040, #8c00ff);
@@ -2693,10 +2657,6 @@ body.dark .user-badge {
   padding: 6px 10px; border-radius: 999px; box-shadow: 0 4px 14px rgba(255,0,64,0.4);
 }
 
-
-
-
-
 .user-xp-badge {
   font-size: 0.72rem; color: #c4b5fd; margin-bottom: 8px; display: none;
 }
@@ -2708,12 +2668,10 @@ body.dark .user-badge {
 .extras-row button, .extras-actions button, 
 .extras-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
-
 @keyframes reactUp {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(-120px) scale(1.4); }
 }
-
 
 .drop-countdown {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 72px; z-index: 9950;
@@ -2721,22 +2679,13 @@ body.dark .user-badge {
   padding: 6px 12px; border-radius: 999px; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
 }
 
-
-
 body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
-
-
-
-
-
-/* extras panel */
 
 @keyframes extrasIn {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Extras modal (same shell as shop) */
 .extras-modal-body {
     flex: 1;
     overflow-y: auto;
@@ -2826,7 +2775,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     stroke-width: 2;
 }
 
-
 .user-xp-badge {
     font-size: 0.78rem;
     color: var(--text-secondary);
@@ -2837,7 +2785,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     text-align: center;
     font-weight: 700;
 }
-/* hide old floating extras */
 
 .shop-tab-bar {
   display: flex;
@@ -2981,7 +2928,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   box-shadow: none !important;
 }
 
-/* extras scrollbar = playlist */
 .extras-modal-body::-webkit-scrollbar,
 .extras-result::-webkit-scrollbar,
 .global-chat-box::-webkit-scrollbar {
@@ -3033,8 +2979,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   opacity: 0.9;
 }
 
-
-/* ===== Huy hiệu / Chat modal (trong khung player như shop) ===== */
 .badges-modal-body,
 .chat-modal-body {
   flex: 1;
@@ -3104,7 +3048,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .badge-got-tag { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
 .badge-lock-tag { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
 
-/* ===== Shop thumb lazy GIF ===== */
 .shop-thumb-preview {
   width: 44px;
   height: 44px;
@@ -3141,16 +3084,10 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .shop-thumb-preview.loaded .thumb-play-icon,
 .shop-thumb-preview.loaded .thumb-placeholder { display: none; }
 
-
-/* ========== Scrollbar 7 màu — đúng music2 ==========
-   QUAN TRỌNG: KHÔNG dùng scrollbar-width / scrollbar-color trên Chrome
-   (Chrome mới sẽ bỏ hẳn ::-webkit-scrollbar → mất CSS custom).
-*/
 :root {
   --xk-scroll-grad: linear-gradient(-45deg, #f1b586, #9f81ca, #c20175, #b33cea, #17adca, #dd4809, #ad9199);
 }
 
-/* Chỉ Firefox mới dùng scrollbar-width (không hỗ trợ webkit pseudo) */
 @supports not selector(::-webkit-scrollbar) {
   #playlist-content,
   #my-playlist-content,
@@ -3170,7 +3107,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   }
 }
 
-/* WebKit / Chrome / Edge / Safari — custom scrollbar 7 màu */
 #playlist-content::-webkit-scrollbar,
 #my-playlist-content::-webkit-scrollbar,
 .shop-list::-webkit-scrollbar,
@@ -3218,7 +3154,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   border-radius: 50px;
 }
 
-/* ===== Result modal (Top / Review / Thời gian) ===== */
 .extras-result-modal-body {
   flex: 1;
   min-height: 0;
@@ -3366,8 +3301,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   line-height: 1.3;
 }
 
-
-/* Compact rank buttons — không scrollbar trong section */
 .extras-rank-compact {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
@@ -3388,8 +3321,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   line-height: 1.15;
 }
 
-
-/* ===== Điểm danh lịch — modern glass ===== */
 .checkin-modal.shop-modal {
   display: flex;
   flex-direction: column;
@@ -3415,7 +3346,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   box-sizing: border-box;
 }
 
-/* Header card */
 .ci-head {
   flex-shrink: 0;
   text-align: center;
@@ -3503,7 +3433,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   line-height: 1.35;
 }
 
-/* Week labels */
 .ci-week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -3522,7 +3451,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .ci-wd:last-child { color: rgba(248,113,113,0.75); }
 
-/* Day grid — fill remaining height */
 .ci-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -3572,7 +3500,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .ci-cell.empty::before { display: none; }
 
-/* Done — emerald glass */
 .ci-cell.done {
   border-color: rgba(74, 222, 128, 0.55);
   background: linear-gradient(160deg, rgba(74,222,128,0.28) 0%, rgba(16,185,129,0.1) 100%);
@@ -3589,13 +3516,11 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   z-index: 1;
 }
 
-/* Miss — soft coral */
 .ci-cell.miss {
   border-color: rgba(248, 113, 113, 0.5);
   background: linear-gradient(160deg, rgba(248,113,113,0.18) 0%, rgba(239,68,68,0.06) 100%);
 }
 
-/* Future */
 .ci-cell.future {
   opacity: 0.32;
   border-color: rgba(255,255,255,0.04);
@@ -3603,7 +3528,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .ci-cell.future::before { opacity: 0.2; }
 
-/* Today — violet pulse ring */
 .ci-cell.today {
   border-color: rgba(192, 132, 252, 0.7);
   background: linear-gradient(160deg, rgba(192,132,252,0.32) 0%, rgba(140,0,255,0.12) 100%);
@@ -3658,7 +3582,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 .ci-cell.today .ci-solar { color: #f3e8ff; }
 .ci-cell.today .ci-lunar { color: rgba(233, 213, 255, 0.55); }
 
-/* Footer streak bar */
 .ci-streak {
   flex-shrink: 0;
   display: flex;
@@ -3720,14 +3643,11 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 }
 .ci-streak-meta i { font-size: 0.65rem; }
 
-/* Ensure top/time use compact */
 .extras-rank-compact {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
-
-/* ===== Extras feature buttons highlight ===== */
 .extras-feat-btn {
   background: linear-gradient(145deg, rgba(140,0,255,0.12), rgba(255,0,64,0.08)) !important;
   border-color: rgba(140,0,255,0.22) !important;
@@ -3737,7 +3657,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   box-shadow: 0 4px 18px rgba(140,0,255,0.18);
 }
 
-/* ===== Đếm ngược sự kiện ===== */
 .cd-wrap {
   display: flex;
   flex-direction: column;
@@ -3892,7 +3811,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   font-weight: 800;
 }
 
-/* ===== Top tuần archive ===== */
 .wk-list {
   display: flex;
   flex-direction: column;
@@ -3987,7 +3905,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   height: 16px !important;
 }
 
-/* ===== Liên kết ===== */
 .lk-grid {
   display: flex;
   flex-direction: column;
@@ -4050,8 +3967,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
   height: 18px !important;
 }
 
-
-/* ========== PC LAYOUT: 2 cột ========== */
 @media (min-width: 900px) {
     body {
         padding: 20px;
@@ -4067,12 +3982,10 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         border-radius: 28px;
         display: flex;
         flex-direction: column;
-        /* header row height dùng chung cho trái (playlist) + phải (top-bar) */
         --pc-header-h: 58px;
         transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
                     max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    /* 2 cột (playlist hoặc panel trái) → 900px */
     .player-container:has(.pc-layout.playlist-open),
     .player-container:has(#my-playlist-overlay.active),
     .player-container:has(.shop-modal.show),
@@ -4082,7 +3995,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         max-width: 900px !important;
     }
 
-    /* Mặc định 1 cột (chỉ player). Có class playlist-open → 2 cột */
     .pc-layout {
         display: grid !important;
         grid-template-columns: 0fr 1fr;
@@ -4096,7 +4008,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         grid-template-columns: 1fr 1fr;
     }
 
-    /* Keyframes: slide + blur từ phải */
     @keyframes slideInRightBlur {
         0% {
             transform: translateX(60px);
@@ -4127,7 +4038,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .element-out-right-blur {
         animation: slideOutRightBlur 0.6s ease-in 0s forwards;
     }
-    /* Panel trái (playlist của tôi / shop / timer / listen) cũng chiếm nửa trái */
     .player-container:has(#my-playlist-overlay.active) .pc-layout,
     .player-container:has(.shop-modal.show) .pc-layout,
     .player-container:has(.timer-modal.show) .pc-layout,
@@ -4162,7 +4072,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         min-width: 0;
     }
 
-    /* Top-bar icons trên cột phải – cùng chiều cao header trái */
     .pc-right .top-bar-icons {
         position: relative !important;
         top: auto !important;
@@ -4183,7 +4092,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         border-bottom: 1px solid var(--border-color);
     }
 
-    /* Playlist PC: ẩn mặc định; hiện/ẩn bằng slideInRightBlur / slideOutRightBlur */
     .pc-left .playlist {
         position: relative !important;
         top: auto !important;
@@ -4207,16 +4115,15 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-left .playlist.element-in-right-blur {
         visibility: visible !important;
         pointer-events: auto !important;
-        animation: slideInRightBlur 0.6s ease-out 0s forwards;
+        animation: slideInRightBlur 0.8s ease-out 0s forwards;
     }
 
     .pc-left .playlist.element-out-right-blur {
         visibility: visible !important;
         pointer-events: none;
-        animation: slideOutRightBlur 0.6s ease-in 0s forwards;
+        animation: slideOutRightBlur 0.8s ease-in 0s forwards;
     }
 
-    /* Sau khi slide-in xong, giữ trạng thái hiện */
     .pc-layout.playlist-open .pc-left .playlist.active:not(.element-out-right-blur) {
         opacity: 1;
         transform: translateX(0);
@@ -4225,7 +4132,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         pointer-events: auto !important;
     }
 
-    /* Header playlist = cùng chiều cao top-bar */
     .pc-left .playlist-header {
         flex-shrink: 0;
         border-radius: 0;
@@ -4237,7 +4143,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         align-items: center;
     }
 
-    /* Hiện nút đóng playlist trên PC (user có thể ẩn tay) */
     .pc-left .close-playlist {
         visibility: visible;
         pointer-events: auto;
@@ -4250,7 +4155,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Cột phải: art + lyric + controls */
     .pc-right .header-section {
         flex: 1;
         min-height: 0;
@@ -4285,15 +4189,10 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         background: transparent;
     }
 
-    /* Hiện nút list trên PC để mở/đóng tay danh sách */
     #list-btn {
         display: flex !important;
     }
 
-    /*
-     * Panel từ top-bar: thay thế vùng danh sách bài (nửa trái),
-     * không che cột phải. Nền đặc, không blur.
-     */
     #my-playlist-overlay.playlist,
     .shop-modal,
     .timer-modal,
@@ -4316,7 +4215,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         overflow: hidden;
         display: flex !important;
         flex-direction: column;
-        /* Đóng chậm hơn */
         transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1),
                     opacity 0.45s ease,
                     visibility 0s linear 0.52s !important;
@@ -4330,13 +4228,11 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         visibility: visible !important;
         pointer-events: auto !important;
         opacity: 1 !important;
-        /* Mở nhanh vừa */
         transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1),
                     opacity 0.32s ease,
                     visibility 0s linear 0s !important;
     }
 
-    /* Panel con trong Tiện ích (badges, kết quả, chat, checkin) cũng nửa trái + animation */
     .shop-modal.badges-modal,
     .shop-modal.extras-result-modal,
     .shop-modal.chat-modal,
@@ -4344,7 +4240,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         z-index: 270 !important;
     }
 
-    /* Header trong các panel cũng cùng chiều cao */
     #my-playlist-overlay .playlist-header,
     .shop-modal-header,
     .timer-modal-header,
@@ -4358,7 +4253,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         align-items: center;
     }
 
-    /* Ẩn danh sách bài khi đang mở panel khác */
     .player-container:has(#my-playlist-overlay.active) .pc-left .playlist,
     .player-container:has(.shop-modal.show) .pc-left .playlist,
     .player-container:has(.timer-modal.show) .pc-left .playlist,
@@ -4367,7 +4261,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         pointer-events: none !important;
     }
 
-    /* Timer overlay: không dùng blur full-screen trên PC (tránh lỗi mờ) */
     .timer-overlay,
     .timer-overlay.show {
         display: none !important;
@@ -4377,7 +4270,6 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         background: transparent !important;
     }
 
-    /* Timer modal: nội dung cuộn trong nửa trái */
     .timer-modal {
         z-index: 260 !important;
     }
@@ -4388,5 +4280,3 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         -webkit-overflow-scrolling: touch;
     }
 }
-
-

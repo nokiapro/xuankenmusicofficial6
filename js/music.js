@@ -14,21 +14,13 @@ let wakeLock = null;
 let isLoopingHandled = false;
 let listenInterval = null;
 let songs = [];
-/** Nguồn cộng lượt nghe: play | loop | next... */
 let currentSource = 'play';
-/** Interval tự refresh list bài từ Firebase */
 let autoRefreshInterval = null;
-/** Timeout ẩn toast notification */
 let notificationTimeout = null;
-/** Đang refresh list bài (tránh chồng request) */
 let isRefreshing = false;
-/** Chờ play sau khi load xong list */
 let pendingPlayAfterLoad = false;
-/** User đã tương tác (gesture) — cho phép autoplay */
 let hasUserInteracted = false;
-/** ID bài đang khóa demo 60s */
 let demoLockedSongId = null;
-/** Lần fetch listenCount gần nhất */
 let lastListenFetch = 0;
 const LISTEN_FETCH_INTERVAL = 15000;
 
@@ -44,7 +36,6 @@ const playlistOverlay = document.getElementById('playlist');
 const songTitleEl = document.getElementById('current-title');
 const artistNameEl = document.getElementById('current-artist');
 
-/** PC (≥900px) */
 function isPcLayout() {
     return typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches;
 }
@@ -52,18 +43,12 @@ function isPcPlaylistOpen() {
     const layout = document.querySelector('.pc-layout');
     return !!(layout && layout.classList.contains('playlist-open'));
 }
-/**
- * Auto playlist PC:
- * - Hiện khi còn ≤10s cuối bài A
- * - Giữ nguyên qua hết A sang bài B
- * - Đến khi bài B chạy được ≥10s thì mới ẩn
- */
-let pcPlaylistPhase = 'idle'; // idle | showing_end_of_a | waiting_10s_of_b
-let pcPlaylistTriggerIndex = -1; // index bài A (bài kích hoạt hiện)
-let pcPlaylistNextIndex = -1;    // index bài B (bài sau A)
+
+let pcPlaylistPhase = 'idle';
+let pcPlaylistTriggerIndex = -1;
+let pcPlaylistNextIndex = -1;
 let pcPlaylistAutoHideTimer = null;
 
-/** Hiện danh sách PC: slideInRightBlur 0.6s */
 function showPcPlaylist() {
     if (!isPcLayout() || !playlistOverlay) return;
     const layout = document.querySelector('.pc-layout');
@@ -71,22 +56,17 @@ function showPcPlaylist() {
     try {
         if (typeof renderPlaylist === 'function') renderPlaylist();
     } catch (e) {}
-    // Bỏ class animation cũ
     playlistOverlay.classList.remove('element-out-right-blur');
-    // Mở cột + chạy animation slide in + blur
     playlistOverlay.classList.add('active');
     layout.classList.add('playlist-open');
-    // Force reflow để animation chạy lại nếu mở lần 2
     void playlistOverlay.offsetWidth;
     playlistOverlay.classList.add('element-in-right-blur');
     if (typeof refreshModalIcons === 'function') refreshModalIcons(playlistOverlay);
-    // Sau animation 0.6s → cuộn mượt tới bài đang phát
     setTimeout(() => {
         try { if (typeof scrollToActiveTop === 'function') scrollToActiveTop('smooth'); } catch (e) {}
     }, 650);
 }
 
-/** Ẩn danh sách PC: slideOutRightBlur 0.6s rồi mới thu cột */
 function hidePcPlaylist() {
     if (!isPcLayout()) return;
     if (pcPlaylistAutoHideTimer) {
@@ -101,7 +81,6 @@ function hidePcPlaylist() {
         pcPlaylistNextIndex = -1;
         return;
     }
-    // Đang ẩn rồi thì thôi
     if (!layout.classList.contains('playlist-open') && !playlistOverlay.classList.contains('element-in-right-blur')) {
         pcPlaylistPhase = 'idle';
         pcPlaylistTriggerIndex = -1;
@@ -123,16 +102,12 @@ function hidePcPlaylist() {
         pcPlaylistNextIndex = -1;
     };
     playlistOverlay.addEventListener('animationend', onEnd);
-    // Fallback nếu animationend không fire
     setTimeout(onEnd, 700);
 }
 
-/** Giữ tương thích chỗ gọi cũ */
 function ensurePcPlaylistOpen() {
-    /* no-op */
 }
 
-// Dữ liệu trên Firebase Realtime Database + Auth (js/firebase-config.js)
 function getDb() {
     return window.fbDB || (typeof firebase !== 'undefined' ? firebase.database() : null);
 }
@@ -144,13 +119,11 @@ function getAuth() {
 function getCurrentUid() {
     const a = getAuth();
     if (!a || !a.currentUser || !a.currentUser.uid) return '';
-    // Chỉ trả UID player (@xuanken.user). Phiên admin trên app default không dùng cho player.
     const email = String(a.currentUser.email || '').toLowerCase();
     if (email && !email.endsWith('@xuanken.user')) return '';
     return a.currentUser.uid;
 }
 
-/** Nếu default Auth đang là email admin (do bản cũ), signOut để không lẫn UID thành viên */
 function ensurePlayerAuthOnly() {
     try {
         const a = getAuth();
@@ -163,7 +136,6 @@ function ensurePlayerAuthOnly() {
     } catch (e) {}
 }
 
-/** Email synthetic cho Firebase Auth — username + PIN = email/password */
 function usernameToEmail(username) {
     const key = sanitizeUsernameKey(username).toLowerCase();
     return key + '@xuanken.user';
@@ -182,7 +154,6 @@ function authErrorMessage(err) {
     return (err && (err.message || err.code)) || 'Đăng nhập thất bại';
 }
 
-// ===== Storage keys & multi-site prefix helpers (định nghĩa sớm) =====
 const STORAGE_ACCOUNTS = 'xuanken_accounts';
 const STORAGE_CURRENT_USER = 'xuanken_current_user';
 const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
@@ -190,27 +161,17 @@ const STORAGE_SONG_PRICES = 'xuanken_song_prices';
 const STORAGE_LISTENS = 'xuanken_listens';
 const STORAGE_THEME = 'xuanken_theme';
 const STORAGE_DEVICE_ID = 'xuanken_device_id';
-/** Nhớ đã xác nhận PIN trên máy này (hết hạn 7 ngày) */
 const STORAGE_PIN_TRUST = 'xuanken_pin_trust';
 const PIN_TRUST_MS = 7 * 24 * 60 * 60 * 1000;
 
 const DEFAULT_ADMIN_SETTINGS = {
-    adminPassword: 'xuanken2024',
-    songPrice: 10,
-    checkinReward: 15,
-    starterCoins: 20,
     siteName: 'XuanKen Music Official',
     siteTitle: 'XuanKen Music Official',
     siteIcon: 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/icon.png',
-    // Chỉ dùng cho localStorage (vd music6_xuanken_accounts) — Firebase luôn ở root
     sitePrefix: 'music6',
-    /** Bắt buộc nhập PIN khi vào player */
     requirePin: true,
-    /** Cho phép tạo username mới từ màn hình đầu */
     allowRegister: true,
-    /** Số lần đăng ký tối đa (0 = không giới hạn) */
     maxRegistrations: 0,
-    /** Đã đăng ký bao nhiêu tài khoản (tự tăng khi đăng ký mới) */
     registrationCount: 0,
     siteBanner: '',
     flashSalePercent: 0,
@@ -232,17 +193,11 @@ function saveAdminSettings(settings) {
     localStorage.setItem(STORAGE_ADMIN_SETTINGS, JSON.stringify({ ...DEFAULT_ADMIN_SETTINGS, ...settings }));
 }
 
-/**
- * Key localStorage theo sitePrefix (vd music6_xuanken_accounts).
- * Settings (STORAGE_ADMIN_SETTINGS) cố ý KHÔNG prefix — chứa sitePrefix để các key khác biết dùng prefix nào.
- * sitePrefix CHỈ ảnh hưởng localStorage, KHÔNG ảnh hưởng Firebase (Firebase luôn root).
- */
 function storageKey(base) {
     const p = String((getAdminSettings().sitePrefix || '')).trim().replace(/^\/+|\/+$/g, '');
     return p ? `${p}_${base}` : base;
 }
 
-/** Đường dẫn Firebase — luôn root (songs, users, prices...). sitePrefix không còn dùng cho Firebase. */
 function dataPath(key) {
     return String(key || '').replace(/^\/+|\/+$/g, '');
 }
@@ -265,10 +220,8 @@ function applyBranding() {
     }
 }
 
-// Helper đổi icon Lucide mà không phá animation của nút
 function setLucideIcon(container, iconName) {
     if (!container) return;
-    // Giữ nguyên container (btn), chỉ thay nội dung icon bên trong
     container.innerHTML = `<i data-lucide="${iconName}"></i>`;
     if (typeof lucide !== 'undefined') {
         lucide.createIcons({ nodes: [container] });
@@ -333,8 +286,6 @@ function hidePlayerLoading() {
 }
 
 function generateDataHash(data) {
-    // Chỉ hash cấu trúc bài (id + link audio) — KHÔNG gồm listenCount
-    // để tránh checkForUpdates coi "có người nghe" là đổi data rồi seek audio → giật nhạc
     if (!data || !data.length) return null;
     return JSON.stringify(data.map(s => ({
         id: s.id,
@@ -377,7 +328,6 @@ function songsObjectToArray(obj) {
         if (Number.isNaN(t)) return true;
         return Date.now() >= t;
       });
-    // Sắp xếp theo bảng chữ cái (tên bài)
     list.sort((a, b) => {
         const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
         if (na !== 0) return na;
@@ -386,7 +336,6 @@ function songsObjectToArray(obj) {
     return list;
 }
 
-/** Danh sách link full (đã mua/thuê) — random + fallback */
 function getFullAudioCandidates(song) {
     if (!song) return [];
     const list = [];
@@ -423,12 +372,6 @@ function pickFullAudioUrl(song, preferOtherThan) {
     return cands[Math.floor(Math.random() * cands.length)];
 }
 
-/**
- * Link phát ổn định:
- * - Đã mua/thuê: giữ nguyên link FULL đã chọn cho bài (không random lại mỗi lần gọi)
- * - Chưa mua: demo
- * Random chỉ khi lần đầu chọn link full cho bài đó.
- */
 function getPlayableAudio(song) {
     if (!song) return '';
     if (isSongOwned(song.id)) {
@@ -439,7 +382,6 @@ function getPlayableAudio(song) {
         if (sticky && cands.some(c => isSameAudioSrc(c, sticky))) {
             return sticky;
         }
-        // Nếu audio đang phát đúng 1 candidate → giữ luôn
         if (typeof audio !== 'undefined' && audio && audio.src) {
             const match = cands.find(c => isSameAudioSrc(audio.src, c));
             if (match) {
@@ -485,7 +427,6 @@ async function checkForUpdates() {
                 notifiedNewSongIds.add(s.id);
                 return true;
             });
-            // Đánh dấu các bài đang có để không báo lại sau reload list
             newSongs.forEach(s => { if (oldSongIds.has(s.id)) notifiedNewSongIds.add(s.id); });
             
             const currentSongId = oldSongs[index]?.id;
@@ -502,7 +443,6 @@ async function checkForUpdates() {
             const oldCurrentShuffleCycle = [...currentShuffleCycle];
             const oldIsShuffle = isShuffle;
             
-            // Chỉ cập nhật metadata — KHÔNG đụng audio.src / currentTime / load()
             songs = newSongs;
             lastDataHash = newHash;
             
@@ -516,7 +456,6 @@ async function checkForUpdates() {
                 : -1;
             if (newIndex !== -1) {
                 index = newIndex;
-                // Cập nhật chữ UI nếu tên/ca sĩ đổi — không reload audio
                 if (songTitleEl && songs[index]) {
                     songTitleEl.innerText = songs[index].name;
                     applyGradientToSongTitle();
@@ -528,11 +467,9 @@ async function checkForUpdates() {
                 autoScaleSongTitle();
                 updateArtImage();
             } else if (songs.length) {
-                // Bài đang nghe bị xóa khỏi list — giữ audio đang phát, chỉnh index an toàn
                 index = Math.min(index, songs.length - 1);
             }
             
-            // Map lại queue shuffle theo ID (tránh index lệch khi đổi thứ tự ABC)
             if (oldIsShuffle) {
                 shuffleHistory = remapList(oldShuffleHistory);
                 remainingQueue = remapList(oldRemainingQueue);
@@ -606,20 +543,17 @@ async function fetchListenDataSilent() {
 
 let publishCheckTimer = null;
 let songsRealtimeBound = false;
-/** ID bài đã từng hiện cho user này (tránh spam thông báo) */
 let notifiedNewSongIds = new Set();
 
 function startAutoRefresh(intervalSeconds = 60) {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
     setTimeout(() => checkForUpdates(), 3000);
-    // Kiểm tra thường hơn để bắt giờ đăng bài (15s)
     autoRefreshInterval = setInterval(checkForUpdates, Math.min(intervalSeconds, 15) * 1000);
     console.log('ĐÃ BẬT TỰ ĐỘNG CẬP NHẬT + lịch đăng bài');
     startSongsRealtimeListener();
     scheduleNextPublishUnlock();
 }
 
-/** Lấy toàn bộ bài (kể cả chưa tới publishAt) — để hẹn giờ mở */
 async function fetchSongsRawFromFirebase() {
     const db = getDb();
     if (!db) return [];
@@ -637,7 +571,6 @@ async function fetchSongsRawFromFirebase() {
     }).filter(s => s.audio && !s.hidden);
 }
 
-/** Hẹn đúng giây publishAt gần nhất → refresh + thông báo */
 async function scheduleNextPublishUnlock() {
     if (publishCheckTimer) {
         clearTimeout(publishCheckTimer);
@@ -674,7 +607,7 @@ function startSongsRealtimeListener() {
     let ready = false;
     let debounceTimer = null;
     const onChange = () => {
-        if (!ready) return; // bỏ qua lần gắn listener (child_added hàng loạt)
+        if (!ready) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             checkForUpdates();
@@ -685,14 +618,12 @@ function startSongsRealtimeListener() {
         db.ref(path).on('child_added', onChange);
         db.ref(path).on('child_changed', onChange);
         db.ref(path).on('child_removed', onChange);
-        // Sau 1.5s mới nhận sự kiện thật (thêm bài / sửa publishAt)
         setTimeout(() => { ready = true; }, 1500);
     } catch (e) {
         console.warn('songs realtime', e);
         songsRealtimeBound = false;
     }
 }
-
 
 function stopAutoRefresh() {
     if (autoRefreshInterval) {
@@ -725,7 +656,6 @@ async function loadSongsFromFirebase() {
             });
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
-            // Dọn owned local + Firebase: bỏ ID bài đã xóa (tránh admin thấy lại −1 rác)
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
             initPlayerAfterLoad();
             updateListenStatsModal();
@@ -753,7 +683,6 @@ async function loadSongsFromFirebase() {
     }
 }
 
-// Alias tương thích
 const loadSongsFromSheet = loadSongsFromFirebase;
 
 function updateArtImage() {
@@ -850,7 +779,6 @@ function getArtistGradientByTheme() {
 }
 
 function autoScaleNotificationMessage() {
-    // Giống music2: scale message span nếu dài hơn khung
     const noti = document.getElementById('custom-notification');
     if (!noti || !noti.classList.contains('show')) return;
 
@@ -892,7 +820,6 @@ function forceScaleNotification() {
     setTimeout(() => autoScaleNotificationMessage(), 120);
 }
 
-// Toast kiểu music2: chỉ setTimeout gỡ class — đơn giản, ổn định
 function hideNotification() {
     const noti = document.getElementById('custom-notification');
     if (noti) noti.classList.remove('show');
@@ -913,10 +840,8 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
 
     noti.style.borderBottomColor = color;
 
-    // Icon: giữ lucide (music6) — màu theo toast
     const iconContainer = noti.querySelector('.notification-icon');
     if (iconContainer) {
-        // Map icon FA cũ (music2) → lucide nếu cần
         const iconMap = {
             'fa-headphones': 'headphones',
             'headphones': 'headphones',
@@ -946,18 +871,15 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         if (iEl) iEl.style.color = color;
     }
 
-    // Gradient chữ giống music2 (title + message tách nhau, không bọc content-inner)
     let formattedMessage = message;
     if (typeof message === 'string' && !message.includes('<span')) {
         const gradient = (typeof getGradientByTheme === 'function') ? getGradientByTheme() : 'linear-gradient(90deg,#fff,#a78bfa,#fff)';
         formattedMessage = '<span style="font-weight:700;background:' + gradient + ';-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:0.5px;font-size:inherit;display:inline-block;white-space:nowrap;">' + message + '</span>';
     }
 
-    // HTML structure giống music2: .notification-title + .notification-message
     const content = noti.querySelector('.notification-content');
     if (content) {
         content.classList.remove('is-marquee');
-        // Khôi phục structure chuẩn nếu từng bị ghi đè
         let titleEl = content.querySelector('.notification-title');
         let msgEl = content.querySelector('.notification-message');
         if (!titleEl || !msgEl || content.querySelector('.notification-content-inner')) {
@@ -969,7 +891,6 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         if (msgEl) msgEl.innerHTML = formattedMessage;
     }
 
-    // Giống music2: tắt show → reflow → bật show → hẹn ẩn 10s
     noti.classList.remove('show');
     void noti.offsetHeight;
     noti.classList.add('show');
@@ -981,8 +902,6 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
     }, 10000);
 }
 
-// Khi bật màn hình / quay lại tab: setTimeout có thể bị hệ thống hủy
-// → nếu toast vẫn đang show thì đặt lại hẹn ẩn ngắn (toast cũ không giữ lâu)
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     const noti = document.getElementById('custom-notification');
@@ -1012,12 +931,8 @@ async function fetchListenData() {
     return fetchListenDataSilent();
 }
 
-
-
-/** Cộng giây nghe thật theo ngày (thống kê tuần/tháng/năm) — chính xác từng giây */
 let _lastListenTickAt = 0;
 let _listenTimeDirty = false;
-/** Gộp listenTime local + remote: byDay lấy max từng ngày, total = max(total, sum byDay) */
 function mergeListenTimeObj(a, b) {
     const out = { total: 0, byDay: Object.create(null) };
     const apply = (src) => {
@@ -1048,7 +963,6 @@ function flushListenTimeToFirebase(force) {
         const uid = (typeof getCurrentUid === 'function' && getCurrentUid()) || acc.uid || '';
         if (!uid) return Promise.resolve(false);
         const local = mergeListenTimeObj(null, acc.listenTime);
-        // Transaction merge — không .set() ghi đè mất máy khác / tab khác
         return db.ref(dataPath('users') + '/' + uid + '/listenTime').transaction((current) => {
             return mergeListenTimeObj(current, local);
         }).then((tx) => {
@@ -1069,20 +983,17 @@ function flushListenTimeToFirebase(force) {
     }
 }
 
-/** Cộng nốt giây đang đếm + đẩy Firebase ngay (gọi khi ẩn tab / thoát / pause) */
 function persistListenTimeNow() {
     try {
         if (_lastListenTickAt > 0) {
             const d = (Date.now() - _lastListenTickAt) / 1000;
             if (d > 0 && d <= 8) recordListenSeconds(d);
-            // Giữ mốc nếu vẫn đang phát (chỉ ẩn tab, chưa pause)
             if (typeof audio !== 'undefined' && audio && !audio.paused) {
                 _lastListenTickAt = Date.now();
             } else {
                 _lastListenTickAt = 0;
             }
         }
-        // Ép ghi localStorage trước khi put Firebase
         try {
             const name = typeof getCurrentUsername === 'function' && getCurrentUsername();
             if (name && typeof getAllAccounts === 'function' && typeof saveAllAccounts === 'function') {
@@ -1099,12 +1010,10 @@ window.persistListenTimeNow = persistListenTimeNow;
 window.flushListenTimeToFirebase = flushListenTimeToFirebase;
 
 function recordListenSeconds(deltaSec) {
-    // Chỉ nhận đoạn nghe hợp lệ (0–8s). >8s = tab ẩn / lag → bỏ
     if (!deltaSec || deltaSec <= 0 || deltaSec > 8) return;
     if (typeof getCurrentUsername !== 'function' || !getCurrentUsername()) return;
     const name = getCurrentUsername();
     if (!name) return;
-    // Mỗi giây → LOCAL (localStorage) ngay lập tức
     const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
     if (!accounts || !accounts[name]) return;
     const acc = accounts[name];
@@ -1117,31 +1026,27 @@ function recordListenSeconds(deltaSec) {
     const add = Number(deltaSec) || 0;
     acc.listenTime.byDay[day] = (Number(acc.listenTime.byDay[day]) || 0) + add;
     acc.listenTime.total = (Number(acc.listenTime.total) || 0) + add;
-    // Ghi localStorage thưa (~3s) — tránh spam I/O mỗi giây trên mobile
     if (!window._listenLocalSaveAt) window._listenLocalSaveAt = 0;
     if (Date.now() - window._listenLocalSaveAt > 3000) {
         if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
         window._listenLocalSaveAt = Date.now();
     } else {
-        // Vẫn giữ object trong memory (accounts[name] đã mutate)
         try { accounts[name] = acc; } catch (e) {}
     }
 
-    // Phiên nghe (huy hiệu Marathon)
     window._sessionListenSec = (Number(window._sessionListenSec) || 0) + add;
     if (window._sessionListenSec >= 3600 && window.xkExtras && typeof window.xkExtras.unlockAchievement === 'function') {
         window.xkExtras.unlockAchievement('marathon');
     }
     _listenTimeDirty = true;
     if (!window._listenTimeSyncAt) window._listenTimeSyncAt = 0;
-    // Backup định kỳ ~15s (phòng trường hợp không kịp flush khi thoát)
     if (Date.now() - window._listenTimeSyncAt > 15000) {
         if (typeof saveAllAccounts === 'function') saveAllAccounts(accounts);
         window._listenLocalSaveAt = Date.now();
         flushListenTimeToFirebase(true);
     }
 }
-/** Tick 1 giây duy nhất khi đang phát — nguồn chính cộng giây nghe */
+
 setInterval(() => {
     try {
         if (typeof audio === 'undefined' || !audio || audio.paused) {
@@ -1163,7 +1068,6 @@ setInterval(() => {
     } catch (e) {}
 }, 1000);
 
-/** Promise với timeout — tránh isUpdatingListen bị kẹt nếu Firebase treo */
 function withTimeout(promise, ms, label) {
     return Promise.race([
         promise,
@@ -1171,14 +1075,6 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
-/**
- * Cộng 1 lượt nghe cho bài.
- * - Toast + local cập nhật ngay (không đợi Firebase)
- * - Firebase ghi root: songs/{id}/listenCount
- * - Username không bắt buộc; có user thì cộng XP / listenedSongs
- */
-
-/** Tuần trong tháng: 2026-09-W1 … W5 (theo ngày 1–7, 8–14, 15–21, 22–28, 29–cuối tháng) */
 function getWeekOfMonthKey(date) {
     const d = date ? new Date(date) : new Date();
     const y = d.getFullYear();
@@ -1186,7 +1082,6 @@ function getWeekOfMonthKey(date) {
     const w = Math.max(1, Math.ceil(d.getDate() / 7));
     return y + '-' + m + '-W' + w;
 }
-/** Khoảng ngày của 1 tuần: { y, m, w, startDay, endDay } */
 function getWeekOfMonthRange(key) {
     const match = String(key || '').match(/^(\d{4})-(\d{2})-W(\d+)$/);
     if (!match) return null;
@@ -1202,13 +1097,11 @@ function getWeekOfMonthRange(key) {
 function formatWeekDateVN(y, m, d) {
     return String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + '/' + y;
 }
-/** Nhãn tuần kèm khoảng ngày: "Tuần 4 · 22/09/2026 – 28/09/2026" */
 function weekOfMonthLabel(key) {
     const r = getWeekOfMonthRange(key);
     if (!r) return String(key || '');
     return 'Tuần ' + r.w + ' · ' + formatWeekDateVN(r.y, r.m, r.startDay) + ' – ' + formatWeekDateVN(r.y, r.m, r.endDay);
 }
-/** Chỉ khoảng ngày ngắn: "22/09 – 28/09/2026" */
 function weekOfMonthDateRange(key) {
     const r = getWeekOfMonthRange(key);
     if (!r) return '';
@@ -1227,7 +1120,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
 
     isUpdatingListen = true;
     try {
-        // 1) Local + UI ngay lập tức
         if (!listenData[sid]) listenData[sid] = 0;
         listenData[sid]++;
         const songIndex = songs.findIndex(s => String(s.id) === sid);
@@ -1237,7 +1129,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
 
         try {
-            // Giống music2 y hệt
             showNotification(
                 '+1 LISTEN:',
                 '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
@@ -1261,7 +1152,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
             } catch (e) {}
         }
 
-        // 2) Firebase root: songs/{id}/listenCount
         const db = getDb();
         if (db) {
             const path = dataPath('songs') + '/' + sid + '/listenCount';
@@ -1297,7 +1187,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 try { localStorage.setItem(storageKey(STORAGE_LISTENS), JSON.stringify(listenData)); } catch (e) {}
                 try { updateListenStatsModal(); } catch (e) {}
                 try { if (typeof renderPlaylist === 'function') renderPlaylist(); } catch (e) {}
-                // Top tuần tự động: cộng vào weeklyListens/{weekKey}/{songId}
                 try {
                     const wk = (typeof getWeekOfMonthKey === 'function')
                         ? getWeekOfMonthKey()
@@ -1310,7 +1199,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                         })();
                     const wPath = (typeof dataPath === 'function' ? dataPath('weeklyListens') : 'weeklyListens') + '/' + wk + '/' + sid;
                     db.ref(wPath).transaction(c => (Number(c) || 0) + 1).catch(() => {});
-                    // Lưu meta tuần (label) để UI liệt kê
                     const metaPath = (typeof dataPath === 'function' ? dataPath('weeklyListensMeta') : 'weeklyListensMeta') + '/' + wk;
                     const range = (typeof getWeekOfMonthRange === 'function') ? getWeekOfMonthRange(wk) : null;
                     const metaUpdate = {
@@ -1330,7 +1218,6 @@ async function incrementListenCount(songId, songName, source = 'normal') {
                 console.warn('listenCount: Firebase chưa ghi được — đã lưu local + toast');
             }
 
-            // User XP / listenedSongs — path theo uid (Firebase Auth)
             const uid = getCurrentUid() || (getCurrentAccount() && getCurrentAccount().uid) || '';
             if (uid) {
                 try {
@@ -1454,7 +1341,6 @@ function showListenStats() {
         const playerContainer = document.querySelector('.player-container');
         if (playerContainer) playerContainer.appendChild(modal);
         else document.body.appendChild(modal);
-        // createIcons SAU khi append vào DOM để màu sắc tính đúng
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: Array.from(modal.querySelectorAll('[data-lucide]')) });
         const closeBtn = document.getElementById('close-listen-modal');
         if (closeBtn) closeBtn.onclick = () => modal.classList.remove('show');
@@ -1462,7 +1348,6 @@ function showListenStats() {
     
     updateListenStatsModal();
     
-    // Force reflow + rAF để luôn có animation slide in (kể cả lần đầu tạo modal)
     const openWithAnimation = () => {
         void modal.offsetWidth;
         requestAnimationFrame(() => {
@@ -1472,7 +1357,6 @@ function showListenStats() {
     };
     
     if (isFirstCreate || modal.classList.contains('show')) {
-        // Lần đầu hoặc đang mở → reset rồi mở lại để có animation
         modal.classList.remove('show');
         openWithAnimation();
     } else {
@@ -1564,10 +1448,8 @@ function getRandomPastel() {
 function scrollToActiveTop(behavior) {
     const scrollContainer = document.getElementById('playlist-content');
     if (!scrollContainer) return;
-    // Chỉ lấy active trong #playlist-content (tránh nhầm modal khác)
     const activeItem = scrollContainer.querySelector('.song-item.active');
     if (!activeItem) return;
-    // Đưa bài đang phát lên đầu vùng list, cách mép trên ~6px (ngay dưới header)
     const gap = 6;
     const containerRect = scrollContainer.getBoundingClientRect();
     const itemRect = activeItem.getBoundingClientRect();
@@ -1575,7 +1457,6 @@ function scrollToActiveTop(behavior) {
     if (!isFinite(targetTop)) targetTop = Math.max(0, activeItem.offsetTop - gap);
     targetTop = Math.max(0, targetTop);
 
-    // auto = nhảy ngay; còn lại = cuộn mượt chậm (~0.9s) như bản đầu
     if (behavior === 'auto') {
         scrollContainer.scrollTop = targetTop;
         return;
@@ -1583,7 +1464,7 @@ function scrollToActiveTop(behavior) {
     const startTop = scrollContainer.scrollTop;
     const distance = targetTop - startTop;
     if (Math.abs(distance) < 2) return;
-    const duration = 900; // ms — chậm vừa
+    const duration = 900;
     const startTime = performance.now();
     function easeInOutCubic(t) {
         return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -1635,7 +1516,6 @@ function parseLRC(text) {
         if (!text || typeof text !== 'string') return [];
         const lines = text.split(/\r?\n/);
         const result = [];
-        // Hỗ trợ [mm:ss], [mm:ss.x], [mm:ss.xx], [mm:ss.xxx]
         const timeReg = /\[(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?\]/g;
         lines.forEach(line => {
             let match;
@@ -1666,7 +1546,6 @@ function parseLRC(text) {
 function looksLikeLrcText(s) {
     if (!s || typeof s !== 'string') return false;
     const t = s.trim();
-    // Raw LRC thường bắt đầu bằng [ti:], [ar:], hoặc [mm:ss...]
     return /^\[(ti|ar|al|by|offset):/i.test(t) || /\[\d{1,2}:\d{1,2}(?:\.\d{1,3})?\]/.test(t);
 }
 
@@ -1681,13 +1560,11 @@ async function fetchLyricWithFallback(lrc1, lrc2) {
         for (let i = 0; i < sources.length; i++) {
             const src = sources[i].trim();
             try {
-                // Nếu là text LRC thô (admin dán trực tiếp) → parse luôn, không fetch
                 if (looksLikeLrcText(src) && !looksLikeUrl(src)) {
                     const parsed = parseLRC(src);
                     if (parsed && parsed.length > 0) return parsed;
                     continue;
                 }
-                // Còn lại coi như URL
                 const res = await fetch(src);
                 if (res.ok) {
                     const text = await res.text();
@@ -1790,13 +1667,10 @@ async function loadSong(i) {
     index = i;
     const song = songs[index];
 
-    // Đổi bài: nếu đang hiện vì 10s cuối bài A → giữ mở, chuyển sang chờ 10s của bài B
     if (pcPlaylistPhase === 'showing_end_of_a' && isPcPlaylistOpen()) {
         pcPlaylistPhase = 'waiting_10s_of_b';
         pcPlaylistNextIndex = i;
     } else if (pcPlaylistPhase !== 'waiting_10s_of_b') {
-        // Không trong chu kỳ auto → ẩn nếu đang mở tay / trạng thái lạ
-        // (giữ nguyên nếu user đang xem list thủ công cũng ok, nhưng reset phase)
         pcPlaylistPhase = 'idle';
         pcPlaylistTriggerIndex = -1;
         pcPlaylistNextIndex = -1;
@@ -1819,7 +1693,6 @@ async function loadSong(i) {
     
     const playUrl = getPlayableAudio(song);
     if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[String(song.id)] = playUrl;
-    // Chỉ đổi src/load khi URL thật sự khác — tránh giật khi gọi lại cùng bài
     if (!isSameAudioSrc(audio.src, playUrl)) {
         audio.pause();
         audio.src = playUrl || '';
@@ -1848,13 +1721,13 @@ async function loadSong(i) {
     if (playlistOverlay.classList.contains('active')) setTimeout(scrollToActiveTop, 100);
     
     hasRecordedCurrentSong = false;
-    demoLockedSongId = null; // đổi bài → bỏ khóa demo
+    demoLockedSongId = null;
     isChanging = false;
 }
 
 function changeSong(i, source = 'normal') {
     currentSource = source;
-    hasUserInteracted = true; // next / prev / random / chọn bài
+    hasUserInteracted = true;
     loadSong(i).then(() => {
         audio.play().catch(e => console.log("CẦN TƯƠNG TÁC TRƯỚC:", e));
         setTimeout(() => {
@@ -1868,9 +1741,7 @@ function changeSong(i, source = 'normal') {
 }
 
 function selectSongFromList(i) {
-    // Mobile: đóng overlay. PC: loadSong sẽ ẩn danh sách (chỉ hiện lại khi ≤10s cuối).
     if (playlistOverlay && !isPcLayout()) playlistOverlay.classList.remove('active');
-    // Chọn từ danh sách tổng → thoát chế độ playlist cá nhân
     myPlaylistMode = false;
     myPlaylistQueue = [];
     changeSong(i, 'select');
@@ -1916,7 +1787,6 @@ function getPrevMyPlaylistIndex(currentIdx) {
         return isShuffle ? getPrevShuffleIndex(currentIdx) : ((currentIdx - 1 + songs.length) % songs.length);
     }
     if (isShuffle) {
-        // Lịch sử đơn giản: bài trước trong indices
         const pos = indices.indexOf(currentIdx);
         if (pos < 0) return indices[indices.length - 1];
         return indices[(pos - 1 + indices.length) % indices.length];
@@ -1926,7 +1796,6 @@ function getPrevMyPlaylistIndex(currentIdx) {
     return indices[(pos - 1 + indices.length) % indices.length];
 }
 
-/** Phát tất cả bài trong playlist của tôi (chỉ vòng trong playlist đó) */
 function playAllMyPlaylist() {
     const indices = getMyPlaylistIndices();
     if (!indices.length) {
@@ -1940,7 +1809,6 @@ function playAllMyPlaylist() {
         myPlaylistQueue = [...indices];
     }
     const start = myPlaylistQueue.shift();
-    // Đưa các bài còn lại vào queue để next dùng
     document.getElementById('my-playlist-overlay')?.classList.remove('active');
     hasUserInteracted = true;
     changeSong(start, 'my-playlist');
@@ -1979,7 +1847,6 @@ function prevSong() {
 }
 
 async function startPlayback() {
-    // Bắt buộc có username
     if (typeof getCurrentUsername === 'function' && !getCurrentUsername()) {
         const input = document.getElementById('username-input');
         const err = document.getElementById('username-error');
@@ -1991,7 +1858,6 @@ async function startPlayback() {
         return;
     }
     
-    // Click "Bắt đầu" = user gesture → được autoplay + cộng lượt nghe
     hasUserInteracted = true;
     
     const playerContainer = document.getElementById('player-container');
@@ -2017,13 +1883,11 @@ async function startPlayback() {
 
     hidePlayerLoading();
     
-    // Chờ danh sách bài nếu chưa có
     if (!songs.length) {
         pendingPlayAfterLoad = true;
         return;
     }
 
-    // Phát bài hiện tại từ đầu (không khôi phục vị trí đã lưu)
     if (songs[index]) {
         const needLoad = !audio.src || !isSameAudioSrc(audio.src, getPlayableAudio(songs[index]));
         const playFn = () => {
@@ -2119,7 +1983,6 @@ function togglePlay() {
 audio.onerror = () => {
     if (!songs[index]) return;
     const song = songs[index];
-    // Thử link full thứ 2 nếu đang nghe full
     if (isSongOwned(song.id)) {
         const failed = lastTriedFullUrl[song.id] || audio.src;
         const alt = pickFullAudioUrl(song, failed);
@@ -2214,7 +2077,6 @@ function tryRecordListenCount() {
         if (!hasUserInteracted) hasUserInteracted = true;
         hasRecordedCurrentSong = true;
         const song = songs[index];
-        // Fire-and-forget; nếu fail thì cho retry lần sau
         Promise.resolve(incrementListenCount(song.id, song.name, currentSource || 'play'))
             .then(ok => {
                 if (!ok) hasRecordedCurrentSong = false;
@@ -2226,7 +2088,6 @@ function tryRecordListenCount() {
     }
 }
 
-// Dự phòng: mỗi giây kiểm tra (timeupdate đôi khi không chạy đủ trên mobile)
 setInterval(() => {
     try {
         if (typeof audio === 'undefined' || !audio) return;
@@ -2236,16 +2097,12 @@ setInterval(() => {
 }, 1000);
 
 audio.ontimeupdate = () => {
-    // Thời gian nghe do setInterval 1s xử lý (tránh cộng đôi với ontimeupdate)
-
-    // Đã khóa demo → bỏ qua mọi xử lý (tránh seek lặp gây giật)
     if (demoLockedSongId) return;
 
     const cur = audio.currentTime;
     const dur = audio.duration;
     const now = performance.now();
 
-    // Cập nhật thời gian / progress thưa hơn để nhẹ main thread
     if (dur && now - lastTimeLabelAt > 250) {
         lastTimeLabelAt = now;
         const timeCurrent = document.getElementById('time-current');
@@ -2266,30 +2123,22 @@ audio.ontimeupdate = () => {
         }
     }
     
-    // Demo 60s nếu chưa sở hữu bài → dừng hẳn, mở cửa hàng đúng bài (không random tiếp)
     if (songs[index] && !isSongOwned(songs[index].id) && cur >= DEMO_SECONDS) {
         const demoSong = songs[index];
         demoLockedSongId = String(demoSong.id);
         showNotification('DEMO HẾT:', 'MUA ĐỂ NGHE FULL — ' + (demoSong.name || demoSong.id), '#ff9800', 'store');
         openShopModal(demoSong.id);
         audio.pause();
-        // Chỉ seek 1 lần khi khóa demo
         try { audio.currentTime = DEMO_SECONDS; } catch (e) {}
         updateProgressUI();
         return;
     }
     
-    // Cộng lượt: currentTime ≥ 5s
     tryRecordListenCount();
 
-    // PC auto playlist:
-    // 1) Còn ≤10s cuối bài A → hiện list, phase = showing_end_of_a
-    // 2) Sang bài B (loadSong) → phase = waiting_10s_of_b, VẪN giữ list
-    // 3) Bài B chạy được ≥10s → ẩn list
     if (isPcLayout() && dur && isFinite(dur) && dur > 0) {
         const remaining = dur - cur;
         if (pcPlaylistPhase === 'idle' || pcPlaylistPhase === 'showing_end_of_a') {
-            // Chưa sang bài B: hiện khi còn ≤10s của bài hiện tại
             if (!audio.paused && remaining <= 10 && remaining > 0.05 && dur > 12) {
                 if (pcPlaylistPhase !== 'showing_end_of_a' || pcPlaylistTriggerIndex !== index) {
                     pcPlaylistPhase = 'showing_end_of_a';
@@ -2298,15 +2147,12 @@ audio.ontimeupdate = () => {
                     showPcPlaylist();
                 }
             } else if (remaining > 10.5 && pcPlaylistPhase === 'showing_end_of_a' && pcPlaylistTriggerIndex === index) {
-                // User tua về trước khi chưa hết bài A → ẩn, cho hiện lại sau
                 hidePcPlaylist();
             }
         } else if (pcPlaylistPhase === 'waiting_10s_of_b') {
-            // Đang giữ list từ bài A → ẩn khi bài B (index === next) chạy ≥10s
             if (index === pcPlaylistNextIndex && cur >= 10) {
                 hidePcPlaylist();
             } else if (index !== pcPlaylistNextIndex && index !== pcPlaylistTriggerIndex) {
-                // Nhảy sang bài khác (không phải B) → ẩn
                 hidePcPlaylist();
             }
         }
@@ -2319,7 +2165,6 @@ audio.ontimeupdate = () => {
             hasRecordedCurrentSong = false;
             currentSource = 'loop';
         }
-        // Dùng ended/loop native nếu có thể — tránh seek cứng giữa ontimeupdate
         try {
             audio.currentTime = 0;
             const p = audio.play();
@@ -2331,8 +2176,6 @@ audio.ontimeupdate = () => {
 };
 
 audio.onended = () => {
-    // Hết bài: KHÔNG ẩn list ở đây — giữ đến khi bài B chạy đủ 10s (xử lý trong ontimeupdate / loadSong)
-    // File demo ngắn kết thúc / hết 60s → dừng, không nhảy bài random
     if (demoLockedSongId || (songs[index] && !isSongOwned(songs[index].id))) {
         audio.pause();
         if (songs[index] && !isSongOwned(songs[index].id) && demoLockedSongId == null) {
@@ -2350,7 +2193,6 @@ audio.onended = () => {
                 hasRecordedCurrentSong = false;
                 currentSource = 'loop';
             }
-            // Không audio.load() lại — load lại gây giật/ngắt quãng rõ
             try {
                 audio.currentTime = 0;
                 const p = audio.play();
@@ -2369,7 +2211,6 @@ audio.onplay = () => {
     requestWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
     hidePlayerLoading();
-    // Bắt đầu đếm thời gian nghe từ lúc play
     _lastListenTickAt = Date.now();
 };
 
@@ -2379,7 +2220,6 @@ audio.onpause = () => {
     if (art) art.style.animationPlayState = 'paused';
     releaseWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
-    // Pause → cộng nốt + PUT Firebase ngay
     persistListenTimeNow();
 };
 
@@ -2400,7 +2240,6 @@ function updatePlaylistStatsFooter() {
     const footer = document.getElementById('playlist-stats-footer');
     if (!footer) return;
     const total = (songs && songs.length) ? songs.length : 0;
-    // Chỉ đếm ID còn tồn tại trong danh sách bài (bỏ ID cũ / đã xóa khỏi list)
     const songIds = new Set((songs || []).map(s => String(s.id)));
     let favCount = 0;
     let plCount = 0;
@@ -2497,7 +2336,6 @@ function renderMyPlaylist() {
         el.onclick = () => {
             const i = parseInt(el.getAttribute('data-play-idx'), 10);
             if (!Number.isNaN(i) && i >= 0) {
-                // Phát 1 bài trong playlist → vẫn giữ vòng playlist của tôi
                 myPlaylistMode = true;
                 myPlaylistQueue = [];
                 document.getElementById('my-playlist-overlay')?.classList.remove('active');
@@ -2525,9 +2363,7 @@ function renderMyPlaylist() {
 const playerContainer = document.getElementById('player-container');
 if (playerContainer) playerContainer.style.display = 'none';
 
-// interaction-hint: bắt buộc username trước khi vào (xử lý trong setupUsernameGate)
 if (hint) {
-    // Xóa handler cũ nếu có
     hint.onclick = null;
 }
 
@@ -2569,7 +2405,6 @@ if (closePlaylistBtn && playlistOverlay) {
     };
 }
 
-// Resize: nếu rời PC thì bỏ class playlist-open
 window.addEventListener('resize', () => {
     if (!isPcLayout()) {
         const layout = document.querySelector('.pc-layout');
@@ -2595,7 +2430,6 @@ if (repeatBtn) {
         isRepeatOne = !isRepeatOne;
         this.classList.toggle('active', isRepeatOne);
         isLoopingHandled = false;
-        // Đổi icon: bình thường = repeat, khi bật lặp 1 bài = repeat-1
         setLucideIcon(this, isRepeatOne ? 'repeat-1' : 'repeat');
         
         if (isRepeatOne) {
@@ -2798,7 +2632,6 @@ function loadTheme() {
 }
 
 function toggleTheme() {
-    // Tắt transition tạm thời để tránh nháy nút khi đổi theme
     document.body.classList.add('no-transition');
     
     if (document.body.classList.contains('dark')) {
@@ -2815,7 +2648,6 @@ function toggleTheme() {
     applyGradientToSongTitle();
     applyGradientToArtistName();
     
-    // Bật lại transition sau 1 frame
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             document.body.classList.remove('no-transition');
@@ -2848,13 +2680,11 @@ if (listenCountBtn) {
     };
 }
 
-// Ẩn tab / chuyển app / khóa màn hình → cộng nốt giây + PUT Firebase ngay
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
         persistListenTimeNow();
     }
 });
-// Đóng tab / refresh / thoát trình duyệt
 window.addEventListener('pagehide', () => {
     persistListenTimeNow();
 });
@@ -2868,7 +2698,6 @@ window.adjustLyricFontSize = adjustLyricFontSize;
 
 window.selectSongFromList = selectSongFromList;
 
-// ========== USERNAME + CỬA HÀNG XK (Firebase Realtime Database) ==========
 const DEMO_SECONDS = 60;
 
 let sheetPricesCache = {};
@@ -2907,7 +2736,6 @@ async function syncPricesFromFirebase() {
     try {
         const db = getDb();
         if (!db) return;
-        // Giá có thể nằm trong songs/{id}.price
         const list = await fetchSongsFromFirebase();
         const map = {};
         list.forEach(s => {
@@ -2915,7 +2743,6 @@ async function syncPricesFromFirebase() {
                 map[s.id] = Number(s.price);
             }
         });
-        // + node prices riêng (nếu có)
         const snap = await db.ref(dataPath('prices')).once('value');
         const prices = snap.val() || {};
         Object.keys(prices).forEach(id => {
@@ -2993,11 +2820,9 @@ function ensureUserAccount(username) {
 }
 
 function sanitizeUsernameKey(name) {
-    // Firebase key không được chứa . # $ [ ]
     return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
 }
 
-/** Map profile Firebase → object local */
 function mapUserProfile(data, name) {
     const d = data || {};
     return {
@@ -3033,14 +2858,9 @@ function mapUserProfile(data, name) {
     };
 }
 
-/** Realtime sync profile user giữa các thiết bị (PC / mobile)
- * Firebase = nguồn sự thật. Local chỉ optimistic UI tạm thời.
- */
 let _userProfileUnsub = null;
-/** Bài vừa mua trên máy này, chưa chắc đã có trên server — giữ UI ĐÃ MUA */
-let _pendingOwnedAdds = Object.create(null); // { songId: timestamp }
-/** Bài vừa thuê trên máy này — giữ UI thuê + không để sync remote trống ghi đè */
-let _pendingRentals = Object.create(null); // { songId: expiryMs }
+let _pendingOwnedAdds = Object.create(null);
+let _pendingRentals = Object.create(null);
 let _profileSyncedFromRemote = false;
 const PENDING_OWNED_MS = 30000;
 const PENDING_RENTAL_MS = 60000;
@@ -3067,7 +2887,6 @@ function consumePendingOwned(remoteOwned) {
     return keep;
 }
 
-/** Gộp rentals: mỗi bài lấy hạn lâu nhất, bỏ đã hết hạn */
 function mergeRentalsMap(a, b) {
     const out = Object.create(null);
     const now = Date.now();
@@ -3102,12 +2921,10 @@ function consumePendingRentals(remoteRentals) {
             delete _pendingRentals[id];
             return;
         }
-        // Hết hạn hoặc pending quá lâu mà server không có → bỏ
         if (localExp <= now) {
             delete _pendingRentals[id];
             return;
         }
-        // Giữ pending thêm tối đa ~24h (theo hạn thuê); không xóa sớm chỉ vì 60s
         keep[id] = localExp;
     });
     return keep;
@@ -3136,20 +2953,16 @@ function startUserProfileListener(uid) {
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
         const prev = accounts[name];
-        // Owned + pending — lọc ID mồ côi (không còn trong list bài)
         const remoteOwned = filterOwnedIds(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pending = consumePendingOwned(remoteOwned);
         mapped.owned = filterOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned)));
-        // Rentals: max expiry (remote + local + pending)
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
             mergeRentalsMap(mapped.rentals, prev && prev.rentals),
             pendingRent
         );
-        // ownedThumbs / achievements: chỉ thêm → union
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prev && prev.ownedThumbs);
         mapped.achievements = unionIdArrays(mapped.achievements, prev && prev.achievements);
-        // favorites / playlist: remote là chuẩn nếu có dữ liệu; remote trống mà local còn → giữ local (chống wipe)
         const preferRemoteList = (remote, local) => {
             const r = Array.isArray(remote) ? remote.map(String) : [];
             const l = Array.isArray(local) ? local.map(String) : [];
@@ -3160,12 +2973,10 @@ function startUserProfileListener(uid) {
         mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prev && prev.myPlaylist);
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prev && prev.listenedSongs);
         mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prev && prev.checkinDays);
-        // listenTime: giữ giây local chưa flush — không để remote cũ xóa
         mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prev && prev.listenTime);
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prev && prev.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prev && prev.level) || 1);
         mapped.seasonXp = Math.max(Number(prev && prev.seasonXp) || 0, Number(mapped.seasonXp) || 0);
-        // streak: lấy max (tránh remote thấp đè local vừa điểm danh)
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prev && prev.streak) || 0);
         mapped.giftClaimCount = Math.max(Number(mapped.giftClaimCount) || 0, Number(prev && prev.giftClaimCount) || 0);
         mapped.chatCount = Math.max(Number(mapped.chatCount) || 0, Number(prev && prev.chatCount) || 0);
@@ -3196,7 +3007,6 @@ function startUserProfileListener(uid) {
     _userProfileUnsub = () => ref.off('value', handler);
 }
 
-/** Lấy profile theo uid (Firebase Auth) */
 async function fetchUserByUid(uid, usernameHint) {
     const id = String(uid || '').trim();
     if (!id) return null;
@@ -3206,7 +3016,6 @@ async function fetchUserByUid(uid, usernameHint) {
         const snap = await db.ref(dataPath('users') + '/' + id).once('value');
         const data = snap.val();
         if (!data) return null;
-        // Ưu tiên username trên Firebase — tránh localStorage gán nhầm tên khác vào uid này
         const remoteName = String(data.username || '').trim();
         const hint = String(usernameHint || '').trim();
         const name = remoteName || hint;
@@ -3216,7 +3025,6 @@ async function fetchUserByUid(uid, usernameHint) {
         }
         const accounts = getAllAccounts();
         const prevLocal = accounts[name];
-        // Xóa bản local cũ gắn sai uid / sai tên cho cùng uid
         Object.keys(accounts).forEach(k => {
             const a = accounts[k];
             if (!a) return;
@@ -3226,7 +3034,6 @@ async function fetchUserByUid(uid, usernameHint) {
         });
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
-        // Merge an toàn: local + remote — không mất mua/thuê/playlist… khi Firebase thiếu tạm thời
         const remoteRentalsBefore = mapped.rentals || {};
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
@@ -3249,7 +3056,6 @@ async function fetchUserByUid(uid, usernameHint) {
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prevLocal && prevLocal.listenedSongs);
         mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prevLocal && prevLocal.checkinDays);
         mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prevLocal && prevLocal.listenTime);
-        // XP/level/streak: lấy max
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prevLocal && prevLocal.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
         mapped.seasonXp = Math.max(Number(mapped.seasonXp) || 0, Number(prevLocal && prevLocal.seasonXp) || 0);
@@ -3266,7 +3072,6 @@ async function fetchUserByUid(uid, usernameHint) {
         }
         _profileSyncedFromRemote = true;
         startUserProfileListener(id);
-        // Đẩy local còn thiếu (mua/thuê/…) lên Firebase — merge, không ghi đè mất
         try {
             pushUserToFirebase(name, mapped, {
                 forceAll: true,
@@ -3288,7 +3093,6 @@ async function fetchUserFromFirebase(username) {
         const byUid = await fetchUserByUid(uid, name);
         if (byUid) return byUid;
     }
-    // Lookup username → uid
     try {
         const db = getDb();
         if (!db) throw new Error('No DB');
@@ -3305,7 +3109,6 @@ async function fetchUserFromFirebase(username) {
 }
 
 function buildUserPayload(uid, name, account, includeCoins) {
-    // KHÔNG ghi rank / banned / banReason từ client — chỉ Admin mới được set trên Firebase
     const payload = {
         uid: uid,
         username: name,
@@ -3337,7 +3140,6 @@ function buildUserPayload(uid, name, account, includeCoins) {
     return payload;
 }
 
-/** Union 2 mảng id (string) */
 function unionIdArrays(a, b) {
     const out = new Set();
     (Array.isArray(a) ? a : []).forEach(x => { if (x != null && String(x)) out.add(String(x)); });
@@ -3345,7 +3147,6 @@ function unionIdArrays(a, b) {
     return [...out];
 }
 
-/** Catalog ID bài hiện có (id + key Firebase + lowercase) — dùng lọc owned mồ côi */
 function getCatalogSongIdSet() {
     const set = new Set();
     const list = (typeof songs !== 'undefined' && Array.isArray(songs)) ? songs : [];
@@ -3361,10 +3162,6 @@ function getCatalogSongIdSet() {
     return set;
 }
 
-/**
- * Lọc owned: bỏ ID trống / trùng / không còn trong list bài.
- * Nếu songs chưa load (catalog rỗng) → chỉ bỏ trống + trùng, giữ nguyên ID.
- */
 function filterOwnedIds(ids) {
     const raw = (Array.isArray(ids) ? ids : []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
     const catalog = getCatalogSongIdSet();
@@ -3380,7 +3177,6 @@ function filterOwnedIds(ids) {
     return out;
 }
 
-/** Sau khi có list bài: dọn owned local (+ đẩy Firebase nếu đã Auth) */
 function scrubOwnedAgainstCatalog() {
     try {
         if (!getCatalogSongIdSet().size) return;
@@ -3390,7 +3186,6 @@ function scrubOwnedAgainstCatalog() {
         const before = acc.owned.map(String);
         const cleaned = filterOwnedIds(before);
         if (cleaned.length === before.length) {
-            // cùng số lượng nhưng có thể khác thứ tự — so sánh set
             const b = new Set(before.map(x => x.toLowerCase()));
             const c = new Set(cleaned.map(x => x.toLowerCase()));
             if (b.size === c.size && [...b].every(x => c.has(x))) return;
@@ -3405,7 +3200,6 @@ function scrubOwnedAgainstCatalog() {
     }
 }
 
-/** Merge map số: mỗi key lấy max (listenedSongs, checkinDays truthy, v.v.) */
 function mergeNumericMaps(a, b) {
     const out = Object.create(null);
     const apply = (src) => {
@@ -3430,7 +3224,6 @@ function mergeNumericMaps(a, b) {
 async function txUnionArrayField(db, uid, field, localArr) {
     const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
     let local = (Array.isArray(localArr) ? localArr : []).map(String);
-    // owned: luôn lọc ID không còn trong catalog trước khi union (chống đẩy lại rác sau admin dọn)
     if (field === 'owned') local = filterOwnedIds(local);
     const tx = await ref.transaction((current) => {
         let remote = Array.isArray(current) ? current.map(String) : [];
@@ -3445,14 +3238,6 @@ async function txUnionArrayField(db, uid, field, localArr) {
     return local;
 }
 
-/**
- * Đồng bộ user → Firebase an toàn đa thiết bị:
- * - owned / ownedThumbs / achievements: UNION (không mất bài máy khác)
- * - rentals: max expiry
- * - coins: delta transaction
- * - favorites / playlist / likes…: chỉ ghi khi field đó đổi trên máy này
- * - Không bao giờ .update() cả profile local thiếu lên server
- */
 async function pushUserToFirebase(username, account, options) {
     const name = String(username || '').trim();
     if (!name || !account) return false;
@@ -3466,24 +3251,21 @@ async function pushUserToFirebase(username, account, options) {
         account.uid = uid;
     }
     const opts = options || {};
-    const forceAll = !!opts.forceAll; // đăng nhập: đẩy local còn thiếu lên server (merge)
+    const forceAll = !!opts.forceAll;
     try {
         const db = getDb();
         if (!db) return false;
         const userRef = db.ref(dataPath('users') + '/' + uid);
         const accounts = getAllAccounts();
 
-        // Luôn đảm bảo uid + username trên node user
         await userRef.update({ uid: uid, username: name });
 
-        // --- owned: UNION ---
         if ((opts.ownedChanged || forceAll) && Array.isArray(account.owned)) {
             const merged = await txUnionArrayField(db, uid, 'owned', account.owned);
             account.owned = merged;
             if (accounts[name]) { accounts[name].owned = merged; saveAllAccounts(accounts); }
         }
 
-        // --- rentals: max expiry ---
         if ((opts.rentalsChanged || forceAll) && account.rentals && typeof account.rentals === 'object') {
             const localRentals = account.rentals;
             const rentalsRef = db.ref(dataPath('users') + '/' + uid + '/rentals');
@@ -3495,7 +3277,6 @@ async function pushUserToFirebase(username, account, options) {
             }
         }
 
-        // --- ownedThumbs / achievements: UNION (chỉ thêm, không mất) ---
         if ((opts.ownedThumbsChanged || forceAll) && Array.isArray(account.ownedThumbs)) {
             const merged = await txUnionArrayField(db, uid, 'ownedThumbs', account.ownedThumbs);
             account.ownedThumbs = merged;
@@ -3507,8 +3288,6 @@ async function pushUserToFirebase(username, account, options) {
             if (accounts[name]) { accounts[name].achievements = merged; saveAllAccounts(accounts); }
         }
 
-        // --- favorites / myPlaylist / likes / dislikes: ghi khi đổi (user chủ động thêm/xóa) ---
-        // forceAll: UNION để không xóa data máy khác khi mới login
         const arrayReplaceOrUnion = async (field, localArr, changedFlag) => {
             if (!(opts[changedFlag] || forceAll)) return;
             const local = (Array.isArray(localArr) ? localArr : []).map(String);
@@ -3525,7 +3304,6 @@ async function pushUserToFirebase(username, account, options) {
         await arrayReplaceOrUnion('likes', account.likes, 'likesChanged');
         await arrayReplaceOrUnion('dislikes', account.dislikes, 'dislikesChanged');
 
-        // --- maps: listenedSongs / checkinDays / listenTime — merge max ---
         const mergeMapField = async (field, localMap, changedFlag) => {
             if (!(opts[changedFlag] || forceAll)) return;
             const local = (localMap && typeof localMap === 'object') ? localMap : {};
@@ -3548,7 +3326,6 @@ async function pushUserToFirebase(username, account, options) {
                 const byDay = mergeNumericMaps(cur.byDay, local.byDay);
                 let total = 0;
                 Object.keys(byDay).forEach(k => { total += Number(byDay[k]) || 0; });
-                // Giữ total max giữa remote/local nếu byDay thiếu
                 total = Math.max(total, Number(cur.total) || 0, Number(local.total) || 0);
                 return { total, byDay };
             });
@@ -3558,7 +3335,6 @@ async function pushUserToFirebase(username, account, options) {
             }
         }
 
-        // --- scalars chỉ khi đổi ---
         const scalarPayload = {};
         if (opts.checkinChanged || forceAll) {
             scalarPayload.lastCheckin = account.lastCheckin || '';
@@ -3566,7 +3342,6 @@ async function pushUserToFirebase(username, account, options) {
             scalarPayload.streakFreeze = Number(account.streakFreeze) || 0;
         }
         if (opts.xpChanged || forceAll) {
-            // XP/level: lấy max để không bị máy thấp đè máy cao
             scalarPayload.xp = Number(account.xp) || 0;
             scalarPayload.level = Number(account.level) || 1;
             scalarPayload.seasonXp = Number(account.seasonXp) || 0;
@@ -3579,7 +3354,6 @@ async function pushUserToFirebase(username, account, options) {
             if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
         }
         if (opts.countersChanged || forceAll) {
-            // Max với server — không để máy thấp đè
             const gLocal = Math.max(0, Number(account.giftClaimCount) || 0);
             const cLocal = Math.max(0, Number(account.chatCount) || 0);
             try {
@@ -3596,7 +3370,6 @@ async function pushUserToFirebase(username, account, options) {
         }
         if (account.createdAt) scalarPayload.createdAt = account.createdAt;
         if (Object.keys(scalarPayload).length) {
-            // XP: transaction max
             if (scalarPayload.xp != null) {
                 const xpRef = db.ref(dataPath('users') + '/' + uid + '/xp');
                 const localXp = Number(scalarPayload.xp) || 0;
@@ -3618,7 +3391,6 @@ async function pushUserToFirebase(username, account, options) {
             }
         }
 
-        // --- coins: delta ---
         if (typeof opts.coinsDelta === 'number' && opts.coinsDelta !== 0) {
             const coinsRef = db.ref(dataPath('users') + '/' + uid + '/coins');
             const tx = await coinsRef.transaction((current) => {
@@ -3645,7 +3417,6 @@ async function pushUserToFirebase(username, account, options) {
     }
 }
 
-// Alias cũ
 const fetchUserFromSheet = fetchUserFromFirebase;
 const pushUserToSheet = pushUserToFirebase;
 
@@ -3654,7 +3425,6 @@ function getCurrentAccount() {
     if (!name) return null;
     const acc = ensureUserAccount(name);
     const authUid = getCurrentUid();
-    // Sửa uid local nếu lệch phiên Auth hiện tại
     if (acc && authUid && acc.uid && acc.uid !== authUid) {
         console.warn('[sync] getCurrentAccount uid lệch, sửa local:', acc.uid, '→', authUid);
         acc.uid = authUid;
@@ -3757,11 +3527,9 @@ function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
     const id = String(songId);
     if (loadOwnedSongs().includes(id)) return true;
-    // Vừa mua trên máy này (pending sync) — vẫn coi là sở hữu
     if (_pendingOwnedAdds[id] && (Date.now() - (_pendingOwnedAdds[id] || 0) < PENDING_OWNED_MS)) {
         return true;
     }
-    // Thuê 24h còn hạn?
     const acc = getCurrentAccount();
     if (acc && acc.rentals && acc.rentals[id]) {
         const exp = Number(acc.rentals[id]) || 0;
@@ -3792,7 +3560,6 @@ function getRentPrice(song) {
     if (song && song.rentPrice != null && !Number.isNaN(Number(song.rentPrice))) {
         return Math.max(0, Number(song.rentPrice));
     }
-    // Mặc định: khoảng 40% giá mua, tối thiểu 1
     const buy = getSongPrice(song);
     return Math.max(1, Math.ceil(buy * 0.4));
 }
@@ -3832,7 +3599,6 @@ function rentSong(songId) {
     renderShopList();
     if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
-    // Thuê bài đang demo / đang nghe → full từ mốc 1 phút (giống mua)
     const isCurrentOrDemo = (songs[index] && String(songs[index].id) === String(songId))
         || (demoLockedSongId != null && String(demoLockedSongId) === String(songId));
     if (isCurrentOrDemo) {
@@ -3955,7 +3721,6 @@ function toggleMyPlaylistSong(id) {
     showNotification('PLAYLIST:', added ? 'ĐÃ THÊM' : 'ĐÃ XÓA', added ? '#4ade80' : '#ff9800', 'list-plus');
     renderPlaylist();
     if (document.getElementById('my-playlist-overlay')?.classList.contains('active')) renderMyPlaylist();
-    // Mở khóa huy hiệu playlist 5 / 10 / 20
     if (typeof window.xkExtras !== 'undefined' && typeof window.xkExtras.checkAchievements === 'function') {
         try { window.xkExtras.checkAchievements(); } catch (e) {}
     }
@@ -3973,7 +3738,6 @@ function getSongPrice(song) {
         if (!Number.isNaN(p) && p >= 0) return p;
     }
     let price = settings.songPrice;
-    // Flash sale toàn site
     try {
         const pct = Number(settings.flashSalePercent) || 0;
         const until = settings.flashSaleUntil ? Date.parse(settings.flashSaleUntil) : 0;
@@ -3996,7 +3760,6 @@ function doDailyCheckin(dayKeyOpt) {
     }
     const today = getTodayKey();
     const dayKey = dayKeyOpt ? String(dayKeyOpt) : today;
-    // Chỉ cho điểm danh từ đầu tháng hiện tại đến hôm nay
     const now = new Date();
     const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
     if (dayKey < monthStart || dayKey > today) {
@@ -4047,12 +3810,10 @@ function doDailyCheckin(dayKeyOpt) {
             acc.seasonXp = (Number(acc.seasonXp) || 0) + 10;
             acc.level = Math.max(1, Math.floor((Number(acc.xp) || 0) / 100) + 1);
         } else {
-            // Điểm danh bù: trừ 5 XK, không thưởng, không đổi streak
             acc.coins = Math.max(0, (acc.coins | 0) - MAKEUP_COST);
             if (dayKey > (acc.lastCheckin || '')) acc.lastCheckin = dayKey;
         }
     });
-    // Ép đẩy checkin lên Firebase ngay (tránh deploy/xóa local mất điểm danh)
     try {
         const name = getCurrentUsername();
         const accNow = getCurrentAccount();
@@ -4080,7 +3841,6 @@ function doDailyCheckin(dayKeyOpt) {
     return true;
 }
 
-/** Ép UI 1 item cửa hàng sang trạng thái ĐÃ MUA ngay (không đợi sync) */
 function markShopItemOwnedUI(songId) {
     const id = String(songId);
     const list = document.getElementById('shop-list');
@@ -4128,26 +3888,22 @@ function buySong(songId) {
         acc.owned = [...new Set(acc.owned)];
     });
     markPendingOwned(songId);
-    // Toast: 2 ngôi sao FA 2 bên ID (giống music2)
     showNotification(
         'MUA THÀNH CÔNG:',
         '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
         '#4ade80',
         'shopping-bag'
     );
-    // Cập nhật UI ngay — badge ĐÃ MUA
     renderShopList();
     markShopItemOwnedUI(songId);
     if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
     updateUsernameBadge();
     
-    // Mua đúng bài vừa hết demo (hoặc đang nghe) → phát full từ mốc 1 phút
     const isCurrentOrDemo = (songs[index] && String(songs[index].id) === String(songId))
         || (demoLockedSongId != null && String(demoLockedSongId) === String(songId));
     
     if (isCurrentOrDemo) {
-        // Đảm bảo đang đứng đúng bài vừa mua
         const songIdx = songs.findIndex(s => String(s.id) === String(songId));
         if (songIdx !== -1) index = songIdx;
         
@@ -4165,7 +3921,6 @@ function buySong(songId) {
                 audio.play().catch(() => {});
                 updateProgressUI();
             });
-            // Fallback nếu metadata đã có sẵn
             if (audio.readyState >= 1) {
                 try {
                     const seekTo = Math.min(DEMO_SECONDS, (audio.duration || DEMO_SECONDS) - 0.5);
@@ -4184,7 +3939,6 @@ function updateShopBalanceUI() {
     updateShopUserProfile();
 }
 
-/** Rank: member | vip | super_vip | admin */
 function getUserRank(account) {
     const r = String((account && account.rank) || 'member').toLowerCase().trim();
     if (r === 'admin' || r === 'super_vip' || r === 'vip') return r;
@@ -4220,14 +3974,13 @@ function updateShopUserProfile() {
 }
 
 function updateUsernameBadge() {
-    // Username đã chuyển vào cửa hàng
     updateShopUserProfile();
 }
 
 function updateCheckinButtonUI() {
     const btn = document.getElementById('checkin-btn');
     const txt = document.getElementById('checkin-btn-text');
-    if (!btn) return; // đã chuyển điểm danh vào Tiện ích
+    if (!btn) return;
     if (hasCheckedInToday()) {
         btn.disabled = true;
         btn.classList.add('done');
@@ -4323,7 +4076,6 @@ function renderShopList(highlightSongId) {
     }
 }
 
-
 let _progressThumbsCache = null;
 let _progressThumbsCacheAt = 0;
 async function fetchProgressThumbs(force) {
@@ -4347,7 +4099,6 @@ async function fetchProgressThumbs(force) {
     return _progressThumbsCache || [];
 }
 
-/** Cập nhật 1 dòng thumb UI — không rebuild cả list (tránh giật) */
 function patchThumbItemUI(thumbId) {
     const list = document.getElementById('shop-thumb-list');
     if (!list) return;
@@ -4381,7 +4132,6 @@ function patchThumbItemUI(thumbId) {
             updateCurrentAccount(a => { a.activeThumb = ''; });
             applyActiveProgressThumb();
             patchThumbItemUI(id);
-            // cập nhật các item khác đang active
             list.querySelectorAll('.shop-thumb-item').forEach(el => {
                 const tid = el.getAttribute('data-thumb-id');
                 if (tid && tid !== id) patchThumbItemUI(tid);
@@ -4411,7 +4161,6 @@ function patchThumbItemUI(thumbId) {
         const price = m ? m[1] : '';
         btn.setAttribute('data-buy-thumb', id);
         btn.textContent = 'MUA ' + (price ? price + ' XK' : '');
-        // buy handler re-bound in renderShopThumbs; fallback:
         btn.onclick = (e) => {
             e.stopPropagation();
             fetchProgressThumbs().then(thumbs => buyProgressThumb(id, thumbs));
@@ -4505,7 +4254,6 @@ async function renderShopThumbs() {
             e.stopPropagation();
             const src = btn.getAttribute('data-thumb-src');
             if (!src) return;
-            // Load vào preview nhỏ + mở demo lớn
             if (btn.dataset.loaded !== '1') {
                 btn.dataset.loaded = '1';
                 btn.innerHTML = '<img src="' + src.replace(/"/g, '&quot;') + '" alt="">';
@@ -4605,8 +4353,6 @@ function closeShopModal() {
     if (modal) modal.classList.remove('show');
 }
 
-
-/** PIN 6 số — UI ô giống upload.xuanken.name.vn */
 const PIN_LEN = 6;
 
 function buildPinBoxes() {
@@ -4685,7 +4431,6 @@ function initPinBoxes() {
     });
 }
 
-
 function readPinTrust() {
     try {
         const raw = localStorage.getItem(storageKey(STORAGE_PIN_TRUST));
@@ -4698,7 +4443,6 @@ function readPinTrust() {
     }
 }
 
-/** Máy này đã nhập đúng PIN cho username trong vòng 7 ngày? */
 function isPinTrusted(username) {
     const name = String(username || '').trim();
     if (!name) return false;
@@ -4726,7 +4470,6 @@ function clearPinTrust() {
     } catch (e) {}
 }
 
-/** Xóa session local (username + accounts cache) — giữ theme. Dùng khi UID bị lẫn. */
 function clearLocalUserSession() {
     try {
         localStorage.removeItem(storageKey(STORAGE_CURRENT_USER));
@@ -4738,7 +4481,6 @@ function clearLocalUserSession() {
     } catch (e) {}
 }
 
-/** Nếu local user/uid lệch Auth → xóa cache local và kéo lại từ Firebase */
 async function reconcileLocalWithAuth() {
     const authUid = getCurrentUid();
     if (!authUid) return false;
@@ -4757,7 +4499,6 @@ function setPinSectionVisible(show) {
     const boxes = document.getElementById('pin-boxes');
     const hint = document.getElementById('pin-hint');
     const label = document.querySelector('label.username-label[for="pin-hidden"], label.username-label');
-    // label "MÃ PIN" — tìm label gần pin-boxes
     const form = document.getElementById('username-form');
     let pinLabel = null;
     if (form) {
@@ -4790,7 +4531,6 @@ async function loginWithUsername(rawName, rawPin) {
     if (!/^[\w\u00C0-\u024F\u1E00-\u1EFF .-]+$/i.test(name)) {
         return { ok: false, message: 'Username không hợp lệ' };
     }
-    // Tên dành riêng cho Admin (Tối Thượng) — không cho player đăng ký / đăng nhập
     const reservedAdmin = ['tối thượng', 'toi thuong', 'toithuong', 'administrator', 'admin', 'xuanken admin'];
     if (reservedAdmin.includes(name.toLowerCase().replace(/\s+/g, ' '))) {
         return { ok: false, message: 'Username này dành riêng cho Admin (Tối Thượng)' };
@@ -4802,8 +4542,6 @@ async function loginWithUsername(rawName, rawPin) {
         return { ok: false, message: 'Firebase Auth chưa sẵn sàng — tải lại trang' };
     }
 
-    // PIN 6 số = mật khẩu Firebase Auth
-    // Chỉ bỏ qua PIN khi ĐÃ có session Auth trên máy này
     const hasAuthSession = !!(auth.currentUser);
     if (!hasAuthSession) {
         if (!/^[0-9]{6}$/.test(pin)) {
@@ -4815,7 +4553,6 @@ async function loginWithUsername(rawName, rawPin) {
     const key = sanitizeUsernameKey(name);
     const db = getDb();
 
-    // Kiểm tra username đã map uid chưa
     let existingUid = null;
     try {
         if (db) {
@@ -4832,15 +4569,12 @@ async function loginWithUsername(rawName, rawPin) {
 
     try {
         if (existingUid || !allowRegister) {
-            // Đăng nhập user đã có
             if (!/^[0-9]{6}$/.test(pin) && auth.currentUser) {
-                // Session còn, trusted
                 cred = { user: auth.currentUser };
             } else {
                 try {
                     cred = await auth.signInWithEmailAndPassword(email, pin);
                 } catch (signErr1) {
-                    // Admin có thể đã đặt loginPin trên DB — thử đồng bộ Auth password rồi đăng nhập lại
                     const code1 = signErr1 && signErr1.code;
                     if ((code1 === 'auth/wrong-password' || code1 === 'auth/invalid-credential' || code1 === 'auth/invalid-login-credentials') && existingUid && db) {
                         try {
@@ -4868,7 +4602,6 @@ async function loginWithUsername(rawName, rawPin) {
                 }
             }
         } else {
-            // Thử đăng nhập trước; nếu không có tài khoản → đăng ký
             try {
                 cred = await auth.signInWithEmailAndPassword(email, pin);
             } catch (signErr) {
@@ -4883,7 +4616,6 @@ async function loginWithUsername(rawName, rawPin) {
                     if (!/^[0-9]{6}$/.test(pin)) {
                         return { ok: false, message: 'Đăng ký mới cần đặt PIN đúng 6 số' };
                     }
-                    // Tạo Auth account
                     cred = await auth.createUserWithEmailAndPassword(email, pin);
                     isNew = true;
                 } else {
@@ -4892,7 +4624,6 @@ async function loginWithUsername(rawName, rawPin) {
             }
         }
     } catch (err) {
-        // Sai mật khẩu khi login
         return { ok: false, message: authErrorMessage(err) };
     }
 
@@ -4901,7 +4632,6 @@ async function loginWithUsername(rawName, rawPin) {
         return { ok: false, message: 'Không lấy được phiên đăng nhập' };
     }
 
-    // Profile + ban check
     let profile = null;
     try {
         if (db) {
@@ -4967,7 +4697,6 @@ async function loginWithUsername(rawName, rawPin) {
         saveAllAccounts(accounts);
     } else {
         await fetchUserByUid(uid, name);
-        // Đảm bảo map username
         try {
             if (db) {
                 await db.ref(dataPath('usernames') + '/' + key).set({ uid: uid, username: name });
@@ -4977,7 +4706,6 @@ async function loginWithUsername(rawName, rawPin) {
 
     setCurrentUsername(name);
     const accounts = getAllAccounts();
-    // Dọn local: xóa entry khác đang trỏ cùng uid (tránh lẫn)
     Object.keys(accounts).forEach(k => {
         if (k !== name && accounts[k] && String(accounts[k].uid || '') === String(uid)) {
             delete accounts[k];
@@ -5008,8 +4736,6 @@ function setupUsernameGate() {
     function refreshPinVisibility() {
         const auth = getAuth();
         const hasAuthSession = !!(auth && auth.currentUser);
-        // Đã có phiên Auth → ẩn PIN (chạm Bắt đầu là vào)
-        // Chưa Auth → LUÔN hiện PIN (mật khẩu đăng nhập)
         setPinSectionVisible(!hasAuthSession);
         const hint = document.getElementById('pin-hint');
         if (hint) {
@@ -5021,7 +4747,6 @@ function setupUsernameGate() {
     
     if (existing && input) {
         input.value = existing;
-        // Ưu tiên Auth uid → profile Firebase (tránh localStorage cứng đầu trên PC)
         const authUid = getCurrentUid();
         const loader = authUid
             ? fetchUserByUid(authUid, existing)
@@ -5055,7 +4780,6 @@ function setupUsernameGate() {
             const name = input.value;
             const auth = getAuth();
             const hasAuthSession = !!(auth && auth.currentUser);
-            // Luôn lấy PIN từ ô nhập khi chưa có session Auth
             const pinVal = hasAuthSession ? '' : getPinValue();
             const result = await loginWithUsername(name, pinVal);
             if (!result.ok) {
@@ -5107,7 +4831,6 @@ function setupUsernameGate() {
                 }
                 return;
             }
-            // Hết hạn 7 ngày / máy lạ → bắt nhập PIN lại
             if (getAdminSettings().requirePin !== false && !isPinTrusted(getCurrentUsername())) {
                 setPinSectionVisible(true);
                 focusPinInput();
@@ -5123,8 +4846,6 @@ function setupUsernameGate() {
         };
     }
 }
-
-// Gắn sự kiện cửa hàng
 
 function initShopTabs() {
     const bar = document.querySelector('.shop-tab-bar');
@@ -5173,7 +4894,6 @@ updateUsernameBadge();
 updateShopBalanceUI();
 updateCheckinButtonUI();
 
-/** Khôi phục phiên Firebase Auth — đã login thì bỏ qua form PIN */
 (function bindAuthSessionRestore() {
     const auth = getAuth();
     if (!auth) return;
@@ -5181,7 +4901,6 @@ updateCheckinButtonUI();
     auth.onAuthStateChanged(async (user) => {
         if (!user) return;
         try {
-            // Chỉ nhận phiên PLAYER (email ảo @xuanken.user). Email admin thật → bỏ qua, không ghi đè thành viên.
             const email = String(user.email || '').toLowerCase();
             if (email && !email.endsWith('@xuanken.user')) {
                 console.warn('[player] Bỏ qua phiên Auth admin/email thật:', email);
@@ -5202,16 +4921,14 @@ updateCheckinButtonUI();
                 console.warn('[sync] localStorage user="' + localName + '" ≠ Auth profile="' + name + '" → ép theo Firebase');
             }
             setCurrentUsername(name);
-            await fetchUserByUid(user.uid, name); // Firebase = nguồn đúng
+            await fetchUserByUid(user.uid, name);
             markPinTrusted(name);
             updateUsernameBadge();
             updateShopBalanceUI();
             updateCheckinButtonUI();
-            // Auto vào player nếu đang ở màn hình gate
             const hint = document.getElementById('interaction-hint');
             const player = document.getElementById('player-container');
             if (hint && player && player.style.display === 'none') {
-                // Không auto-play (cần gesture) — chỉ điền username & ẩn PIN
                 const input = document.getElementById('username-input');
                 if (input) input.value = name;
                 setPinSectionVisible(false);
@@ -5224,7 +4941,6 @@ updateCheckinButtonUI();
     });
 })();
 
-/** Khi mở lại tab / app (PC ↔ mobile) thì kéo lại dữ liệu mới nhất từ Firebase */
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     reconcileLocalWithAuth().then(() => {
@@ -5238,10 +4954,6 @@ document.addEventListener('visibilitychange', () => {
     }).catch(() => {});
 });
 
-// Settings / prices / songs được load ở cuối file (sau khi define đủ hàm)
-
-
-// ===== PRELOAD bài kế tiếp (shuffle / tuần tự) =====
 function getNextSongIndexForPreload() {
     if (!songs.length) return -1;
     if (isShuffle) {
@@ -5268,13 +4980,9 @@ function preloadNextSong() {
     } catch (e) {}
 }
 
-// ===== LƯU / TIẾP TỤC vị trí nghe theo username (mọi thiết bị) =====
-// Máy A nghe đến phút X → dừng/thoát → lưu.
-// Máy A/B/C vào lại (cùng username) → mở đúng bài + đúng phút đó.
 const DEVICE_ID = (() => {
     let id = localStorage.getItem(storageKey(STORAGE_DEVICE_ID));
     if (!id) {
-        // fallback key cũ (không prefix) → chuyển sang key mới nếu có
         const legacy = localStorage.getItem(STORAGE_DEVICE_ID);
         if (legacy) {
             id = legacy;
@@ -5288,7 +4996,6 @@ const DEVICE_ID = (() => {
 })();
 let syncApplying = false;
 let lastSyncPush = 0;
-// ===== Playback position save/restore: ĐÃ TẮT theo yêu cầu =====
 async function restorePlaybackState() { return false; }
 function startPlaybackSyncListener() {}
 function pushPlaybackSync() {}
@@ -5299,7 +5006,6 @@ audio.addEventListener('play', () => {
     preloadNextSong();
 });
 
-// My playlist button
 const myPlaylistBtn = document.getElementById('my-playlist-btn');
 const myPlaylistOverlay = document.getElementById('my-playlist-overlay');
 const closeMyPlaylistBtn = document.getElementById('close-my-playlist-btn');
@@ -5323,7 +5029,6 @@ window.fetchProgressThumbs = fetchProgressThumbs;
 window.getCurrentUsername = getCurrentUsername;
 window.clearLocalUserSession = clearLocalUserSession;
 window.reconcileLocalWithAuth = reconcileLocalWithAuth;
-// Expose for extras.js
 Object.defineProperty(window, 'songs', { get: () => songs });
 Object.defineProperty(window, 'index', { get: () => index });
 window.audio = typeof audio !== 'undefined' ? audio : document.getElementById('audio-player');
@@ -5346,7 +5051,3 @@ window.getDb = getDb;
     syncPricesFromFirebase();
     loadSongsFromFirebase();
 })();
-
-
-
-

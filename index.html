@@ -15,7 +15,6 @@
     <script src="js/firebase-config.js"></script>
 
     <script>
-    // Ẩn đuôi .html trên URL (GitHub Pages / static hosting)
     (function () {
         try {
             var path = location.pathname;
@@ -70,7 +69,6 @@
 
     <div class="player-container" id="player-container" style="display: none;">
         <div class="pc-layout">
-            <!-- Cột trái (PC): danh sách bài hát – ẩn mặc định, tự hiện khi còn ≤10s cuối bài -->
             <div class="pc-left">
                 <div class="playlist" id="playlist">
                     <div class="playlist-header" id="playlist-header">
@@ -89,7 +87,6 @@
                 </div>
             </div>
 
-            <!-- Cột phải (PC): top-bar + art + lyric + progress + controls – mặc định full width -->
             <div class="pc-right">
                 <div class="top-bar-icons">
                     <div class="btn-icon" id="open-timer-btn" title="Hẹn giờ tắt">
@@ -161,8 +158,6 @@
             </div>
         </div>
 
-
-
         <div class="playlist" id="my-playlist-overlay">
             <div class="playlist-header">
                 <div class="close-playlist" id="close-my-playlist-btn">
@@ -215,8 +210,6 @@
             </div>
         </div>
 
-
-        <!-- Tiện ích -->
         <div id="extras-modal" class="shop-modal extras-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-extras-btn">
@@ -292,8 +285,6 @@
             </div>
         </div>
 
-
-        <!-- Chat toàn web (khung player) -->
         <div id="chat-modal" class="shop-modal chat-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-chat-btn" title="Quay lại">
@@ -312,7 +303,6 @@
             </div>
         </div>
 
-        <!-- Điểm danh lịch -->
         <div id="checkin-modal" class="shop-modal checkin-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-checkin-btn" title="Quay lại">
@@ -324,7 +314,6 @@
             <div class="checkin-modal-body" id="checkin-modal-body"></div>
         </div>
 
-        <!-- Cửa hàng XK -->
         <div id="shop-modal" class="shop-modal">
             <div class="shop-modal-header">
                 <div class="close-shop" id="close-shop-btn">
@@ -367,7 +356,6 @@
 
     <script src="js/music.js"></script>
     <script>
-        // Khởi tạo Lucide icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
