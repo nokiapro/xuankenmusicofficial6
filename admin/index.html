@@ -1576,7 +1576,7 @@
             applyBranding();
         }
 
-        async function loadSongs() {
+        async function loadSongs(keepPage = false) {
             const snap = await db().ref(dataPath('songs')).once('value');
             const obj = snap.val() || {};
             songsCache = Object.keys(obj).map(id => ({
@@ -1601,7 +1601,13 @@
                 if (na !== 0) return na;
                 return String(a.id || '').localeCompare(String(b.id || ''), 'vi', { sensitivity: 'base' });
             });
-            renderSongs(document.getElementById('song-search').value);
+            const searchVal = (document.getElementById('song-search') && document.getElementById('song-search').value) || '';
+            if (keepPage) {
+                songsFilter = searchVal;
+                renderSongs(songsFilter, true);
+            } else {
+                renderSongs(searchVal);
+            }
             refreshStats();
         }
 
@@ -1882,7 +1888,7 @@
                     if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
                     await db().ref(dataPath('songs') + '/' + id).remove();
                     toast('Đã xóa ' + id);
-                    await loadSongs();
+                    await loadSongs(true);
                 };
             });
             tbody.querySelectorAll('[data-toggle-hide]').forEach(btn => {
@@ -1893,7 +1899,7 @@
                     const next = !song.hidden;
                     await db().ref(dataPath('songs') + '/' + id + '/hidden').set(next);
                     toast(next ? ('Đã ẩn "' + id + '" — player không còn hiện') : ('Đã hiện lại "' + id + '"'));
-                    await loadSongs();
+                    await loadSongs(true);
                 };
             });
             renderSongsPagination(totalPages);
@@ -2061,7 +2067,7 @@
             }
 
             editingSongId = null;
-            await loadSongs();
+            await loadSongs(true);
             const saved = songsCache.find(s => s.id === id);
             if (saved) fillSongForm(saved);
             else clearSongForm();
