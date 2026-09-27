@@ -418,6 +418,36 @@
             font-weight: 600;
         }
         .full { grid-column: 1 / -1; }
+        .upload-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .upload-row input[type="text"],
+        .upload-row input:not([type]) {
+            flex: 1;
+            min-width: 160px;
+        }
+        .upload-folder-select {
+            width: auto;
+            min-width: 100px;
+            max-width: 140px;
+            padding: 8px 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .upload-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.72rem;
+            color: var(--muted);
+            min-height: 1.1em;
+        }
+        .upload-hint.ok { color: var(--ok, #4ade80); }
+        .upload-hint.err { color: var(--danger, #f87171); }
+        .upload-hint.loading { color: var(--info, #60a5fa); }
         .check-row {
             display: flex;
             align-items: center;
@@ -980,7 +1010,16 @@
                     </div>
                     <div class="full">
                         <label>Link audio DEMO 1 phút *</label>
-                        <input id="s-audio" placeholder="https://.../demo-1p.mp3">
+                        <div class="upload-row">
+                            <input id="s-audio" placeholder="https://.../demo-1p.mp3" style="flex:1;min-width:160px;">
+                            <select id="s-audio-folder" class="upload-folder-select" title="Folder Cloudinary">
+                                <option value="DEMO" selected>DEMO</option>
+                                <option value="MUSIC">MUSIC</option>
+                            </select>
+                            <input type="file" id="s-audio-file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" style="display:none;">
+                            <button type="button" class="btn btn-info" id="s-audio-upload-btn" title="Upload file lên Cloudinary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</button>
+                        </div>
+                        <small class="upload-hint" id="s-audio-upload-status"></small>
                     </div>
                     <div class="full">
                         <label>Link audio FULL 1 (sau khi mua/thuê)</label>
@@ -988,7 +1027,16 @@
                     </div>
                     <div class="full">
                         <label>Link audio FULL 2 (dự phòng / random)</label>
-                        <input id="s-audio-full-2" placeholder="https://.../full-backup.mp3 — random + fallback nếu link 1 lỗi">
+                        <div class="upload-row">
+                            <input id="s-audio-full-2" placeholder="https://.../full-backup.mp3 — random + fallback nếu link 1 lỗi" style="flex:1;min-width:160px;">
+                            <select id="s-audio-full-2-folder" class="upload-folder-select" title="Folder Cloudinary">
+                                <option value="DEMO">DEMO</option>
+                                <option value="MUSIC" selected>MUSIC</option>
+                            </select>
+                            <input type="file" id="s-audio-full-2-file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" style="display:none;">
+                            <button type="button" class="btn btn-info" id="s-audio-full-2-upload-btn" title="Upload file lên Cloudinary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</button>
+                        </div>
+                        <small class="upload-hint" id="s-audio-full-2-upload-status"></small>
                     </div>
                     <div class="full">
                         <label>Lịch đăng bài (để trống = hiện ngay)</label>
@@ -1197,6 +1245,32 @@
             </div>
 
             <div class="card">
+                <h2>Cloudinary (Upload audio)</h2>
+                <p class="muted" style="margin-bottom:12px;font-size:0.78rem;">Dùng cho nút Upload ở link DEMO và FULL 2. Tạo <b>Unsigned Upload Preset</b> trên Cloudinary Dashboard → Settings → Upload. Chọn folder DEMO / MUSIC ngay khi upload.</p>
+                <div class="form-grid">
+                    <div>
+                        <label>Cloud name</label>
+                        <input type="text" id="set-cloudinary-cloud" placeholder="vd: dxxxx">
+                    </div>
+                    <div>
+                        <label>Upload preset (unsigned)</label>
+                        <input type="text" id="set-cloudinary-preset" placeholder="vd: xuanken_audio">
+                    </div>
+                    <div>
+                        <label>Folder DEMO</label>
+                        <input type="text" id="set-cloudinary-folder-demo" placeholder="DEMO">
+                    </div>
+                    <div>
+                        <label>Folder MUSIC</label>
+                        <input type="text" id="set-cloudinary-folder-music" placeholder="MUSIC">
+                    </div>
+                </div>
+                <div class="row-actions form-actions">
+                    <button type="button" class="btn btn-primary" id="save-cloudinary-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu Cloudinary</button>
+                </div>
+            </div>
+
+            <div class="card">
                 <h2>Gift code</h2>
                 <div class="form-grid">
                     <div>
@@ -1353,7 +1427,11 @@
             siteBanner: '',
             flashSalePercent: 0,
             flashSaleUntil: '',
-            inviteReward: 20
+            inviteReward: 20,
+            cloudinaryCloud: '',
+            cloudinaryPreset: '',
+            cloudinaryFolderDemo: 'DEMO',
+            cloudinaryFolderMusic: 'MUSIC'
         };
 
         let songsCache = [];
@@ -1474,6 +1552,14 @@
                         pl.value = links;
                     } else pl.value = '';
                 }
+                const cc = document.getElementById('set-cloudinary-cloud');
+                const cp = document.getElementById('set-cloudinary-preset');
+                const cfd = document.getElementById('set-cloudinary-folder-demo');
+                const cfm = document.getElementById('set-cloudinary-folder-music');
+                if (cc) cc.value = settingsCache.cloudinaryCloud || '';
+                if (cp) cp.value = settingsCache.cloudinaryPreset || '';
+                if (cfd) cfd.value = settingsCache.cloudinaryFolderDemo || 'DEMO';
+                if (cfm) cfm.value = settingsCache.cloudinaryFolderMusic || 'MUSIC';
             } catch (e) { console.warn('load countdown/links', e); }
 
             try {
@@ -2618,6 +2704,107 @@
             settingsCache.partnerLinks = list;
             toast(list.length ? ('Đã lưu ' + list.length + ' liên kết') : 'Đã xóa hết liên kết');
         };
+
+        const saveCloudinaryBtn = document.getElementById('save-cloudinary-btn');
+        if (saveCloudinaryBtn) saveCloudinaryBtn.onclick = async () => {
+            const cloud = (document.getElementById('set-cloudinary-cloud') && document.getElementById('set-cloudinary-cloud').value || '').trim();
+            const preset = (document.getElementById('set-cloudinary-preset') && document.getElementById('set-cloudinary-preset').value || '').trim();
+            const folderDemo = (document.getElementById('set-cloudinary-folder-demo') && document.getElementById('set-cloudinary-folder-demo').value || '').trim() || 'DEMO';
+            const folderMusic = (document.getElementById('set-cloudinary-folder-music') && document.getElementById('set-cloudinary-folder-music').value || '').trim() || 'MUSIC';
+            await saveSettingsPartial({
+                cloudinaryCloud: cloud,
+                cloudinaryPreset: preset,
+                cloudinaryFolderDemo: folderDemo,
+                cloudinaryFolderMusic: folderMusic
+            });
+            settingsCache.cloudinaryCloud = cloud;
+            settingsCache.cloudinaryPreset = preset;
+            settingsCache.cloudinaryFolderDemo = folderDemo;
+            settingsCache.cloudinaryFolderMusic = folderMusic;
+            toast(cloud && preset ? 'Đã lưu Cloudinary' : 'Đã lưu (thiếu cloud name hoặc preset — upload sẽ không chạy)');
+        };
+
+        function resolveCloudinaryFolder(key) {
+            const k = (key || 'DEMO').toUpperCase();
+            if (k === 'MUSIC') {
+                return (settingsCache.cloudinaryFolderMusic || 'MUSIC').trim() || 'MUSIC';
+            }
+            return (settingsCache.cloudinaryFolderDemo || 'DEMO').trim() || 'DEMO';
+        }
+
+        async function uploadToCloudinary(file, statusEl, folderKey) {
+            const cloud = (settingsCache.cloudinaryCloud || '').trim();
+            const preset = (settingsCache.cloudinaryPreset || '').trim();
+            const folder = resolveCloudinaryFolder(folderKey);
+            if (!cloud || !preset) {
+                if (statusEl) {
+                    statusEl.textContent = 'Chưa cấu hình Cloudinary (Cài đặt → Cloudinary)';
+                    statusEl.className = 'upload-hint err';
+                }
+                toast('Vào Cài đặt → Cloudinary nhập Cloud name + Upload preset');
+                return null;
+            }
+            if (!file) return null;
+            if (statusEl) {
+                statusEl.textContent = 'Đang upload → ' + folder + ': ' + file.name + '…';
+                statusEl.className = 'upload-hint loading';
+            }
+            const form = new FormData();
+            form.append('file', file);
+            form.append('upload_preset', preset);
+            if (folder) form.append('folder', folder);
+            try {
+                const res = await fetch('https://api.cloudinary.com/v1_1/' + encodeURIComponent(cloud) + '/auto/upload', {
+                    method: 'POST',
+                    body: form
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    const msg = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+                    throw new Error(msg);
+                }
+                const url = data.secure_url || data.url;
+                if (!url) throw new Error('Không nhận được URL từ Cloudinary');
+                if (statusEl) {
+                    statusEl.textContent = 'OK [' + folder + ']: ' + file.name;
+                    statusEl.className = 'upload-hint ok';
+                }
+                toast('Upload thành công → ' + folder);
+                return url;
+            } catch (e) {
+                console.error('Cloudinary upload', e);
+                if (statusEl) {
+                    statusEl.textContent = 'Lỗi: ' + (e && e.message ? e.message : e);
+                    statusEl.className = 'upload-hint err';
+                }
+                toast('Upload lỗi: ' + (e && e.message ? e.message : e));
+                return null;
+            }
+        }
+
+        function bindCloudinaryUpload(btnId, fileId, inputId, statusId, folderSelectId) {
+            const btn = document.getElementById(btnId);
+            const fileEl = document.getElementById(fileId);
+            const inputEl = document.getElementById(inputId);
+            const statusEl = document.getElementById(statusId);
+            const folderSel = document.getElementById(folderSelectId);
+            if (!btn || !fileEl || !inputEl) return;
+            btn.onclick = () => fileEl.click();
+            fileEl.onchange = async () => {
+                const file = fileEl.files && fileEl.files[0];
+                fileEl.value = '';
+                if (!file) return;
+                const folderKey = folderSel ? folderSel.value : 'DEMO';
+                btn.disabled = true;
+                if (folderSel) folderSel.disabled = true;
+                const url = await uploadToCloudinary(file, statusEl, folderKey);
+                btn.disabled = false;
+                if (folderSel) folderSel.disabled = false;
+                if (url) inputEl.value = url;
+            };
+        }
+        bindCloudinaryUpload('s-audio-upload-btn', 's-audio-file', 's-audio', 's-audio-upload-status', 's-audio-folder');
+        bindCloudinaryUpload('s-audio-full-2-upload-btn', 's-audio-full-2-file', 's-audio-full-2', 's-audio-full-2-upload-status', 's-audio-full-2-folder');
 
         async function loadGiftCodes() {
             const el = document.getElementById('gift-list');
