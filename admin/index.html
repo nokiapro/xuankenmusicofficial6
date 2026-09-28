@@ -1577,17 +1577,45 @@
             applyBranding();
         }
 
+        async function fetchSongFullById(id) {
+            const key = String(id || '');
+            if (!key) return { audioFull: '', audioFull2: '' };
+            try {
+                const snap = await db().ref(dataPath('songFulls') + '/' + key).once('value');
+                const v = snap.val() || {};
+                return {
+                    audioFull: (v.audioFull || '') || '',
+                    audioFull2: (v.audioFull2 || '') || ''
+                };
+            } catch (e) {
+                console.warn('fetchSongFullById', key, e && (e.code || e.message));
+                return { audioFull: '', audioFull2: '' };
+            }
+        }
+
         async function loadSongs(keepPage = false) {
             const snap = await db().ref(dataPath('songs')).once('value');
             const obj = snap.val() || {};
             let fulls = {};
+            // Thử đọc cả node (admin). Nếu Rules chặn list, fallback từng ID.
             try {
                 const fullSnap = await db().ref(dataPath('songFulls')).once('value');
                 fulls = fullSnap.val() || {};
             } catch (e) {
-                console.warn('load songFulls', e);
+                console.warn('load songFulls bulk', e && (e.code || e.message));
             }
-            songsCache = Object.keys(obj).map(id => {
+            const ids = Object.keys(obj);
+            if (!Object.keys(fulls).length && ids.length) {
+                const chunk = 20;
+                for (let i = 0; i < ids.length; i += chunk) {
+                    const slice = ids.slice(i, i + chunk);
+                    await Promise.all(slice.map(async (id) => {
+                        const f = await fetchSongFullById(id);
+                        if (f.audioFull || f.audioFull2) fulls[id] = f;
+                    }));
+                }
+            }
+            songsCache = ids.map(id => {
                 const s = obj[id] || {};
                 const f = fulls[id] || fulls[String(s.id || id)] || {};
                 return {
@@ -1776,7 +1804,7 @@
             `;
         }
 
-        function fillSongForm(song) {
+        async function fillSongForm(song) {
             editingSongId = song.id || null;
             document.getElementById('s-id').value = song.id || '';
             document.getElementById('s-name').value = song.name || '';
@@ -1799,6 +1827,27 @@
                 document.getElementById('s-publish-at').value = '';
             }
             document.getElementById('s-hidden').checked = !!song.hidden;
+            // Luôn nạp lại full từ songFulls/{id} khi sửa (tránh form trống do Rules chặn list)
+            if (song && song.id) {
+                try {
+                    const f = await fetchSongFullById(song.id);
+                    if (f.audioFull) {
+                        document.getElementById('s-audio-full').value = f.audioFull;
+                        song.audioFull = f.audioFull;
+                    }
+                    if (f.audioFull2) {
+                        document.getElementById('s-audio-full-2').value = f.audioFull2;
+                        song.audioFull2 = f.audioFull2;
+                    }
+                    const inCache = songsCache.find(x => x.id === song.id);
+                    if (inCache) {
+                        if (f.audioFull) inCache.audioFull = f.audioFull;
+                        if (f.audioFull2) inCache.audioFull2 = f.audioFull2;
+                    }
+                } catch (e) {
+                    console.warn('fillSongForm fulls', e);
+                }
+            }
         }
 
         function clearSongForm() {
@@ -1886,10 +1935,10 @@
             </tr>`).join('');
 
             tbody.querySelectorAll('[data-edit]').forEach(btn => {
-                btn.onclick = () => {
+                btn.onclick = async () => {
                     const song = songsCache.find(x => x.id === btn.getAttribute('data-edit'));
                     if (song) {
-                        fillSongForm(song);
+                        await fillSongForm(song);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                 };
@@ -2074,10 +2123,17 @@
             };
 
             await db().ref(dataPath('songs') + '/' + id).set(payload);
+            // Ghi songFulls: có link thì set; form trống thì GIỮ full cũ (không xóa nhầm)
             if (audioFull || audioFull2) {
-                await db().ref(dataPath('songFulls') + '/' + id).set(fullPayload);
-            } else {
-                await db().ref(dataPath('songFulls') + '/' + id).remove();
+                let prev = {};
+                try {
+                    const ps = await db().ref(dataPath('songFulls') + '/' + id).once('value');
+                    prev = ps.val() || {};
+                } catch (e) {}
+                await db().ref(dataPath('songFulls') + '/' + id).set({
+                    audioFull: audioFull || prev.audioFull || null,
+                    audioFull2: audioFull2 || prev.audioFull2 || null
+                });
             }
             // Dọn link full cũ nếu còn sót trong node songs
             try {
