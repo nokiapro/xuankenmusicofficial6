@@ -2286,6 +2286,8 @@ audio.onplay = () => {
     isPlaying = true;
     setLucideIcon(document.getElementById('play-pause-btn'), 'pause');
     if (art) art.style.animationPlayState = 'running';
+    const wrap = document.getElementById('album-art-wrap');
+    if (wrap) wrap.classList.add('ring-playing');
     requestWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
     hidePlayerLoading();
@@ -2296,10 +2298,101 @@ audio.onpause = () => {
     isPlaying = false;
     setLucideIcon(document.getElementById('play-pause-btn'), 'play');
     if (art) art.style.animationPlayState = 'paused';
+    const wrap = document.getElementById('album-art-wrap');
+    if (wrap) wrap.classList.remove('ring-playing');
     releaseWakeLock();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
     persistListenTimeNow();
 };
+
+function buildArtRingLabel(raw) {
+    let t = String(raw || '').trim();
+    if (!t) {
+        t = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
+        t = String(t || '').trim();
+    }
+    if (!t) {
+        try {
+            const s = typeof getAdminSettings === 'function' ? getAdminSettings() : null;
+            t = (s && (s.siteName || s.siteTitle)) || 'XuanKen Music';
+        } catch (e) {
+            t = 'XuanKen Music';
+        }
+    }
+    t = t.slice(0, 28);
+    // Lặp chữ để vòng tròn đầy
+    const unit = t + ' · ';
+    let out = '';
+    while (out.length < 56) out += unit;
+    return out;
+}
+
+function updateArtNameRing() {
+    const wrap = document.getElementById('album-art-wrap');
+    const pathEl = document.getElementById('art-name-textpath');
+    const enEl = document.getElementById('art-ring-enabled');
+    const txEl = document.getElementById('art-ring-text');
+    if (!wrap || !pathEl) return;
+
+    let on = true;
+    let custom = '';
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    if (acc) {
+        on = acc.artRingOn !== false;
+        custom = String(acc.artRingText || '');
+    }
+    if (enEl) enEl.checked = on;
+    if (txEl && document.activeElement !== txEl) txEl.value = custom;
+
+    wrap.classList.toggle('ring-off', !on);
+    pathEl.textContent = buildArtRingLabel(custom);
+    if (isPlaying) wrap.classList.add('ring-playing');
+    else wrap.classList.remove('ring-playing');
+}
+
+function saveArtRingSettings() {
+    if (!getCurrentUsername()) {
+        if (typeof showNotification === 'function') {
+            showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        }
+        return;
+    }
+    const enEl = document.getElementById('art-ring-enabled');
+    const txEl = document.getElementById('art-ring-text');
+    const on = !!(enEl && enEl.checked);
+    const text = (txEl && txEl.value || '').trim().slice(0, 28);
+    updateCurrentAccount(acc => {
+        acc.artRingOn = on;
+        acc.artRingText = text;
+    });
+    updateArtNameRing();
+    if (typeof showNotification === 'function') {
+        showNotification('VÒNG TÊN:', on ? ('Đã bật · ' + (text || getCurrentUsername() || 'username')) : 'Đã tắt', '#4ade80', 'sparkles');
+    } else if (typeof showToastMsg === 'function') {
+        showToastMsg(on ? 'Đã lưu vòng tên' : 'Đã tắt vòng tên', true);
+    }
+}
+
+function bindArtRingSettingsUI() {
+    const btn = document.getElementById('art-ring-save-btn');
+    if (btn && !btn._artRingBound) {
+        btn._artRingBound = true;
+        btn.onclick = () => saveArtRingSettings();
+    }
+    const enEl = document.getElementById('art-ring-enabled');
+    if (enEl && !enEl._artRingBound) {
+        enEl._artRingBound = true;
+        enEl.onchange = () => {
+            if (!getCurrentUsername()) {
+                enEl.checked = true;
+                return;
+            }
+            updateCurrentAccount(acc => { acc.artRingOn = !!enEl.checked; });
+            updateArtNameRing();
+        };
+    }
+    updateArtNameRing();
+}
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -2883,6 +2976,8 @@ function ensureUserAccount(username) {
             streakFreeze: 0,
             listenedSongs: {},
             listenTime: { total: 0, byDay: {} },
+            artRingOn: true,
+            artRingText: ''
         };
         saveAllAccounts(accounts);
     } else {
@@ -2892,6 +2987,8 @@ function ensureUserAccount(username) {
         if (!Array.isArray(a.dislikes)) a.dislikes = [];
         if (!Array.isArray(a.myPlaylist)) a.myPlaylist = [];
         if (!a.rentals || typeof a.rentals !== 'object') a.rentals = {};
+        if (a.artRingOn == null) a.artRingOn = true;
+        if (a.artRingText == null) a.artRingText = '';
         saveAllAccounts(accounts);
     }
     return accounts[name];
@@ -2932,7 +3029,9 @@ function mapUserProfile(data, name) {
         inviteBy: d.inviteBy || '',
         giftClaimCount: Number(d.giftClaimCount) || 0,
         chatCount: Number(d.chatCount) || 0,
-        profiles: Array.isArray(d.profiles) ? d.profiles : []
+        profiles: Array.isArray(d.profiles) ? d.profiles : [],
+        artRingOn: d.artRingOn !== false,
+        artRingText: typeof d.artRingText === 'string' ? d.artRingText : ''
     };
 }
 
@@ -3434,6 +3533,10 @@ async function pushUserToFirebase(username, account, options) {
             scalarPayload.activeThumb = account.activeThumb || '';
             scalarPayload.frame = account.frame || '';
         }
+        if (opts.artRingChanged || forceAll) {
+            scalarPayload.artRingOn = account.artRingOn !== false;
+            scalarPayload.artRingText = String(account.artRingText || '').slice(0, 28);
+        }
         if (opts.inviteChanged || forceAll) {
             if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
         }
@@ -3551,6 +3654,7 @@ function updateCurrentAccount(mutator) {
         checkin: snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
+        artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '' }),
         inviteBy: snap(acc.inviteBy || ''),
         counters: snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -3571,6 +3675,7 @@ function updateCurrentAccount(mutator) {
         checkinChanged: before.checkin !== snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
+        artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '' }),
         inviteChanged: before.inviteBy !== snap(acc.inviteBy || ''),
         countersChanged: before.counters !== snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -4822,6 +4927,7 @@ async function loginWithUsername(rawName, rawPin) {
     updateUsernameBadge();
     updateShopBalanceUI();
     updateCheckinButtonUI();
+    try { updateArtNameRing(); } catch (e) {}
     return { ok: true, username: name, uid: uid, isNew: isNew };
 }
 
@@ -5026,6 +5132,7 @@ updateCheckinButtonUI();
             updateUsernameBadge();
             updateShopBalanceUI();
             updateCheckinButtonUI();
+            try { updateArtNameRing(); } catch (e) {}
             const hint = document.getElementById('interaction-hint');
             const player = document.getElementById('player-container');
             if (hint && player && player.style.display === 'none') {
@@ -5150,4 +5257,16 @@ window.getDb = getDb;
     await syncSettingsFromFirebase();
     syncPricesFromFirebase();
     loadSongsFromFirebase();
+    try { bindArtRingSettingsUI(); } catch (e) {}
+    try { updateArtNameRing(); } catch (e) {}
 })();
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        try { bindArtRingSettingsUI(); } catch (e) {}
+        try { updateArtNameRing(); } catch (e) {}
+    });
+} else {
+    try { bindArtRingSettingsUI(); } catch (e) {}
+    try { updateArtNameRing(); } catch (e) {}
+}
