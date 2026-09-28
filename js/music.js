@@ -290,8 +290,6 @@ function generateDataHash(data) {
     return JSON.stringify(data.map(s => ({
         id: s.id,
         audio: s.audio || '',
-        audioFull: s.audioFull || '',
-        audioFull2: s.audioFull2 || '',
         name: s.name || '',
         artist: s.artist || '',
         publishAt: s.publishAt || null,
@@ -299,18 +297,24 @@ function generateDataHash(data) {
     })));
 }
 
+/** Cache link full (songFulls) — chỉ nạp khi user đã mua/thuê */
+const fullAudioCache = Object.create(null);
+
 function songsObjectToArray(obj) {
     if (!obj) return [];
     const list = Object.keys(obj).map(id => {
         const s = obj[id] || {};
+        const sid = String(s.id || id);
+        const cached = fullAudioCache[sid] || null;
         return {
-            id: String(s.id || id),
+            id: sid,
             _fbKey: String(id),
             name: s.name || id,
             artist: s.artist || '',
             audio: s.audio || '',
-            audioFull: s.audioFull || '',
-            audioFull2: s.audioFull2 || '',
+            // Không lấy audioFull từ node public songs — chỉ từ cache songFulls
+            audioFull: (cached && cached.audioFull) || '',
+            audioFull2: (cached && cached.audioFull2) || '',
             albumArt: s.albumArt || '',
             listenCount: Number(s.listenCount) || 0,
             lrc1: s.lrc1 || '',
@@ -336,11 +340,75 @@ function songsObjectToArray(obj) {
     return list;
 }
 
+function applyFullCacheToSongs() {
+    if (!Array.isArray(songs)) return;
+    songs.forEach(s => {
+        const f = fullAudioCache[String(s.id)];
+        if (f) {
+            s.audioFull = f.audioFull || '';
+            s.audioFull2 = f.audioFull2 || '';
+        }
+    });
+}
+
+async function fetchSongFull(songId) {
+    const id = String(songId || '');
+    if (!id) return null;
+    if (fullAudioCache[id] && (fullAudioCache[id].audioFull || fullAudioCache[id].audioFull2)) {
+        return fullAudioCache[id];
+    }
+    const db = getDb();
+    if (!db) return null;
+    try {
+        const snap = await db.ref(dataPath('songFulls') + '/' + id).once('value');
+        const v = snap.val();
+        if (v && (v.audioFull || v.audioFull2)) {
+            fullAudioCache[id] = {
+                audioFull: v.audioFull || '',
+                audioFull2: v.audioFull2 || ''
+            };
+            return fullAudioCache[id];
+        }
+        // Legacy fallback: full còn nằm trong songs (trước khi migrate)
+        const leg = await db.ref(dataPath('songs') + '/' + id).once('value');
+        const ls = leg.val() || {};
+        if (ls.audioFull || ls.audioFull2) {
+            fullAudioCache[id] = {
+                audioFull: ls.audioFull || '',
+                audioFull2: ls.audioFull2 || ''
+            };
+            return fullAudioCache[id];
+        }
+    } catch (e) {
+        console.warn('[songFulls] fetch', id, e && (e.code || e.message));
+    }
+    return null;
+}
+
+async function ensureFullAudioForOwned() {
+    const ids = new Set();
+    loadOwnedSongs().forEach(id => ids.add(String(id)));
+    const acc = getCurrentAccount();
+    if (acc && acc.rentals && typeof acc.rentals === 'object') {
+        Object.keys(acc.rentals).forEach(id => {
+            if (isSongRented(id)) ids.add(String(id));
+        });
+    }
+    const list = [...ids];
+    if (!list.length) return;
+    await Promise.all(list.map(id => fetchSongFull(id)));
+    applyFullCacheToSongs();
+}
+
 function getFullAudioCandidates(song) {
     if (!song) return [];
+    const id = String(song.id || '');
+    const cached = fullAudioCache[id];
     const list = [];
-    if (song.audioFull) list.push(song.audioFull);
-    if (song.audioFull2) list.push(song.audioFull2);
+    const a1 = (song.audioFull || (cached && cached.audioFull) || '');
+    const a2 = (song.audioFull2 || (cached && cached.audioFull2) || '');
+    if (a1) list.push(a1);
+    if (a2) list.push(a2);
     return list.filter(Boolean);
 }
 
@@ -657,6 +725,7 @@ async function loadSongsFromFirebase() {
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
+            try { await ensureFullAudioForOwned(); } catch (e) { console.warn('ensureFullAudioForOwned', e); }
             initPlayerAfterLoad();
             updateListenStatsModal();
             
@@ -1691,6 +1760,15 @@ async function loadSong(i) {
     document.documentElement.style.setProperty('--bg-color', colors.bg);
     document.documentElement.style.setProperty('--accent-color', colors.accent);
     
+    if (isSongOwned(song.id)) {
+        try {
+            const full = await fetchSongFull(song.id);
+            if (full) {
+                song.audioFull = full.audioFull || '';
+                song.audioFull2 = full.audioFull2 || '';
+            }
+        } catch (e) {}
+    }
     const playUrl = getPlayableAudio(song);
     if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[String(song.id)] = playUrl;
     if (!isSameAudioSrc(audio.src, playUrl)) {
@@ -3264,6 +3342,12 @@ async function pushUserToFirebase(username, account, options) {
             const merged = await txUnionArrayField(db, uid, 'owned', account.owned);
             account.owned = merged;
             if (accounts[name]) { accounts[name].owned = merged; saveAllAccounts(accounts); }
+            // ownedMap phục vụ Firebase Rules đọc songFulls
+            try {
+                const map = {};
+                (merged || []).forEach(id => { map[String(id)] = true; });
+                await db.ref(dataPath('users') + '/' + uid + '/ownedMap').set(map);
+            } catch (e) { console.warn('ownedMap sync', e); }
         }
 
         if ((opts.rentalsChanged || forceAll) && account.rentals && typeof account.rentals === 'object') {
@@ -3605,8 +3689,16 @@ function rentSong(songId) {
         const songIdx = songs.findIndex(s => String(s.id) === String(songId));
         if (songIdx !== -1) index = songIdx;
         demoLockedSongId = null;
-        const fullUrl = getPlayableAudio(songs[index]);
-        if (fullUrl) {
+        (async () => {
+            try {
+                const full = await fetchSongFull(songId);
+                if (full && songs[index] && String(songs[index].id) === String(songId)) {
+                    songs[index].audioFull = full.audioFull || '';
+                    songs[index].audioFull2 = full.audioFull2 || '';
+                }
+            } catch (e) {}
+            const fullUrl = getPlayableAudio(songs[index]);
+            if (!fullUrl) return;
             audio.src = fullUrl;
             audio.load();
             const seekPlay = () => {
@@ -3622,7 +3714,7 @@ function rentSong(songId) {
                 seekPlay();
             });
             if (audio.readyState >= 1) seekPlay();
-        }
+        })();
     }
     return true;
 }
@@ -3908,8 +4000,16 @@ function buySong(songId) {
         if (songIdx !== -1) index = songIdx;
         
         demoLockedSongId = null;
-        const fullUrl = getPlayableAudio(songs[index]);
-        if (fullUrl) {
+        (async () => {
+            try {
+                const full = await fetchSongFull(songId);
+                if (full && songs[index] && String(songs[index].id) === String(songId)) {
+                    songs[index].audioFull = full.audioFull || '';
+                    songs[index].audioFull2 = full.audioFull2 || '';
+                }
+            } catch (e) {}
+            const fullUrl = getPlayableAudio(songs[index]);
+            if (!fullUrl) return;
             audio.src = fullUrl;
             audio.load();
             audio.addEventListener('loadedmetadata', function once() {
@@ -3928,7 +4028,7 @@ function buySong(songId) {
                 } catch (e) {}
                 audio.play().catch(() => {});
             }
-        }
+        })();
     }
     return true;
 }

@@ -1324,6 +1324,7 @@
                 <h2>Công cụ</h2>
                 <div class="row-actions form-actions" style="border:none;padding-top:0;margin-top:0;">
                     <button type="button" class="btn btn-info" id="check-dead-links-btn"><i class="fa-solid fa-link-slash"></i> Kiểm tra link audio</button>
+                    <button type="button" class="btn btn-warn" id="migrate-fulls-btn" title="Chuyển audioFull/audioFull2 từ songs → songFulls"><i class="fa-solid fa-shield-halved"></i> Tách link FULL → songFulls</button>
                 </div>
                 <div id="tools-progress-wrap" style="display:none;margin-top:12px;">
                     <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted);margin-bottom:6px;">
@@ -1579,23 +1580,34 @@
         async function loadSongs(keepPage = false) {
             const snap = await db().ref(dataPath('songs')).once('value');
             const obj = snap.val() || {};
-            songsCache = Object.keys(obj).map(id => ({
-                id: String(obj[id].id || id),
-                _fbKey: String(id),
-                name: obj[id].name || id,
-                artist: obj[id].artist || '',
-                audio: obj[id].audio || '',
-                audioFull: obj[id].audioFull || '',
-                audioFull2: obj[id].audioFull2 || '',
-                albumArt: obj[id].albumArt || '',
-                listenCount: Number(obj[id].listenCount) || 0,
-                lrc1: obj[id].lrc1 || '',
-                lrc2: obj[id].lrc2 || '',
-                price: obj[id].price != null ? Number(obj[id].price) : settingsCache.songPrice,
-                rentPrice: obj[id].rentPrice != null ? Number(obj[id].rentPrice) : null,
-                publishAt: obj[id].publishAt || null,
-                hidden: !!obj[id].hidden
-            }));
+            let fulls = {};
+            try {
+                const fullSnap = await db().ref(dataPath('songFulls')).once('value');
+                fulls = fullSnap.val() || {};
+            } catch (e) {
+                console.warn('load songFulls', e);
+            }
+            songsCache = Object.keys(obj).map(id => {
+                const s = obj[id] || {};
+                const f = fulls[id] || fulls[String(s.id || id)] || {};
+                return {
+                    id: String(s.id || id),
+                    _fbKey: String(id),
+                    name: s.name || id,
+                    artist: s.artist || '',
+                    audio: s.audio || '',
+                    audioFull: (f.audioFull || s.audioFull || '') || '',
+                    audioFull2: (f.audioFull2 || s.audioFull2 || '') || '',
+                    albumArt: s.albumArt || '',
+                    listenCount: Number(s.listenCount) || 0,
+                    lrc1: s.lrc1 || '',
+                    lrc2: s.lrc2 || '',
+                    price: s.price != null ? Number(s.price) : settingsCache.songPrice,
+                    rentPrice: s.rentPrice != null ? Number(s.rentPrice) : null,
+                    publishAt: s.publishAt || null,
+                    hidden: !!s.hidden
+                };
+            });
             songsCache.sort((a, b) => {
                 const na = String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' });
                 if (na !== 0) return na;
@@ -1887,6 +1899,7 @@
                     const id = btn.getAttribute('data-del');
                     if (!confirm('Xóa bài "' + id + '" khỏi Firebase?')) return;
                     await db().ref(dataPath('songs') + '/' + id).remove();
+                    try { await db().ref(dataPath('songFulls') + '/' + id).remove(); } catch (e) {}
                     toast('Đã xóa ' + id);
                     await loadSongs(true);
                 };
@@ -2045,8 +2058,6 @@
                 name,
                 artist: document.getElementById('s-artist').value.trim(),
                 audio,
-                audioFull: audioFull || null,
-                audioFull2: audioFull2 || null,
                 albumArt: document.getElementById('s-art').value.trim(),
                 lrc1: document.getElementById('s-lrc1').value,
                 lrc2: document.getElementById('s-lrc2').value,
@@ -2056,11 +2067,26 @@
                 hidden: !!document.getElementById('s-hidden').checked,
                 listenCount: Math.max(liveCount, cacheCount, 0)
             };
+            // Link full tách riêng → songFulls (không public trong songs)
+            const fullPayload = {
+                audioFull: audioFull || null,
+                audioFull2: audioFull2 || null
+            };
 
             await db().ref(dataPath('songs') + '/' + id).set(payload);
+            if (audioFull || audioFull2) {
+                await db().ref(dataPath('songFulls') + '/' + id).set(fullPayload);
+            } else {
+                await db().ref(dataPath('songFulls') + '/' + id).remove();
+            }
+            // Dọn link full cũ nếu còn sót trong node songs
+            try {
+                await db().ref(dataPath('songs') + '/' + id).update({ audioFull: null, audioFull2: null });
+            } catch (e) {}
 
             if (isRename) {
                 await db().ref(dataPath('songs') + '/' + originalId).remove();
+                try { await db().ref(dataPath('songFulls') + '/' + originalId).remove(); } catch (e) {}
                 toast('Đã đổi ID ' + originalId + ' → ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
             } else {
                 toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
@@ -2241,12 +2267,23 @@
                     const snap = await db().ref(dataPath('songs') + '/' + song.id + '/listenCount').once('value');
                     liveCount = Number(snap.val()) || 0;
                 } catch (e) {}
+                const { audioFull, audioFull2, ...publicFields } = song;
                 const payload = {
-                    ...song,
+                    ...publicFields,
                     listenCount: Math.max(liveCount, Number(song.listenCount) || 0)
                 };
+                delete payload.audioFull;
+                delete payload.audioFull2;
                 const existed = songsCache.some(s => s.id === song.id);
                 await db().ref(dataPath('songs') + '/' + song.id).set(payload);
+                if (audioFull || audioFull2) {
+                    await db().ref(dataPath('songFulls') + '/' + song.id).set({
+                        audioFull: audioFull || null,
+                        audioFull2: audioFull2 || null
+                    });
+                } else {
+                    try { await db().ref(dataPath('songFulls') + '/' + song.id).remove(); } catch (e) {}
+                }
                 if (existed) updated++;
                 else added++;
             }
@@ -2261,15 +2298,21 @@
                     toast('Đang tải list nhạc...');
                     const snap = await db().ref(dataPath('songs')).once('value');
                     const obj = snap.val() || {};
+                    let fulls = {};
+                    try {
+                        const fs = await db().ref(dataPath('songFulls')).once('value');
+                        fulls = fs.val() || {};
+                    } catch (e) {}
                     const list = Object.keys(obj).map(id => {
                         const s = obj[id] || {};
+                        const f = fulls[id] || {};
                         return songToExportObj({
                             id: String(s.id || id),
                             name: s.name || id,
                             artist: s.artist || '',
                             audio: s.audio || '',
-                            audioFull: s.audioFull || '',
-                            audioFull2: s.audioFull2 || '',
+                            audioFull: f.audioFull || s.audioFull || '',
+                            audioFull2: f.audioFull2 || s.audioFull2 || '',
                             albumArt: s.albumArt || '',
                             lrc1: s.lrc1 || '',
                             lrc2: s.lrc2 || '',
@@ -2449,6 +2492,7 @@
                 if (wipeSongs) {
                     tick('Xóa songs...');
                     await safeRemove(dataPath('songs'), 'songs');
+                    await safeRemove(dataPath('songFulls'), 'songFulls');
                     songsCache = [];
                 }
                 if (wipeExtras) {
@@ -2554,6 +2598,50 @@
             toast('Xong kiểm tra link');
             setTimeout(() => setToolsProgress(false, 0, ''), 2000);
         };
+
+        const migrateFullsBtn = document.getElementById('migrate-fulls-btn');
+        if (migrateFullsBtn) migrateFullsBtn.onclick = async () => {
+            if (!confirm('Chuyển toàn bộ audioFull / audioFull2 từ node songs sang songFulls và xóa khỏi songs?\n\nSau đó gắn Firebase Rules để chỉ user đã mua/thuê đọc được songFulls.')) return;
+            migrateFullsBtn.disabled = true;
+            try {
+                const snap = await db().ref(dataPath('songs')).once('value');
+                const obj = snap.val() || {};
+                const ids = Object.keys(obj);
+                let moved = 0;
+                let skipped = 0;
+                for (let i = 0; i < ids.length; i++) {
+                    const id = ids[i];
+                    const s = obj[id] || {};
+                    setToolsProgress(true, ((i) / Math.max(ids.length, 1)) * 100, 'Migrate ' + id + '...');
+                    const af = (s.audioFull || '').trim();
+                    const af2 = (s.audioFull2 || '').trim();
+                    if (!af && !af2) {
+                        skipped++;
+                        continue;
+                    }
+                    let existing = {};
+                    try {
+                        const fs = await db().ref(dataPath('songFulls') + '/' + id).once('value');
+                        existing = fs.val() || {};
+                    } catch (e) {}
+                    await db().ref(dataPath('songFulls') + '/' + id).set({
+                        audioFull: af || existing.audioFull || null,
+                        audioFull2: af2 || existing.audioFull2 || null
+                    });
+                    await db().ref(dataPath('songs') + '/' + id).update({ audioFull: null, audioFull2: null });
+                    moved++;
+                }
+                setToolsProgress(true, 100, 'Hoàn tất');
+                await loadSongs(true);
+                toast('Đã tách ' + moved + ' bài sang songFulls (bỏ qua ' + skipped + ' bài không có full)');
+            } catch (e) {
+                console.error(e);
+                toast('Migrate lỗi: ' + (e.message || e));
+            }
+            migrateFullsBtn.disabled = false;
+            setTimeout(() => setToolsProgress(false, 0, ''), 2000);
+        };
+
         function switchAdminTab(name) {
             const tabName = String(name || 'songs');
             document.querySelectorAll('.tab').forEach(t => {
