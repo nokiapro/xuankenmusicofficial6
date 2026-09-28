@@ -113,8 +113,29 @@
                 </div>
 
                 <div class="header-section">
-                    <div class="album-art">
-                        <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
+                    <div class="album-art-wrap" id="album-art-wrap">
+                        <div class="album-art">
+                            <img id="current-art" src="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" alt="Art">
+                        </div>
+                        <svg class="art-name-ring" id="art-name-ring" viewBox="0 0 200 200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                            <defs>
+                                <path id="art-ring-path" d="M 100,100 m -82,0 a 82,82 0 1,1 164,0 a 82,82 0 1,1 -164,0" fill="none"/>
+                                <linearGradient id="art-name-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#ff0040">
+                                        <animate attributeName="stop-color" values="#ff0040;#8c00ff;#17adca;#ffd700;#ff0040" dur="6s" repeatCount="indefinite"/>
+                                    </stop>
+                                    <stop offset="50%" stop-color="#8c00ff">
+                                        <animate attributeName="stop-color" values="#8c00ff;#17adca;#ffd700;#ff0040;#8c00ff" dur="6s" repeatCount="indefinite"/>
+                                    </stop>
+                                    <stop offset="100%" stop-color="#17adca">
+                                        <animate attributeName="stop-color" values="#17adca;#ffd700;#ff0040;#8c00ff;#17adca" dur="6s" repeatCount="indefinite"/>
+                                    </stop>
+                                </linearGradient>
+                            </defs>
+                            <text class="art-name-text">
+                                <textPath id="art-name-textpath" href="#art-ring-path" xlink:href="#art-ring-path" startOffset="0%">XuanKen Music · </textPath>
+                            </text>
+                        </svg>
                     </div>
                     <div class="song-info-main">
                         <span class="song-title" id="current-title">Sẵn sàng</span>
@@ -271,6 +292,18 @@
                         <button type="button" class="extras-action-btn extras-feat-btn" data-x="countdown"><i data-lucide="hourglass"></i><span>Đếm ngược</span></button>
                         <button type="button" class="extras-action-btn extras-feat-btn" data-x="weekly-archive"><i data-lucide="list-music"></i><span>Top tuần</span></button>
                         <button type="button" class="extras-action-btn extras-feat-btn" data-x="links"><i data-lucide="link"></i><span>Liên kết</span></button>
+                    </div>
+                </div>
+                <div class="extras-section">
+                    <label class="extras-label">Vòng tên quanh art</label>
+                    <div class="art-ring-settings">
+                        <label class="art-ring-toggle-row">
+                            <input type="checkbox" id="art-ring-enabled" checked>
+                            <span>Hiện vòng chữ quanh ảnh bìa</span>
+                        </label>
+                        <input type="text" id="art-ring-text" class="art-ring-text-input" maxlength="28" placeholder="Trống = dùng username">
+                        <button type="button" id="art-ring-save-btn" class="extras-btn-primary" style="width:100%;margin-top:8px;">Lưu vòng tên</button>
+                        <p class="muted" style="font-size:0.72rem;margin-top:6px;opacity:0.75;">Chữ gradient chạy quanh art tròn. Tối đa 28 ký tự.</p>
                     </div>
                 </div>
                 <div class="extras-section">
