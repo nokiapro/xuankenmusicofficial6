@@ -2330,38 +2330,44 @@ function resolveArtRingName(raw) {
  */
 function fitArtRingTextToPath(name) {
     const pathGeom = document.getElementById('art-ring-path');
-    const textPath = document.getElementById('art-name-textpath');
-    if (!pathGeom || !textPath) return;
+    const textEl = document.querySelector('#art-name-ring text.art-name-text');
+    if (!pathGeom || !textEl) return;
 
     const pathLen = (typeof pathGeom.getTotalLength === 'function')
         ? pathGeom.getTotalLength()
         : (2 * Math.PI * 92);
 
-    // Cụm "TÊN · " nguyên vẹn — dấu · luôn giữa 2 cụm, không lệch đầu chữ
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
-    const unit = base + ' · ';
+    if (!base) return;
 
-    textPath.removeAttribute('textLength');
-    textPath.removeAttribute('lengthAdjust');
-    textPath.setAttribute('startOffset', '0');
+    // Đo độ dài 1 cụm "TÊN ·" (không dãn textLength — tránh lệch dấu ·)
+    textEl.innerHTML = '';
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'textPath');
+    probe.setAttribute('href', '#art-ring-path');
+    try { probe.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#art-ring-path'); } catch (e) {}
+    probe.textContent = base + ' ·';
+    textEl.appendChild(probe);
 
-    textPath.textContent = unit;
     let unitLen = 0;
-    try { unitLen = textPath.getComputedTextLength(); } catch (e) { unitLen = 0; }
-    if (!unitLen || unitLen < 4) unitLen = Math.max(28, unit.length * 7);
+    try { unitLen = probe.getComputedTextLength(); } catch (e) { unitLen = 0; }
+    if (!unitLen || unitLen < 4) unitLen = Math.max(28, (base.length + 2) * 7);
 
+    // Số cụm vừa khít: mỗi cụm một cung bằng nhau, không overlap
     let n = Math.max(1, Math.floor(pathLen / unitLen));
-    if (n * unitLen < pathLen * 0.88 && (n + 1) * unitLen <= pathLen * 1.06) {
-        n += 1;
+    if (n < 1) n = 1;
+    const slot = pathLen / n;
+
+    textEl.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+        const tp = document.createElementNS('http://www.w3.org/2000/svg', 'textPath');
+        tp.setAttribute('href', '#art-ring-path');
+        try { tp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#art-ring-path'); } catch (e) {}
+        // startOffset theo đơn vị user space của path (= độ dài cung)
+        tp.setAttribute('startOffset', String(Math.round(i * slot * 1000) / 1000));
+        // Dấu · nằm SAU tên, khoảng trống đến cụm sau = slot - unitLen (đều nhau)
+        tp.textContent = base + ' ·';
+        textEl.appendChild(tp);
     }
-
-    textPath.textContent = unit.repeat(n);
-
-    let natural = 0;
-    try { natural = textPath.getComputedTextLength(); } catch (e) { natural = n * unitLen; }
-
-    textPath.setAttribute('textLength', String(Math.round(pathLen * 1000) / 1000));
-    textPath.setAttribute('lengthAdjust', natural > pathLen * 1.02 ? 'spacingAndGlyphs' : 'spacing');
 }
 
 /** Gói thuê vòng tên quanh art (ngày) */
@@ -2397,10 +2403,10 @@ function hasArtRingAccess() {
 
 function updateArtNameRing() {
     const wrap = document.getElementById('album-art-wrap');
-    const pathEl = document.getElementById('art-name-textpath');
+    const textEl = document.querySelector('#art-name-ring text.art-name-text');
     const enEl = document.getElementById('art-ring-enabled');
     const txEl = document.getElementById('art-ring-text');
-    if (!wrap || !pathEl) return;
+    if (!wrap || !textEl) return;
 
     let preferOn = true;
     let custom = '';
@@ -2426,7 +2432,7 @@ function updateArtNameRing() {
         const name = resolveArtRingName(custom);
         requestAnimationFrame(() => {
             try { fitArtRingTextToPath(name); } catch (e) {
-                pathEl.textContent = name + ' · ' + name + ' · ';
+                console.warn('fitArtRingTextToPath', e);
             }
         });
     }
