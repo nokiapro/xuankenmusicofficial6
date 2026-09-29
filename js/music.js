@@ -2340,33 +2340,46 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    // Đo độ dài 1 cụm "TÊN ·" (không dãn textLength — tránh lệch dấu ·)
-    textEl.innerHTML = '';
-    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'textPath');
-    probe.setAttribute('href', '#art-ring-path');
-    try { probe.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#art-ring-path'); } catch (e) {}
-    probe.textContent = base + ' ·';
-    textEl.appendChild(probe);
+    const NS = 'http://www.w3.org/2000/svg';
+    const XLINK = 'http://www.w3.org/1999/xlink';
 
-    let unitLen = 0;
-    try { unitLen = probe.getComputedTextLength(); } catch (e) { unitLen = 0; }
-    if (!unitLen || unitLen < 4) unitLen = Math.max(28, (base.length + 2) * 7);
+    function makeTp(content, offset) {
+        const tp = document.createElementNS(NS, 'textPath');
+        tp.setAttribute('href', '#art-ring-path');
+        try { tp.setAttributeNS(XLINK, 'xlink:href', '#art-ring-path'); } catch (e) {}
+        tp.setAttribute('startOffset', String(Math.round(offset * 1000) / 1000));
+        tp.textContent = content;
+        return tp;
+    }
 
-    // Số cụm vừa khít: mỗi cụm một cung bằng nhau, không overlap
-    let n = Math.max(1, Math.floor(pathLen / unitLen));
-    if (n < 1) n = 1;
+    function measure(str) {
+        textEl.innerHTML = '';
+        textEl.appendChild(makeTp(str, 0));
+        let len = 0;
+        try { len = textEl.querySelector('textPath').getComputedTextLength(); } catch (e) {}
+        return (len && len > 1) ? len : Math.max(8, str.length * 7);
+    }
+
+    const nameLen = measure(base);
+    const sep = '·';
+    const sepLen = measure(sep);
+
+    // Mỗi "slot" = tên + khoảng trống (đủ chỗ cho dấu · ở giữa)
+    const minSlot = nameLen + sepLen + 6;
+    let n = Math.max(1, Math.floor(pathLen / minSlot));
     const slot = pathLen / n;
 
     textEl.innerHTML = '';
     for (let i = 0; i < n; i++) {
-        const tp = document.createElementNS('http://www.w3.org/2000/svg', 'textPath');
-        tp.setAttribute('href', '#art-ring-path');
-        try { tp.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#art-ring-path'); } catch (e) {}
-        // startOffset theo đơn vị user space của path (= độ dài cung)
-        tp.setAttribute('startOffset', String(Math.round(i * slot * 1000) / 1000));
-        // Dấu · nằm SAU tên, khoảng trống đến cụm sau = slot - unitLen (đều nhau)
-        tp.textContent = base + ' ·';
-        textEl.appendChild(tp);
+        const nameStart = i * slot;
+        // Tên bắt đầu đầu mỗi cung
+        textEl.appendChild(makeTp(base, nameStart));
+        // Dấu · đúng giữa khoảng từ hết tên → đầu tên kế
+        // gap = slot - nameLen; tâm gap = nameStart + nameLen + gap/2
+        const gap = Math.max(0, slot - nameLen);
+        const dotCenter = nameStart + nameLen + gap / 2;
+        const dotStart = dotCenter - sepLen / 2;
+        textEl.appendChild(makeTp(sep, dotStart));
     }
 }
 
