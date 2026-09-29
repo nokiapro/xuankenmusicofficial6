@@ -159,7 +159,7 @@ body.dark .player-container {
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
     .lyric-container { min-height: 52px; }
-    .controls-bar { padding: 20px; }
+    .controls-bar { padding: 4px 20px 24px 20px; }
     .btn-icon { width: 38px; height: 38px; font-size: 1rem; }
     .play-btn { width: 46px; height: 46px; }
     .song-title { font-size: 1.2rem; }
@@ -189,7 +189,7 @@ body.dark .player-container {
 }
 
 .header-section {
-    padding: 58px 24px 16px 24px;
+    padding: 58px 24px 8px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -654,7 +654,7 @@ body.dark .album-art {
     background: var(--progress-bg);
     border-radius: 40px;
     margin-top: 10px;
-    margin-bottom: 14px;
+    margin-bottom: 20px;
     transition: background 0.3s ease;
     flex-shrink: 0;
     position: relative;
@@ -675,13 +675,13 @@ body.dark .album-art {
 }
 
 .controls-bar {
-    padding: 8px 24px 28px 24px;
+    padding: 4px 24px 28px 24px;
     background: var(--card-bg);
     transition: background 0.3s ease;
 }
 
 .progress-wrapper {
-    margin-top: 4px;
+    margin-top: 0;
     margin-bottom: 20px;
 }
 
@@ -4397,12 +4397,12 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .lyric-container {
         min-height: 56px;
         flex-shrink: 0;
-        margin-bottom: 16px;
+        margin-bottom: 22px;
     }
 
     .pc-right .controls-bar {
         flex-shrink: 0;
-        padding: 8px 28px 28px;
+        padding: 4px 28px 28px;
         background: transparent;
     }
 
