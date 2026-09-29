@@ -2575,9 +2575,6 @@ function renderShopRing() {
     }).join('');
     list.innerHTML = `
         <div class="shop-ring-card">
-            <div class="shop-ring-preview" aria-hidden="true">
-                <div class="shop-ring-preview-label">TÊN BẠN · TÊN BẠN ·</div>
-            </div>
             ${statusHtml}
             <div class="shop-ring-packs">${packs}</div>
         </div>`;
@@ -3996,7 +3993,7 @@ function getRentExpiry(songId) {
 }
 
 /** Gói thuê: 1 / 3 / 5 / 7 ngày */
-const RENT_DAY_OPTIONS = [1, 3, 5, 7];
+const RENT_DAY_OPTIONS = [1];
 
 /** Giá thuê 1 ngày (base) — từ rentPrice bài hoặc 40% giá mua */
 function getRentPrice(song) {
@@ -4058,7 +4055,7 @@ function rentSong(songId, days) {
     const price = getRentPriceForDays(song, d);
     const coins = loadCoins();
     if (coins < price) {
-        showNotification('THIẾU XK:', `THUÊ ${d} NGÀY CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        showNotification('THIẾU XK:', `THUÊ 24H CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
         return false;
     }
     // Gia hạn: cộng thêm từ hạn hiện tại (nếu còn) hoặc từ bây giờ
@@ -4074,7 +4071,7 @@ function rentSong(songId, days) {
         acc.rentals[String(songId)] = expiry;
     });
     showNotification(
-        wasRented ? ('GIA HẠN +' + d + 'N:') : ('THUÊ ' + d + ' NGÀY:'),
+        wasRented ? ('GIA HẠN +24H:') : ('THUÊ 24H:'),
         '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
         '#4ade80',
         'clock'
@@ -4519,17 +4516,17 @@ function renderShopList(highlightSongId) {
         } else {
             const rentBtns = RENT_DAY_OPTIONS.map(d => {
                 const p = getRentPriceForDays(s, d);
-                return `<button type="button" class="shop-buy-btn shop-rent-btn shop-rent-day" data-rent-id="${id}" data-rent-days="${d}" title="Thuê ${d} ngày — ${p} XK">${d}N · ${p}</button>`;
+                return `<button type="button" class="shop-buy-btn shop-rent-btn shop-rent-day" data-rent-id="${id}" data-rent-days="${d}" title="Thuê 24h — ${p} XK">24H · ${p}</button>`;
             }).join('');
             action = `
                 <button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
                 ${rented ? `<span class="shop-owned-badge shop-rent-countdown" data-rent-exp="${getRentExpiry(id)}">THUÊ …</span>` : ''}
-                <div class="shop-rent-days" title="Chọn số ngày thuê / gia hạn">${rentBtns}</div>
+                <div class="shop-rent-days" title="Thuê 24h / gia hạn">${rentBtns}</div>
             `;
         }
         const priceLabel = permanentlyOwned
             ? ''
-            : `<div class="shop-item-price">Mua ${price} XK · Thuê từ ${rentP1} XK/ngày (1·3·5·7 ngày)</div>`;
+            : `<div class="shop-item-price">Mua ${price} XK · Thuê 24h: ${rentP1} XK</div>`;
         return `<div class="shop-item ${permanentlyOwned || owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
             <div class="shop-item-info">
                 <div class="shop-item-name">${name}${permanentlyOwned || owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
