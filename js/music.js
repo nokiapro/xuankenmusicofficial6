@@ -2305,7 +2305,7 @@ audio.onpause = () => {
     persistListenTimeNow();
 };
 
-function buildArtRingLabel(raw) {
+function resolveArtRingName(raw) {
     let t = String(raw || '').trim();
     if (!t) {
         t = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
@@ -2319,12 +2319,89 @@ function buildArtRingLabel(raw) {
             t = 'XuanKen Music';
         }
     }
-    t = t.slice(0, 28);
-    // Lặp chữ để vòng tròn đầy
-    const unit = t + ' · ';
-    let out = '';
-    while (out.length < 56) out += unit;
-    return out;
+    return t.slice(0, 28);
+}
+
+/**
+ * Tính chuỗi lặp vừa khít 1 vòng path:
+ * - đo chiều dài path (chu vi)
+ * - lặp "TÊN · " sao cho độ dài tự nhiên ≤ chu vi
+ * - gán textLength = chu vi + lengthAdjust=spacing → dãn đều, không thừa/thiếu
+ */
+function fitArtRingTextToPath(name) {
+    const pathGeom = document.getElementById('art-ring-path');
+    const textPath = document.getElementById('art-name-textpath');
+    if (!pathGeom || !textPath) return;
+
+    const pathLen = (typeof pathGeom.getTotalLength === 'function')
+        ? pathGeom.getTotalLength()
+        : (2 * Math.PI * 92);
+
+    const unit = String(name || 'XuanKen').trim() + ' · ';
+    textPath.removeAttribute('textLength');
+    textPath.removeAttribute('lengthAdjust');
+    textPath.textContent = unit;
+
+    let unitLen = 0;
+    try {
+        unitLen = textPath.getComputedTextLength();
+    } catch (e) {
+        unitLen = 0;
+    }
+    if (!unitLen || unitLen < 4) {
+        unitLen = Math.max(24, unit.length * 7);
+    }
+
+    // Số lần lặp lớn nhất sao cho vẫn ≤ chu vi (không tràn)
+    let n = Math.max(1, Math.floor(pathLen / unitLen));
+    // Nếu quá thưa (< 70% vòng) thì thêm 1 lần (sẽ nén nhẹ bằng spacingAndGlyphs)
+    if (n * unitLen < pathLen * 0.7) n += 1;
+
+    let label = unit.repeat(n);
+    textPath.textContent = label;
+
+    let natural = 0;
+    try {
+        natural = textPath.getComputedTextLength();
+    } catch (e) {
+        natural = n * unitLen;
+    }
+
+    // Ép đúng 1 vòng: dãn đều (hoặc nén nhẹ nếu hơi dài)
+    textPath.setAttribute('textLength', String(Math.round(pathLen * 100) / 100));
+    textPath.setAttribute('lengthAdjust', natural > pathLen * 1.01 ? 'spacingAndGlyphs' : 'spacing');
+    textPath.setAttribute('startOffset', '0%');
+}
+
+/** Gói thuê vòng tên quanh art (ngày) */
+const ART_RING_RENT_DAYS = [1, 3, 5, 7];
+/** Giá mặc định XK theo số ngày */
+const ART_RING_RENT_PRICES = { 1: 15, 3: 35, 5: 50, 7: 65 };
+
+function getArtRingRentPrice(days) {
+    const d = Number(days) || 1;
+    try {
+        const s = typeof getAdminSettings === 'function' ? getAdminSettings() : null;
+        const map = s && s.artRingRentPrices;
+        if (map && map[d] != null && !Number.isNaN(Number(map[d]))) {
+            return Math.max(0, Number(map[d]));
+        }
+    } catch (e) {}
+    return ART_RING_RENT_PRICES[d] != null ? ART_RING_RENT_PRICES[d] : Math.max(1, 15 * d);
+}
+
+function getArtRingUntil() {
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    return Math.max(0, Number(acc && acc.artRingUntil) || 0);
+}
+
+function hasArtRingAccess() {
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    if (!acc) return false;
+    // Admin / rank cao: miễn phí
+    const rank = String(acc.rank || '').toLowerCase();
+    if (rank === 'admin' || rank === 'super_vip' || rank === 'toi_thuong' || rank === 'tối thượng') return true;
+    return getArtRingUntil() > Date.now();
 }
 
 function updateArtNameRing() {
@@ -2334,19 +2411,35 @@ function updateArtNameRing() {
     const txEl = document.getElementById('art-ring-text');
     if (!wrap || !pathEl) return;
 
-    let on = true;
+    let preferOn = true;
     let custom = '';
     const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
     if (acc) {
-        on = acc.artRingOn !== false;
+        preferOn = acc.artRingOn !== false;
         custom = String(acc.artRingText || '');
     }
-    if (enEl) enEl.checked = on;
-    if (txEl && document.activeElement !== txEl) txEl.value = custom;
+    const access = hasArtRingAccess();
+    const on = access && preferOn;
+
+    if (enEl) {
+        enEl.checked = preferOn;
+        enEl.disabled = !access;
+    }
+    if (txEl) {
+        if (document.activeElement !== txEl) txEl.value = custom;
+        txEl.disabled = !access;
+    }
 
     wrap.classList.toggle('ring-off', !on);
-    pathEl.textContent = buildArtRingLabel(custom);
-    if (isPlaying) wrap.classList.add('ring-playing');
+    if (on) {
+        const name = resolveArtRingName(custom);
+        requestAnimationFrame(() => {
+            try { fitArtRingTextToPath(name); } catch (e) {
+                pathEl.textContent = name + ' · ' + name + ' · ';
+            }
+        });
+    }
+    if (isPlaying && on) wrap.classList.add('ring-playing');
     else wrap.classList.remove('ring-playing');
 }
 
@@ -2354,6 +2447,12 @@ function saveArtRingSettings() {
     if (!getCurrentUsername()) {
         if (typeof showNotification === 'function') {
             showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        }
+        return;
+    }
+    if (!hasArtRingAccess()) {
+        if (typeof showNotification === 'function') {
+            showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG (1·3·5·7 NGÀY)', '#ff9800', 'clock');
         }
         return;
     }
@@ -2373,6 +2472,101 @@ function saveArtRingSettings() {
     }
 }
 
+function rentArtRing(days) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
+    const d = ART_RING_RENT_DAYS.includes(Number(days)) ? Number(days) : 1;
+    const price = getArtRingRentPrice(d);
+    const coins = loadCoins();
+    if (coins < price) {
+        showNotification('THIẾU XK:', `THUÊ VÒNG TÊN ${d} NGÀY CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        return false;
+    }
+    const now = Date.now();
+    const cur = getArtRingUntil();
+    const base = cur > now ? cur : now;
+    const until = base + d * 24 * 60 * 60 * 1000;
+    const wasActive = cur > now;
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) - price;
+        acc.artRingUntil = until;
+        if (acc.artRingOn == null) acc.artRingOn = true;
+    });
+    updateArtNameRing();
+    if (typeof renderShopRing === 'function') renderShopRing();
+    updateShopBalanceUI();
+    showNotification(
+        wasActive ? ('GIA HẠN VÒNG TÊN +' + d + 'N:') : ('THUÊ VÒNG TÊN ' + d + ' NGÀY:'),
+        'Chữ gradient quanh album art đã mở',
+        '#4ade80',
+        'sparkles'
+    );
+    return true;
+}
+
+function renderShopRing() {
+    const list = document.getElementById('shop-ring-list');
+    if (!list) return;
+    const access = hasArtRingAccess();
+    const until = getArtRingUntil();
+    const left = Math.max(0, until - Date.now());
+    let statusHtml = '';
+    if (access && until > Date.now()) {
+        statusHtml = `<div class="shop-ring-status active">
+            <div class="shop-ring-status-title">Đang có vòng tên</div>
+            <div class="shop-ring-status-time shop-rent-countdown" data-ring-exp="${until}">${formatRentCountdown(until).replace(/^THUÊ /, 'Còn ')}</div>
+            <p class="shop-ring-hint">Thuê thêm để gia hạn · Tùy chỉnh chữ ở Tiện ích</p>
+        </div>`;
+    } else if (access) {
+        statusHtml = `<div class="shop-ring-status active">
+            <div class="shop-ring-status-title">Vòng tên miễn phí (rank)</div>
+            <p class="shop-ring-hint">Tùy chỉnh chữ ở Tiện ích → Vòng tên quanh art</p>
+        </div>`;
+    } else {
+        statusHtml = `<div class="shop-ring-status">
+            <div class="shop-ring-status-title">Chưa thuê vòng tên</div>
+            <p class="shop-ring-hint">Chữ username gradient chạy quanh album art tròn</p>
+        </div>`;
+    }
+    const packs = ART_RING_RENT_DAYS.map(d => {
+        const p = getArtRingRentPrice(d);
+        return `<button type="button" class="shop-buy-btn shop-rent-btn shop-ring-pack" data-ring-days="${d}">
+            <span class="shop-ring-pack-days">${d} ngày</span>
+            <span class="shop-ring-pack-price">${p} XK</span>
+        </button>`;
+    }).join('');
+    list.innerHTML = `
+        <div class="shop-ring-card">
+            <div class="shop-ring-preview" aria-hidden="true">
+                <div class="shop-ring-preview-disc"></div>
+                <div class="shop-ring-preview-label">TÊN BẠN · TÊN BẠN ·</div>
+            </div>
+            ${statusHtml}
+            <div class="shop-ring-packs">${packs}</div>
+        </div>`;
+    list.querySelectorAll('[data-ring-days]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            rentArtRing(Number(btn.getAttribute('data-ring-days')) || 1);
+        };
+    });
+    if (window._shopRingTimer) clearInterval(window._shopRingTimer);
+    const tick = () => {
+        list.querySelectorAll('[data-ring-exp]').forEach(el => {
+            const exp = Number(el.getAttribute('data-ring-exp')) || 0;
+            const t = formatRentCountdown(exp);
+            el.textContent = t === 'HẾT HẠN THUÊ' ? 'HẾT HẠN' : t.replace(/^THUÊ /, 'Còn ');
+            if (exp <= Date.now()) {
+                try { updateArtNameRing(); renderShopRing(); } catch (e) {}
+            }
+        });
+    };
+    tick();
+    window._shopRingTimer = setInterval(tick, 1000);
+}
+
 function bindArtRingSettingsUI() {
     const btn = document.getElementById('art-ring-save-btn');
     if (btn && !btn._artRingBound) {
@@ -2384,7 +2578,12 @@ function bindArtRingSettingsUI() {
         enEl._artRingBound = true;
         enEl.onchange = () => {
             if (!getCurrentUsername()) {
-                enEl.checked = true;
+                enEl.checked = false;
+                return;
+            }
+            if (!hasArtRingAccess()) {
+                enEl.checked = false;
+                showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG', '#ff9800', 'clock');
                 return;
             }
             updateCurrentAccount(acc => { acc.artRingOn = !!enEl.checked; });
@@ -2977,7 +3176,8 @@ function ensureUserAccount(username) {
             listenedSongs: {},
             listenTime: { total: 0, byDay: {} },
             artRingOn: true,
-            artRingText: ''
+            artRingText: '',
+            artRingUntil: 0
         };
         saveAllAccounts(accounts);
     } else {
@@ -2989,6 +3189,7 @@ function ensureUserAccount(username) {
         if (!a.rentals || typeof a.rentals !== 'object') a.rentals = {};
         if (a.artRingOn == null) a.artRingOn = true;
         if (a.artRingText == null) a.artRingText = '';
+        if (a.artRingUntil == null) a.artRingUntil = 0;
         saveAllAccounts(accounts);
     }
     return accounts[name];
@@ -3031,7 +3232,8 @@ function mapUserProfile(data, name) {
         chatCount: Number(d.chatCount) || 0,
         profiles: Array.isArray(d.profiles) ? d.profiles : [],
         artRingOn: d.artRingOn !== false,
-        artRingText: typeof d.artRingText === 'string' ? d.artRingText : ''
+        artRingText: typeof d.artRingText === 'string' ? d.artRingText : '',
+        artRingUntil: Number(d.artRingUntil) || 0
     };
 }
 
@@ -3536,6 +3738,7 @@ async function pushUserToFirebase(username, account, options) {
         if (opts.artRingChanged || forceAll) {
             scalarPayload.artRingOn = account.artRingOn !== false;
             scalarPayload.artRingText = String(account.artRingText || '').slice(0, 28);
+            scalarPayload.artRingUntil = Math.max(0, Number(account.artRingUntil) || 0);
         }
         if (opts.inviteChanged || forceAll) {
             if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
@@ -3654,7 +3857,7 @@ function updateCurrentAccount(mutator) {
         checkin: snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
-        artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '' }),
+        artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', u: acc.artRingUntil || 0 }),
         inviteBy: snap(acc.inviteBy || ''),
         counters: snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -3675,7 +3878,7 @@ function updateCurrentAccount(mutator) {
         checkinChanged: before.checkin !== snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
-        artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '' }),
+        artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', u: acc.artRingUntil || 0 }),
         inviteChanged: before.inviteBy !== snap(acc.inviteBy || ''),
         countersChanged: before.counters !== snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -3745,6 +3948,10 @@ function getRentExpiry(songId) {
     return Math.max(fromAcc, fromPending);
 }
 
+/** Gói thuê: 1 / 3 / 5 / 7 ngày */
+const RENT_DAY_OPTIONS = [1, 3, 5, 7];
+
+/** Giá thuê 1 ngày (base) — từ rentPrice bài hoặc 40% giá mua */
 function getRentPrice(song) {
     if (song && song.rentPrice != null && !Number.isNaN(Number(song.rentPrice))) {
         return Math.max(0, Number(song.rentPrice));
@@ -3753,7 +3960,36 @@ function getRentPrice(song) {
     return Math.max(1, Math.ceil(buy * 0.4));
 }
 
-function rentSong(songId) {
+/**
+ * Giá thuê theo số ngày (có giảm nhẹ gói dài):
+ * 1 ngày = base
+ * 3 ngày ≈ base × 2.7
+ * 5 ngày ≈ base × 4.2
+ * 7 ngày ≈ base × 5.5
+ */
+function getRentPriceForDays(song, days) {
+    const d = Math.max(1, Number(days) || 1);
+    const base = getRentPrice(song);
+    if (d <= 1) return base;
+    const multipliers = { 3: 2.7, 5: 4.2, 7: 5.5 };
+    const m = multipliers[d] != null ? multipliers[d] : (d * (1 - Math.min(0.25, (d - 1) * 0.04)));
+    return Math.max(base, Math.ceil(base * m));
+}
+
+function formatRentCountdown(expMs) {
+    let left = Math.max(0, (Number(expMs) || 0) - Date.now());
+    if (left <= 0) return 'HẾT HẠN THUÊ';
+    const day = Math.floor(left / 86400000);
+    const h = Math.floor((left % 86400000) / 3600000);
+    const mi = Math.floor((left % 3600000) / 60000);
+    const s = Math.floor((left % 60000) / 1000);
+    if (day > 0) {
+        return 'THUÊ ' + day + 'n ' + String(h).padStart(2, '0') + 'h' + String(mi).padStart(2, '0');
+    }
+    return 'THUÊ ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function rentSong(songId, days) {
     if (!getCurrentUsername()) {
         showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
         return false;
@@ -3767,24 +4003,31 @@ function rentSong(songId) {
         showNotification('CỬA HÀNG:', 'BẠN ĐÃ MUA BÀI NÀY', '#4ade80', 'check');
         return false;
     }
-    if (isSongRented(songId)) {
-        showNotification('THUÊ:', 'VẪN CÒN HẠN THUÊ', '#4ade80', 'clock');
-        return false;
-    }
-    const price = getRentPrice(song);
+    const d = RENT_DAY_OPTIONS.includes(Number(days)) ? Number(days) : 1;
+    const price = getRentPriceForDays(song, d);
     const coins = loadCoins();
     if (coins < price) {
-        showNotification('THIẾU XK:', `THUÊ CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
+        showNotification('THIẾU XK:', `THUÊ ${d} NGÀY CẦN ${price} XK — ĐANG CÓ ${coins} XK`, '#ff9800', 'coins');
         return false;
     }
-    const expiry = Date.now() + 24 * 60 * 60 * 1000;
+    // Gia hạn: cộng thêm từ hạn hiện tại (nếu còn) hoặc từ bây giờ
+    const now = Date.now();
+    const curExp = getRentExpiry(songId);
+    const baseStart = curExp > now ? curExp : now;
+    const expiry = baseStart + d * 24 * 60 * 60 * 1000;
+    const wasRented = curExp > now;
     markPendingRental(songId, expiry);
     updateCurrentAccount(acc => {
         acc.coins = (acc.coins | 0) - price;
         if (!acc.rentals) acc.rentals = {};
         acc.rentals[String(songId)] = expiry;
     });
-    showNotification('THUÊ 24H:', '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'clock');
+    showNotification(
+        wasRented ? ('GIA HẠN +' + d + 'N:') : ('THUÊ ' + d + ' NGÀY:'),
+        '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
+        '#4ade80',
+        'clock'
+    );
     renderShopList();
     if (typeof renderShopThumbs === 'function') renderShopThumbs();
     updateShopBalanceUI();
@@ -4217,19 +4460,25 @@ function renderShopList(highlightSongId) {
         const artist = escapeHtml(s.artist || 'ĐANG CẬP NHẬT');
         const isFocus = focusId && id === focusId;
         const rented = isSongRented(id);
-        const rentP = getRentPrice(s);
-        let action = '';
-        if (loadOwnedSongs().includes(id)) {
-            action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
-        } else if (rented) {
-            action = `<span class="shop-owned-badge shop-rent-countdown" data-rent-exp="${getRentExpiry(id)}">THUÊ …</span>
-                <button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>`;
-        } else {
-            action = `<button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
-                <button type="button" class="shop-buy-btn shop-rent-btn" data-rent-id="${id}">THUÊ 24H ${rentP} XK</button>`;
-        }
+        const rentP1 = getRentPriceForDays(s, 1);
         const permanentlyOwned = loadOwnedSongs().includes(id);
-        const priceLabel = permanentlyOwned ? '' : `<div class="shop-item-price">Mua ${price} XK · Thuê ${rentP} XK/24h</div>`;
+        let action = '';
+        if (permanentlyOwned) {
+            action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
+        } else {
+            const rentBtns = RENT_DAY_OPTIONS.map(d => {
+                const p = getRentPriceForDays(s, d);
+                return `<button type="button" class="shop-buy-btn shop-rent-btn shop-rent-day" data-rent-id="${id}" data-rent-days="${d}" title="Thuê ${d} ngày — ${p} XK">${d}N · ${p}</button>`;
+            }).join('');
+            action = `
+                <button type="button" class="shop-buy-btn" data-buy-id="${id}">MUA ${price} XK</button>
+                ${rented ? `<span class="shop-owned-badge shop-rent-countdown" data-rent-exp="${getRentExpiry(id)}">THUÊ …</span>` : ''}
+                <div class="shop-rent-days" title="Chọn số ngày thuê / gia hạn">${rentBtns}</div>
+            `;
+        }
+        const priceLabel = permanentlyOwned
+            ? ''
+            : `<div class="shop-item-price">Mua ${price} XK · Thuê từ ${rentP1} XK/ngày (1·3·5·7 ngày)</div>`;
         return `<div class="shop-item ${permanentlyOwned || owned ? 'owned' : ''} ${isFocus ? 'highlight-buy' : ''}" data-song-id="${id}">
             <div class="shop-item-info">
                 <div class="shop-item-name">${name}${permanentlyOwned || owned ? '' : ' <span class="demo-badge">DEMO 1P</span>'}</div>
@@ -4249,7 +4498,8 @@ function renderShopList(highlightSongId) {
     list.querySelectorAll('[data-rent-id]').forEach(btn => {
         btn.onclick = (e) => {
             e.stopPropagation();
-            rentSong(btn.getAttribute('data-rent-id'));
+            const days = Number(btn.getAttribute('data-rent-days')) || 1;
+            rentSong(btn.getAttribute('data-rent-id'), days);
         };
     });
 
@@ -4257,15 +4507,7 @@ function renderShopList(highlightSongId) {
     const tickRent = () => {
         list.querySelectorAll('.shop-rent-countdown[data-rent-exp]').forEach(el => {
             const exp = Number(el.getAttribute('data-rent-exp')) || 0;
-            let left = Math.max(0, exp - Date.now());
-            if (left <= 0) {
-                el.textContent = 'HẾT HẠN THUÊ';
-                return;
-            }
-            const h = Math.floor(left / 3600000);
-            const mi = Math.floor((left % 3600000) / 60000);
-            const s = Math.floor((left % 60000) / 1000);
-            el.textContent = 'THUÊ ' + String(h).padStart(2,'0') + ':' + String(mi).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+            el.textContent = formatRentCountdown(exp);
         });
     };
     tickRent();
@@ -4543,6 +4785,7 @@ function openShopModal(highlightSongId) {
     updateCheckinButtonUI();
     renderShopList(highlightSongId);
     if (typeof renderShopThumbs === "function") renderShopThumbs();
+    if (typeof renderShopRing === "function") renderShopRing();
     modal.classList.remove('show');
     void modal.offsetWidth;
     requestAnimationFrame(() => {
@@ -5065,6 +5308,7 @@ function initShopTabs() {
                 p.classList.toggle('active', p.getAttribute('data-panel') === key);
             });
             if (key === 'thumb' && typeof renderShopThumbs === 'function') renderShopThumbs();
+            if (key === 'ring' && typeof renderShopRing === 'function') renderShopRing();
             if (typeof lucide !== 'undefined') {
                 try { lucide.createIcons({ nodes: Array.from(bar.querySelectorAll('[data-lucide]')) }); } catch (e) {}
             }
@@ -5232,6 +5476,8 @@ window.rentSong = rentSong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;
 window.renderShopThumbs = renderShopThumbs;
+window.renderShopRing = renderShopRing;
+window.rentArtRing = rentArtRing;
 window.fetchProgressThumbs = fetchProgressThumbs;
 window.getCurrentUsername = getCurrentUsername;
 window.clearLocalUserSession = clearLocalUserSession;
