@@ -144,17 +144,21 @@ body.dark .player-container {
     body { padding: 8px; }
     .player-container { border-radius: 24px; }
     .header-section { padding: 40px 16px 20px 16px; }
-    .album-art-wrap { width: 148px; height: 148px; margin-top: 12px; }
-    .album-art { width: 120px; height: 120px; margin-top: 0; }
+    .album-art-wrap { width: 156px; height: 156px; margin-top: 8px; }
+    .album-art { width: 116px; height: 116px; margin-top: 0; }
     .art-name-text { font-size: 9px; letter-spacing: 0; }
+    .header-section { gap: 14px; }
+    .lyric-container { min-height: 48px; }
     .song-title { font-size: 1rem; }
 }
 
 @media (min-width: 361px) and (max-width: 480px) {
     .header-section { padding: 48px 16px 25px 16px; }
-    .album-art-wrap { width: 170px; height: 170px; margin-top: 14px; }
-    .album-art { width: 140px; height: 140px; margin-top: 0; }
+    .album-art-wrap { width: 180px; height: 180px; margin-top: 10px; }
+    .album-art { width: 136px; height: 136px; margin-top: 0; }
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
+    .header-section { gap: 16px; }
+    .lyric-container { min-height: 52px; }
     .controls-bar { padding: 20px; }
     .btn-icon { width: 38px; height: 38px; font-size: 1rem; }
     .play-btn { width: 46px; height: 46px; }
@@ -185,15 +189,16 @@ body.dark .player-container {
 }
 
 .header-section {
-    padding: 55px 24px 30px 24px;
+    padding: 48px 24px 18px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 24px;
+    gap: 16px;
     border-bottom: none;
     position: relative;
     transition: border-color 0.3s ease;
+    overflow: visible;
 }
 
 .top-right-action {
@@ -480,10 +485,10 @@ body.dark .top-bar-icons .btn-icon {
 
 .album-art-wrap {
     position: relative;
-    /* Art 170 + 2×(gap 5px + ~10px chữ) */
-    width: 200px;
-    height: 200px;
-    margin: 18px auto 0;
+    /* Art 170 + 2×(gap ~12px + chữ) */
+    width: 216px;
+    height: 216px;
+    margin: 12px auto 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -596,8 +601,9 @@ body.dark .album-art {
 .song-info-main {
     width: 100%;
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
     min-width: 0;
+    flex-shrink: 0;
 }
 
 .song-title {
@@ -644,11 +650,17 @@ body.dark .album-art {
     justify-content: center;
     align-items: center;
     width: 100%;
-    padding: 0 16px;
+    padding: 10px 16px;
     background: var(--progress-bg);
     border-radius: 40px;
-    margin-top: 8px;
+    margin-top: 10px;
+    margin-bottom: 4px;
     transition: background 0.3s ease;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .current-lyric {
@@ -4353,35 +4365,37 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 20px 28px 16px;
-        gap: 18px;
-        overflow: hidden;
+        padding: 20px 28px 12px;
+        gap: 14px;
+        overflow: visible;
     }
 
     .pc-right .album-art-wrap {
-        width: 236px;
-        height: 236px;
+        width: 248px;
+        height: 248px;
         margin-top: 0;
         flex-shrink: 0;
     }
     .pc-right .album-art {
-        width: 200px;
-        height: 200px;
+        width: 196px;
+        height: 196px;
         margin-top: 0;
         flex-shrink: 0;
     }
     .pc-right .art-name-text {
-        font-size: 11.5px;
+        font-size: 11px;
         letter-spacing: 0;
     }
 
     .pc-right .song-info-main {
         width: 100%;
         max-width: 420px;
+        flex-shrink: 0;
     }
 
     .pc-right .lyric-container {
-        min-height: 52px;
+        min-height: 56px;
+        flex-shrink: 0;
     }
 
     .pc-right .controls-bar {

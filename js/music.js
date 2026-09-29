@@ -2343,7 +2343,7 @@ function updateArtRingPathRadius() {
         if (te) fontPx = parseFloat(getComputedStyle(te).fontSize) || fontPx;
     } catch (e) {}
 
-    const GAP = 5; // px cách mép album art
+    const GAP = 12; // px cách mép album art (không sát quá)
     const artR = artSize / 2;
     // Path = đường giữa chữ; mép trong ≈ pathR - 0.35*font → artR + GAP
     const pathRpx = artR + GAP + fontPx * 0.35;
