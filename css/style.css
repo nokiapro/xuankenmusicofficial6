@@ -143,8 +143,8 @@ body.dark .player-container {
 @media (max-width: 360px) {
     body { padding: 8px; }
     .player-container { border-radius: 24px; }
-    .header-section { padding: 70px 16px 16px 16px; }
-    .album-art-wrap { width: 156px; height: 156px; margin-top: 10px; }
+    .header-section { padding: 74px 16px 14px 16px; }
+    .album-art-wrap { width: 156px; height: 156px; margin-top: 12px; }
     .album-art { width: 116px; height: 116px; margin-top: 0; }
     .art-name-text { font-size: 9px; letter-spacing: 0; }
     .header-section { gap: 14px; }
@@ -153,13 +153,13 @@ body.dark .player-container {
 }
 
 @media (min-width: 361px) and (max-width: 480px) {
-    .header-section { padding: 72px 16px 16px 16px; }
-    .album-art-wrap { width: 180px; height: 180px; margin-top: 12px; }
+    .header-section { padding: 76px 16px 14px 16px; }
+    .album-art-wrap { width: 180px; height: 180px; margin-top: 14px; }
     .album-art { width: 136px; height: 136px; margin-top: 0; }
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
     .lyric-container { min-height: 52px; }
-    .controls-bar { padding: 12px 20px 24px 20px; }
+    .controls-bar { padding: 16px 20px 28px 20px; }
     .btn-icon { width: 38px; height: 38px; font-size: 1rem; }
     .play-btn { width: 46px; height: 46px; }
     .song-title { font-size: 1.2rem; }
@@ -189,12 +189,12 @@ body.dark .player-container {
 }
 
 .header-section {
-    padding: 76px 24px 8px 24px;
+    padding: 80px 24px 12px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 16px;
+    gap: 18px;
     border-bottom: none;
     position: relative;
     transition: border-color 0.3s ease;
@@ -488,7 +488,7 @@ body.dark .top-bar-icons .btn-icon {
     /* Art 170 + 2×(gap ~12px + chữ) */
     width: 216px;
     height: 216px;
-    margin: 18px auto 0;
+    margin: 20px auto 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -654,8 +654,8 @@ body.dark .album-art {
     padding: 10px 16px;
     background: var(--progress-bg);
     border-radius: 40px;
-    margin-top: 10px;
-    margin-bottom: 28px;
+    margin-top: 12px;
+    margin-bottom: 36px;
     transition: background 0.3s ease;
     flex-shrink: 0;
     position: relative;
@@ -676,7 +676,7 @@ body.dark .album-art {
 }
 
 .controls-bar {
-    padding: 12px 24px 28px 24px;
+    padding: 16px 24px 32px 24px;
     background: var(--card-bg);
     transition: background 0.3s ease;
 }
@@ -4368,15 +4368,15 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 40px 28px 12px;
-        gap: 14px;
+        padding: 44px 28px 16px;
+        gap: 16px;
         overflow: visible;
     }
 
     .pc-right .album-art-wrap {
         width: 248px;
         height: 248px;
-        margin-top: 12px;
+        margin-top: 14px;
         flex-shrink: 0;
     }
     .pc-right .album-art {
@@ -4399,12 +4399,12 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .lyric-container {
         min-height: 56px;
         flex-shrink: 0;
-        margin-bottom: 28px;
+        margin-bottom: 36px;
     }
 
     .pc-right .controls-bar {
         flex-shrink: 0;
-        padding: 12px 28px 28px;
+        padding: 16px 28px 32px;
         background: transparent;
     }
 
