@@ -2337,40 +2337,31 @@ function fitArtRingTextToPath(name) {
         ? pathGeom.getTotalLength()
         : (2 * Math.PI * 92);
 
-    const unit = String(name || 'XuanKen').trim() + ' · ';
+    // Cụm "TÊN · " nguyên vẹn — dấu · luôn giữa 2 cụm, không lệch đầu chữ
+    const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
+    const unit = base + ' · ';
+
     textPath.removeAttribute('textLength');
     textPath.removeAttribute('lengthAdjust');
+    textPath.setAttribute('startOffset', '0');
+
     textPath.textContent = unit;
-
     let unitLen = 0;
-    try {
-        unitLen = textPath.getComputedTextLength();
-    } catch (e) {
-        unitLen = 0;
-    }
-    if (!unitLen || unitLen < 4) {
-        unitLen = Math.max(24, unit.length * 7);
-    }
+    try { unitLen = textPath.getComputedTextLength(); } catch (e) { unitLen = 0; }
+    if (!unitLen || unitLen < 4) unitLen = Math.max(28, unit.length * 7);
 
-    // Số lần lặp lớn nhất sao cho vẫn ≤ chu vi (không tràn)
     let n = Math.max(1, Math.floor(pathLen / unitLen));
-    // Nếu quá thưa (< 70% vòng) thì thêm 1 lần (sẽ nén nhẹ bằng spacingAndGlyphs)
-    if (n * unitLen < pathLen * 0.7) n += 1;
+    if (n * unitLen < pathLen * 0.88 && (n + 1) * unitLen <= pathLen * 1.06) {
+        n += 1;
+    }
 
-    let label = unit.repeat(n);
-    textPath.textContent = label;
+    textPath.textContent = unit.repeat(n);
 
     let natural = 0;
-    try {
-        natural = textPath.getComputedTextLength();
-    } catch (e) {
-        natural = n * unitLen;
-    }
+    try { natural = textPath.getComputedTextLength(); } catch (e) { natural = n * unitLen; }
 
-    // Ép đúng 1 vòng: dãn đều (hoặc nén nhẹ nếu hơi dài)
-    textPath.setAttribute('textLength', String(Math.round(pathLen * 100) / 100));
-    textPath.setAttribute('lengthAdjust', natural > pathLen * 1.01 ? 'spacingAndGlyphs' : 'spacing');
-    textPath.setAttribute('startOffset', '0%');
+    textPath.setAttribute('textLength', String(Math.round(pathLen * 1000) / 1000));
+    textPath.setAttribute('lengthAdjust', natural > pathLen * 1.02 ? 'spacingAndGlyphs' : 'spacing');
 }
 
 /** Gói thuê vòng tên quanh art (ngày) */
@@ -2540,7 +2531,6 @@ function renderShopRing() {
     list.innerHTML = `
         <div class="shop-ring-card">
             <div class="shop-ring-preview" aria-hidden="true">
-                <div class="shop-ring-preview-disc"></div>
                 <div class="shop-ring-preview-label">TÊN BẠN · TÊN BẠN ·</div>
             </div>
             ${statusHtml}
@@ -3983,10 +3973,14 @@ function formatRentCountdown(expMs) {
     const h = Math.floor((left % 86400000) / 3600000);
     const mi = Math.floor((left % 3600000) / 60000);
     const s = Math.floor((left % 60000) / 1000);
+    const hh = String(h).padStart(2, '0');
+    const mm = String(mi).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+    // Đầy đủ: ngày + giờ + phút + giây
     if (day > 0) {
-        return 'THUÊ ' + day + 'n ' + String(h).padStart(2, '0') + 'h' + String(mi).padStart(2, '0');
+        return 'THUÊ ' + day + 'n ' + hh + 'g ' + mm + 'p ' + ss + 's';
     }
-    return 'THUÊ ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    return 'THUÊ ' + hh + 'g ' + mm + 'p ' + ss + 's';
 }
 
 function rentSong(songId, days) {
