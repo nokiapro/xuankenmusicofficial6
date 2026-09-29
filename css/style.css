@@ -480,8 +480,7 @@ body.dark .top-bar-icons .btn-icon {
 
 .album-art-wrap {
     position: relative;
-    /* Art 170px + khoảng trống hai bên (~12–14px) + chỗ chữ */
-    width: 230px;
+    width: 205px;
     height: 230px;
     margin: 18px auto 0;
     display: flex;
