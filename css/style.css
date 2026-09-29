@@ -143,8 +143,8 @@ body.dark .player-container {
 @media (max-width: 360px) {
     body { padding: 8px; }
     .player-container { border-radius: 24px; }
-    .header-section { padding: 52px 16px 16px 16px; }
-    .album-art-wrap { width: 156px; height: 156px; margin-top: 14px; }
+    .header-section { padding: 70px 16px 16px 16px; }
+    .album-art-wrap { width: 156px; height: 156px; margin-top: 10px; }
     .album-art { width: 116px; height: 116px; margin-top: 0; }
     .art-name-text { font-size: 9px; letter-spacing: 0; }
     .header-section { gap: 14px; }
@@ -153,8 +153,8 @@ body.dark .player-container {
 }
 
 @media (min-width: 361px) and (max-width: 480px) {
-    .header-section { padding: 54px 16px 16px 16px; }
-    .album-art-wrap { width: 180px; height: 180px; margin-top: 16px; }
+    .header-section { padding: 72px 16px 16px 16px; }
+    .album-art-wrap { width: 180px; height: 180px; margin-top: 12px; }
     .album-art { width: 136px; height: 136px; margin-top: 0; }
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
@@ -189,7 +189,7 @@ body.dark .player-container {
 }
 
 .header-section {
-    padding: 58px 24px 8px 24px;
+    padding: 76px 24px 8px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -4368,7 +4368,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 28px 28px 12px;
+        padding: 40px 28px 12px;
         gap: 14px;
         overflow: visible;
     }
@@ -4376,7 +4376,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .album-art-wrap {
         width: 248px;
         height: 248px;
-        margin-top: 8px;
+        margin-top: 12px;
         flex-shrink: 0;
     }
     .pc-right .album-art {
