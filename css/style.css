@@ -159,7 +159,7 @@ body.dark .player-container {
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
     .lyric-container { min-height: 52px; }
-    .controls-bar { padding: 8px 20px 28px 20px; }
+    .controls-bar { padding: 0 20px 28px 20px; }
     .btn-icon { width: 38px; height: 38px; font-size: 1rem; }
     .play-btn { width: 46px; height: 46px; }
     .song-title { font-size: 1.2rem; }
@@ -202,26 +202,28 @@ body.dark .player-container {
 }
 
 
-/* Spacer cố định — không bị margin-collapse */
+/* Spacer cố định — không bị margin-collapse / flex-shrink */
 .header-top-spacer {
     width: 100%;
-    height: 28px;
-    flex-shrink: 0;
+    height: 36px !important;
+    min-height: 36px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
     pointer-events: none;
+    display: block;
 }
 .lyric-progress-spacer {
     width: 100%;
-    height: 32px;
-    flex-shrink: 0;
+    height: 40px !important;
+    min-height: 40px !important;
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
     pointer-events: none;
+    display: block;
 }
 @media (max-width: 480px) {
-    .header-top-spacer { height: 24px; }
-    .lyric-progress-spacer { height: 28px; }
-}
-@media (min-width: 900px) {
-    .header-top-spacer { height: 20px; }
-    .lyric-progress-spacer { height: 32px; }
+    .header-top-spacer { height: 32px !important; min-height: 32px !important; }
+    .lyric-progress-spacer { height: 36px !important; min-height: 36px !important; }
 }
 
 .top-right-action {
@@ -699,7 +701,7 @@ body.dark .album-art {
 }
 
 .controls-bar {
-    padding: 8px 24px 32px 24px;
+    padding: 0 24px 32px 24px;
     background: var(--card-bg);
     transition: background 0.3s ease;
 }
@@ -707,7 +709,7 @@ body.dark .album-art {
 .progress-wrapper {
     margin-top: 0;
     margin-bottom: 20px;
-    padding-top: 8px;
+    padding-top: 0;
 }
 
 .progress-bar-container {
@@ -716,6 +718,7 @@ body.dark .album-art {
     cursor: pointer;
     position: relative;
     border-radius: 10px;
+    margin-top: 14px; /* chừa chỗ nửa thumb (28px) phía trên, không đè lyric */
     margin-bottom: 10px;
     transition: background 0.3s ease;
 }
@@ -4427,8 +4430,18 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
 
     .pc-right .controls-bar {
         flex-shrink: 0;
-        padding: 8px 28px 32px;
+        padding: 0 28px 32px;
         background: transparent;
+    }
+    .pc-right .lyric-progress-spacer {
+        height: 40px !important;
+        min-height: 40px !important;
+    }
+    .pc-right .header-top-spacer {
+        display: none; /* PC: top-bar không absolute, không cần spacer này */
+    }
+    .pc-right .header-section {
+        padding-top: 20px !important;
     }
 
     #list-btn {
