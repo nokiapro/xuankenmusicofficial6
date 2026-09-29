@@ -2328,14 +2328,44 @@ function resolveArtRingName(raw) {
  * - lặp "TÊN · " sao cho độ dài tự nhiên ≤ chu vi
  * - gán textLength = chu vi + lengthAdjust=spacing → dãn đều, không thừa/thiếu
  */
+function updateArtRingPathRadius() {
+    const wrap = document.getElementById('album-art-wrap');
+    const art = wrap && wrap.querySelector('.album-art');
+    const pathGeom = document.getElementById('art-ring-path');
+    const svg = document.getElementById('art-name-ring');
+    if (!wrap || !art || !pathGeom || !svg) return 92;
+
+    const wrapSize = wrap.clientWidth || 200;
+    const artSize = art.clientWidth || 170;
+    let fontPx = 10.5;
+    try {
+        const te = svg.querySelector('text.art-name-text');
+        if (te) fontPx = parseFloat(getComputedStyle(te).fontSize) || fontPx;
+    } catch (e) {}
+
+    const GAP = 5; // px cách mép album art
+    const artR = artSize / 2;
+    // Path = đường giữa chữ; mép trong ≈ pathR - 0.35*font → artR + GAP
+    const pathRpx = artR + GAP + fontPx * 0.35;
+    let rVb = (pathRpx / wrapSize) * 200;
+    const maxR = 100 - (fontPx / wrapSize) * 100 - 1;
+    rVb = Math.max(20, Math.min(maxR, rVb));
+
+    const d = 'M 100,' + (100 - rVb) + ' A ' + rVb + ',' + rVb + ' 0 1,1 99.999,' + (100 - rVb);
+    pathGeom.setAttribute('d', d);
+    return rVb;
+}
+
 function fitArtRingTextToPath(name) {
     const pathGeom = document.getElementById('art-ring-path');
     const textEl = document.querySelector('#art-name-ring text.art-name-text');
     if (!pathGeom || !textEl) return;
 
+    updateArtRingPathRadius();
+
     const pathLen = (typeof pathGeom.getTotalLength === 'function')
         ? pathGeom.getTotalLength()
-        : (2 * Math.PI * 92);
+        : (2 * Math.PI * 90);
 
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
@@ -2364,21 +2394,17 @@ function fitArtRingTextToPath(name) {
     const sep = '·';
     const sepLen = measure(sep);
 
-    // Mỗi "slot" = tên + khoảng trống (đủ chỗ cho dấu · ở giữa)
-    const minSlot = nameLen + sepLen + 6;
+    const minSlot = nameLen + sepLen + 8;
     let n = Math.max(1, Math.floor(pathLen / minSlot));
     const slot = pathLen / n;
 
     textEl.innerHTML = '';
     for (let i = 0; i < n; i++) {
         const nameStart = i * slot;
-        // Tên bắt đầu đầu mỗi cung
         textEl.appendChild(makeTp(base, nameStart));
-        // Dấu · đúng giữa khoảng từ hết tên → đầu tên kế
-        // gap = slot - nameLen; tâm gap = nameStart + nameLen + gap/2
         const gap = Math.max(0, slot - nameLen);
         const dotCenter = nameStart + nameLen + gap / 2;
-        const dotStart = dotCenter - sepLen / 2;
+        const dotStart = Math.max(0, dotCenter - sepLen / 2);
         textEl.appendChild(makeTp(sep, dotStart));
     }
 }
@@ -2574,6 +2600,18 @@ function renderShopRing() {
     };
     tick();
     window._shopRingTimer = setInterval(tick, 1000);
+}
+
+function bindArtRingResize() {
+    if (window.artRingResizeBound) return;
+    window.artRingResizeBound = true;
+    let t = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+            try { if (typeof updateArtNameRing === 'function') updateArtNameRing(); } catch (e) {}
+        }, 120);
+    });
 }
 
 function bindArtRingSettingsUI() {
@@ -5518,14 +5556,17 @@ window.getDb = getDb;
     loadSongsFromFirebase();
     try { bindArtRingSettingsUI(); } catch (e) {}
     try { updateArtNameRing(); } catch (e) {}
+    try { bindArtRingResize(); } catch (e) {}
 })();
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         try { bindArtRingSettingsUI(); } catch (e) {}
         try { updateArtNameRing(); } catch (e) {}
+        try { bindArtRingResize(); } catch (e) {}
     });
 } else {
     try { bindArtRingSettingsUI(); } catch (e) {}
     try { updateArtNameRing(); } catch (e) {}
+    try { bindArtRingResize(); } catch (e) {}
 }
