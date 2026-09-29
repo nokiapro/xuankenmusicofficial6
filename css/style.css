@@ -143,8 +143,8 @@ body.dark .player-container {
 @media (max-width: 360px) {
     body { padding: 8px; }
     .player-container { border-radius: 24px; }
-    .header-section { padding: 40px 16px 20px 16px; }
-    .album-art-wrap { width: 156px; height: 156px; margin-top: 8px; }
+    .header-section { padding: 52px 16px 16px 16px; }
+    .album-art-wrap { width: 156px; height: 156px; margin-top: 14px; }
     .album-art { width: 116px; height: 116px; margin-top: 0; }
     .art-name-text { font-size: 9px; letter-spacing: 0; }
     .header-section { gap: 14px; }
@@ -153,8 +153,8 @@ body.dark .player-container {
 }
 
 @media (min-width: 361px) and (max-width: 480px) {
-    .header-section { padding: 48px 16px 25px 16px; }
-    .album-art-wrap { width: 180px; height: 180px; margin-top: 10px; }
+    .header-section { padding: 54px 16px 16px 16px; }
+    .album-art-wrap { width: 180px; height: 180px; margin-top: 16px; }
     .album-art { width: 136px; height: 136px; margin-top: 0; }
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
@@ -189,7 +189,7 @@ body.dark .player-container {
 }
 
 .header-section {
-    padding: 48px 24px 18px 24px;
+    padding: 58px 24px 16px 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -488,7 +488,7 @@ body.dark .top-bar-icons .btn-icon {
     /* Art 170 + 2×(gap ~12px + chữ) */
     width: 216px;
     height: 216px;
-    margin: 12px auto 0;
+    margin: 18px auto 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -654,7 +654,7 @@ body.dark .album-art {
     background: var(--progress-bg);
     border-radius: 40px;
     margin-top: 10px;
-    margin-bottom: 4px;
+    margin-bottom: 14px;
     transition: background 0.3s ease;
     flex-shrink: 0;
     position: relative;
@@ -675,12 +675,13 @@ body.dark .album-art {
 }
 
 .controls-bar {
-    padding: 24px 24px 28px 24px;
+    padding: 8px 24px 28px 24px;
     background: var(--card-bg);
     transition: background 0.3s ease;
 }
 
 .progress-wrapper {
+    margin-top: 4px;
     margin-bottom: 20px;
 }
 
@@ -4365,7 +4366,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 20px 28px 12px;
+        padding: 28px 28px 12px;
         gap: 14px;
         overflow: visible;
     }
@@ -4373,7 +4374,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .album-art-wrap {
         width: 248px;
         height: 248px;
-        margin-top: 0;
+        margin-top: 8px;
         flex-shrink: 0;
     }
     .pc-right .album-art {
@@ -4396,11 +4397,12 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .lyric-container {
         min-height: 56px;
         flex-shrink: 0;
+        margin-bottom: 16px;
     }
 
     .pc-right .controls-bar {
         flex-shrink: 0;
-        padding: 16px 28px 28px;
+        padding: 8px 28px 28px;
         background: transparent;
     }
 
