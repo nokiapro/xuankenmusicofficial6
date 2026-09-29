@@ -201,6 +201,29 @@ body.dark .player-container {
     overflow: visible;
 }
 
+
+/* Spacer cố định — không bị margin-collapse */
+.header-top-spacer {
+    width: 100%;
+    height: 28px;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+.lyric-progress-spacer {
+    width: 100%;
+    height: 32px;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+@media (max-width: 480px) {
+    .header-top-spacer { height: 24px; }
+    .lyric-progress-spacer { height: 28px; }
+}
+@media (min-width: 900px) {
+    .header-top-spacer { height: 20px; }
+    .lyric-progress-spacer { height: 32px; }
+}
+
 .top-right-action {
     position: absolute;
     top: 15px;
@@ -655,7 +678,7 @@ body.dark .album-art {
     background: var(--progress-bg);
     border-radius: 40px;
     margin-top: 12px;
-    margin-bottom: 48px;
+    margin-bottom: 0;
     transition: background 0.3s ease;
     flex-shrink: 0;
     position: relative;
@@ -4399,7 +4422,7 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
     .pc-right .lyric-container {
         min-height: 56px;
         flex-shrink: 0;
-        margin-bottom: 48px;
+        margin-bottom: 0;
     }
 
     .pc-right .controls-bar {
