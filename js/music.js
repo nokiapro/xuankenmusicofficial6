@@ -2452,17 +2452,17 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    // Font theo độ dài — tên rất dài vẫn hiện đủ 1 vòng
+    // Font theo độ dài — ưu tiên đọc được, tối đa 2 vòng chữ
     const len = base.length;
     let fontPx = 10.5;
-    if (len > 64) fontPx = 6.2;
-    else if (len > 52) fontPx = 6.8;
-    else if (len > 40) fontPx = 7.5;
-    else if (len > 32) fontPx = 8.2;
-    else if (len > 24) fontPx = 9;
-    else if (len > 16) fontPx = 9.8;
+    if (len > 64) fontPx = 7.2;
+    else if (len > 52) fontPx = 7.8;
+    else if (len > 40) fontPx = 8.5;
+    else if (len > 32) fontPx = 9.2;
+    else if (len > 24) fontPx = 9.8;
+    else if (len > 16) fontPx = 10.2;
     textEl.style.fontSize = fontPx + 'px';
-    textEl.style.letterSpacing = len > 40 ? '0.2px' : '0';
+    textEl.style.letterSpacing = len > 40 ? '0.15px' : '0';
 
     updateArtRingPathRadius();
 
@@ -2490,11 +2490,13 @@ function fitArtRingTextToPath(name) {
         return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.58));
     }
 
-    // Thu nhỏ đến khi cả tên (không cắt) vừa ≤ 95% chu vi
+    // Thu nhỏ font đến khi vừa 2 vòng (hoặc 1 vòng nếu vẫn dài) — không ép 3 vòng
+    const MAX_LOOPS = 2;
+    const MIN_FONT = 6.5;
     let nameLen = measure(base);
     let guard = 0;
-    while (nameLen > pathLen * 0.95 && fontPx > 5 && guard < 16) {
-        fontPx -= 0.35;
+    while (nameLen * MAX_LOOPS > pathLen * 0.98 && fontPx > MIN_FONT && guard < 14) {
+        fontPx -= 0.3;
         textEl.style.fontSize = fontPx + 'px';
         updateArtRingPathRadius();
         pathLen = (typeof pathGeom.getTotalLength === 'function')
@@ -2507,9 +2509,13 @@ function fitArtRingTextToPath(name) {
     const sep = ' · ';
     const sepLen = measure(sep);
     const minSlot = nameLen + sepLen + 2;
+
+    // Số vòng: 1 hoặc 2 thôi (không 3)
     let n = Math.max(1, Math.floor(pathLen / minSlot));
-    // Tên dài: chỉ 1 bản đầy đủ, không lặp cắt chữ
-    if (nameLen > pathLen * 0.42) n = 1;
+    if (n > MAX_LOOPS) n = MAX_LOOPS;
+    // Tên quá dài so với chu vi → chỉ 1 vòng đầy đủ
+    if (nameLen > pathLen * 0.48) n = 1;
+
     const slot = pathLen / n;
 
     textEl.innerHTML = '';
