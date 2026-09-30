@@ -798,6 +798,7 @@ function loadSongInfoOnly(i) {
     
     if (songTitleEl) {
         songTitleEl.innerText = song.name;
+        try { if (typeof updateArtNameRing === 'function') updateArtNameRing(); } catch (e) {}
         applyGradientToSongTitle();
     }
     if (artistNameEl) {
@@ -1747,6 +1748,7 @@ async function loadSong(i) {
     
     if (songTitleEl) {
         songTitleEl.innerText = song.name;
+        try { if (typeof updateArtNameRing === 'function') updateArtNameRing(); } catch (e) {}
         applyGradientToSongTitle();
     }
     if (artistNameEl) {
@@ -2306,6 +2308,17 @@ audio.onpause = () => {
 };
 
 function resolveArtRingName(raw) {
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    const useSong = !!(acc && acc.artRingUseSong);
+    if (useSong) {
+        try {
+            const song = (typeof songs !== 'undefined' && songs && typeof index === 'number' && songs[index])
+                ? songs[index]
+                : null;
+            let sn = song && (song.name || song.title) ? String(song.name || song.title).trim() : '';
+            if (sn) return sn.slice(0, 28);
+        } catch (e) {}
+    }
     let t = String(raw || '').trim();
     if (!t) {
         t = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
@@ -2445,14 +2458,17 @@ function updateArtNameRing() {
     const textEl = document.querySelector('#art-name-ring text.art-name-text');
     const enEl = document.getElementById('art-ring-enabled');
     const txEl = document.getElementById('art-ring-text');
+    const songEl = document.getElementById('art-ring-use-song');
     if (!wrap || !textEl) return;
 
     let preferOn = true;
     let custom = '';
+    let useSong = false;
     const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
     if (acc) {
         preferOn = acc.artRingOn !== false;
         custom = String(acc.artRingText || '');
+        useSong = !!acc.artRingUseSong;
     }
     const access = hasArtRingAccess();
     const on = access && preferOn;
@@ -2461,9 +2477,14 @@ function updateArtNameRing() {
         enEl.checked = preferOn;
         enEl.disabled = !access;
     }
+    if (songEl) {
+        songEl.checked = useSong;
+        songEl.disabled = !access;
+    }
     if (txEl) {
         if (document.activeElement !== txEl) txEl.value = custom;
-        txEl.disabled = !access;
+        txEl.disabled = !access || useSong;
+        txEl.placeholder = useSong ? 'Đang dùng tên bài hát' : 'Trống = username · tối đa 28 ký tự';
     }
 
     wrap.classList.toggle('ring-off', !on);
@@ -2488,21 +2509,29 @@ function saveArtRingSettings() {
     }
     if (!hasArtRingAccess()) {
         if (typeof showNotification === 'function') {
-            showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG (1·3·5·7 NGÀY)', '#ff9800', 'clock');
+            showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG', '#ff9800', 'clock');
         }
         return;
     }
     const enEl = document.getElementById('art-ring-enabled');
     const txEl = document.getElementById('art-ring-text');
+    const songEl = document.getElementById('art-ring-use-song');
     const on = !!(enEl && enEl.checked);
+    const useSong = !!(songEl && songEl.checked);
     const text = (txEl && txEl.value || '').trim().slice(0, 28);
     updateCurrentAccount(acc => {
         acc.artRingOn = on;
         acc.artRingText = text;
+        acc.artRingUseSong = useSong;
     });
     updateArtNameRing();
     if (typeof showNotification === 'function') {
-        showNotification('VÒNG TÊN:', on ? ('Đã bật · ' + (text || getCurrentUsername() || 'username')) : 'Đã tắt', '#4ade80', 'sparkles');
+        let label = 'Đã tắt';
+        if (on) {
+            if (useSong) label = 'Đã bật · tên bài hát';
+            else label = 'Đã bật · ' + (text || getCurrentUsername() || 'username');
+        }
+        showNotification('VÒNG TÊN:', label, '#4ade80', 'sparkles');
     } else if (typeof showToastMsg === 'function') {
         showToastMsg(on ? 'Đã lưu vòng tên' : 'Đã tắt vòng tên', true);
     }
@@ -2552,7 +2581,7 @@ function renderShopRing() {
     if (access && until > Date.now()) {
         statusHtml = `<div class="shop-ring-status active">
             <div class="shop-ring-status-title">Đang có vòng tên</div>
-            <div class="shop-ring-status-time shop-rent-countdown" data-ring-exp="${until}">${formatRentCountdown(until).replace(/^THUÊ /, 'Còn ')}</div>
+            <div class="shop-ring-status-time shop-rent-countdown" data-ring-exp="${until}">${formatRentCountdown(until).replace(/^THUÊ /, 'CÒN ')}</div>
             <p class="shop-ring-hint">Thuê thêm để gia hạn · Tùy chỉnh chữ ở Tiện ích</p>
         </div>`;
     } else if (access) {
@@ -2589,7 +2618,7 @@ function renderShopRing() {
         list.querySelectorAll('[data-ring-exp]').forEach(el => {
             const exp = Number(el.getAttribute('data-ring-exp')) || 0;
             const t = formatRentCountdown(exp);
-            el.textContent = t === 'HẾT HẠN THUÊ' ? 'HẾT HẠN' : t.replace(/^THUÊ /, 'Còn ');
+            el.textContent = t === 'HẾT HẠN THUÊ' ? 'HẾT HẠN' : t.replace(/^THUÊ /, 'CÒN ');
             if (exp <= Date.now()) {
                 try { updateArtNameRing(); renderShopRing(); } catch (e) {}
             }
@@ -2631,6 +2660,23 @@ function bindArtRingSettingsUI() {
                 return;
             }
             updateCurrentAccount(acc => { acc.artRingOn = !!enEl.checked; });
+            updateArtNameRing();
+        };
+    }
+    const songEl = document.getElementById('art-ring-use-song');
+    if (songEl && !songEl._artRingBound) {
+        songEl._artRingBound = true;
+        songEl.onchange = () => {
+            if (!getCurrentUsername()) {
+                songEl.checked = false;
+                return;
+            }
+            if (!hasArtRingAccess()) {
+                songEl.checked = false;
+                showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG', '#ff9800', 'clock');
+                return;
+            }
+            updateCurrentAccount(acc => { acc.artRingUseSong = !!songEl.checked; });
             updateArtNameRing();
         };
     }
@@ -3221,6 +3267,7 @@ function ensureUserAccount(username) {
             listenTime: { total: 0, byDay: {} },
             artRingOn: true,
             artRingText: '',
+            artRingUseSong: false,
             artRingUntil: 0
         };
         saveAllAccounts(accounts);
@@ -3231,8 +3278,13 @@ function ensureUserAccount(username) {
         if (!Array.isArray(a.dislikes)) a.dislikes = [];
         if (!Array.isArray(a.myPlaylist)) a.myPlaylist = [];
         if (!a.rentals || typeof a.rentals !== 'object') a.rentals = {};
+        if (!a.checkinDays || typeof a.checkinDays !== 'object') a.checkinDays = {};
+        if (a.lastCheckin == null) a.lastCheckin = '';
+        if (a.streak == null) a.streak = 0;
+        if (a.streakFreeze == null) a.streakFreeze = 0;
         if (a.artRingOn == null) a.artRingOn = true;
         if (a.artRingText == null) a.artRingText = '';
+        if (a.artRingUseSong == null) a.artRingUseSong = false;
         if (a.artRingUntil == null) a.artRingUntil = 0;
         saveAllAccounts(accounts);
     }
@@ -3241,6 +3293,24 @@ function ensureUserAccount(username) {
 
 function sanitizeUsernameKey(name) {
     return String(name || '').trim().replace(/[.#$\[\]/]/g, '_');
+}
+
+
+/** Chuẩn hoá map ngày điểm danh: key YYYY-MM-DD → timestamp (ms) hoặc true */
+function normalizeCheckinDays(src) {
+    const out = Object.create(null);
+    if (!src || typeof src !== 'object') return out;
+    Object.keys(src).forEach(k => {
+        const key = String(k || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+        const v = src[k];
+        if (v === false || v == null || v === 0 || v === '0') return;
+        if (v === true) { out[key] = true; return; }
+        const n = Number(v);
+        if (Number.isFinite(n) && n > 0) out[key] = n;
+        else out[key] = true;
+    });
+    return out;
 }
 
 function mapUserProfile(data, name) {
@@ -3255,7 +3325,7 @@ function mapUserProfile(data, name) {
         myPlaylist: Array.isArray(d.myPlaylist) ? d.myPlaylist.map(String) : [],
         rentals: (d.rentals && typeof d.rentals === 'object') ? d.rentals : {},
         lastCheckin: d.lastCheckin || '',
-        checkinDays: (d.checkinDays && typeof d.checkinDays === 'object') ? d.checkinDays : {},
+        checkinDays: normalizeCheckinDays(d.checkinDays),
         createdAt: d.createdAt || Date.now(),
         rank: d.rank || 'member',
         banned: !!d.banned,
@@ -3277,6 +3347,7 @@ function mapUserProfile(data, name) {
         profiles: Array.isArray(d.profiles) ? d.profiles : [],
         artRingOn: d.artRingOn !== false,
         artRingText: typeof d.artRingText === 'string' ? d.artRingText : '',
+        artRingUseSong: !!d.artRingUseSong,
         artRingUntil: Number(d.artRingUntil) || 0
     };
 }
@@ -3395,7 +3466,7 @@ function startUserProfileListener(uid) {
         mapped.favorites = preferRemoteList(mapped.favorites, prev && prev.favorites);
         mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prev && prev.myPlaylist);
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prev && prev.listenedSongs);
-        mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prev && prev.checkinDays);
+        mapped.checkinDays = normalizeCheckinDays(mergeNumericMaps(mapped.checkinDays, prev && prev.checkinDays));
         mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prev && prev.listenTime);
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prev && prev.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prev && prev.level) || 1);
@@ -3419,6 +3490,12 @@ function startUserProfileListener(uid) {
                 const modal = document.getElementById('shop-modal');
                 if (modal && modal.classList.contains('show') && typeof renderShopList === 'function') {
                     renderShopList();
+                }
+            } catch (e) {}
+            try {
+                const ciModal = document.getElementById('checkin-modal');
+                if (ciModal && ciModal.classList.contains('show') && typeof window.renderCheckinCalendar === 'function') {
+                    window.renderCheckinCalendar();
                 }
             } catch (e) {}
         }
@@ -3477,7 +3554,7 @@ async function fetchUserByUid(uid, usernameHint) {
         mapped.favorites = preferRemoteList(mapped.favorites, prevLocal && prevLocal.favorites);
         mapped.myPlaylist = preferRemoteList(mapped.myPlaylist, prevLocal && prevLocal.myPlaylist);
         mapped.listenedSongs = mergeNumericMaps(mapped.listenedSongs, prevLocal && prevLocal.listenedSongs);
-        mapped.checkinDays = mergeNumericMaps(mapped.checkinDays, prevLocal && prevLocal.checkinDays);
+        mapped.checkinDays = normalizeCheckinDays(mergeNumericMaps(mapped.checkinDays, prevLocal && prevLocal.checkinDays));
         mapped.listenTime = mergeListenTimeObj(mapped.listenTime, prevLocal && prevLocal.listenTime);
         mapped.xp = Math.max(Number(mapped.xp) || 0, Number(prevLocal && prevLocal.xp) || 0);
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
@@ -3735,11 +3812,22 @@ async function pushUserToFirebase(username, account, options) {
 
         const mergeMapField = async (field, localMap, changedFlag) => {
             if (!(opts[changedFlag] || forceAll)) return;
-            const local = (localMap && typeof localMap === 'object') ? localMap : {};
+            let local = (localMap && typeof localMap === 'object') ? localMap : {};
+            if (field === 'checkinDays') local = normalizeCheckinDays(local);
             const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
-            const tx = await ref.transaction((current) => mergeNumericMaps(current, local));
-            if (tx.committed && tx.snapshot.val()) {
-                account[field] = tx.snapshot.val();
+            const tx = await ref.transaction((current) => {
+                if (field === 'checkinDays') {
+                    return mergeNumericMaps(normalizeCheckinDays(current), local);
+                }
+                return mergeNumericMaps(current, local);
+            });
+            if (tx.committed) {
+                const val = tx.snapshot.val();
+                if (field === 'checkinDays') {
+                    account[field] = normalizeCheckinDays(val || local);
+                } else if (val && typeof val === 'object') {
+                    account[field] = val;
+                }
                 if (accounts[name]) { accounts[name][field] = account[field]; saveAllAccounts(accounts); }
             }
         };
@@ -3766,9 +3854,44 @@ async function pushUserToFirebase(username, account, options) {
 
         const scalarPayload = {};
         if (opts.checkinChanged || forceAll) {
-            scalarPayload.lastCheckin = account.lastCheckin || '';
-            scalarPayload.streak = Number(account.streak) || 0;
-            scalarPayload.streakFreeze = Number(account.streakFreeze) || 0;
+            // Không ghi đè lastCheckin/streak bằng giá trị yếu hơn (tránh mất điểm danh khi deploy/load lại)
+            try {
+                const lastLocal = String(account.lastCheckin || '');
+                const lastRef = db.ref(dataPath('users') + '/' + uid + '/lastCheckin');
+                const lastTx = await lastRef.transaction((cur) => {
+                    const c = String(cur || '');
+                    if (!lastLocal) return c || null;
+                    if (!c) return lastLocal;
+                    return lastLocal > c ? lastLocal : c;
+                });
+                if (lastTx.committed) {
+                    const kept = String(lastTx.snapshot.val() || lastLocal || '');
+                    account.lastCheckin = kept;
+                    if (accounts[name]) accounts[name].lastCheckin = kept;
+                }
+                const streakLocal = Number(account.streak) || 0;
+                const streakRef = db.ref(dataPath('users') + '/' + uid + '/streak');
+                const stTx = await streakRef.transaction((cur) => Math.max(Number(cur) || 0, streakLocal));
+                if (stTx.committed) {
+                    const keptS = Number(stTx.snapshot.val()) || streakLocal;
+                    account.streak = keptS;
+                    if (accounts[name]) accounts[name].streak = keptS;
+                }
+                const freezeLocal = Number(account.streakFreeze) || 0;
+                const frRef = db.ref(dataPath('users') + '/' + uid + '/streakFreeze');
+                const frTx = await frRef.transaction((cur) => Math.max(Number(cur) || 0, freezeLocal));
+                if (frTx.committed) {
+                    const keptF = Number(frTx.snapshot.val()) || freezeLocal;
+                    account.streakFreeze = keptF;
+                    if (accounts[name]) accounts[name].streakFreeze = keptF;
+                }
+                saveAllAccounts(accounts);
+            } catch (e) {
+                console.warn('[checkin] scalar merge fail', e);
+                if (account.lastCheckin) scalarPayload.lastCheckin = account.lastCheckin;
+                scalarPayload.streak = Number(account.streak) || 0;
+                scalarPayload.streakFreeze = Number(account.streakFreeze) || 0;
+            }
         }
         if (opts.xpChanged || forceAll) {
             scalarPayload.xp = Number(account.xp) || 0;
@@ -3782,6 +3905,7 @@ async function pushUserToFirebase(username, account, options) {
         if (opts.artRingChanged || forceAll) {
             scalarPayload.artRingOn = account.artRingOn !== false;
             scalarPayload.artRingText = String(account.artRingText || '').slice(0, 28);
+            scalarPayload.artRingUseSong = !!account.artRingUseSong;
             scalarPayload.artRingUntil = Math.max(0, Number(account.artRingUntil) || 0);
         }
         if (opts.inviteChanged || forceAll) {
@@ -3881,7 +4005,8 @@ function updateCurrentAccount(mutator) {
         const settings = getAdminSettings();
         accounts[name] = {
             coins: settings.starterCoins, owned: [], rentals: {}, favorites: [],
-            myPlaylist: [], ownedThumbs: [], achievements: [], lastCheckin: '', createdAt: Date.now()
+            myPlaylist: [], ownedThumbs: [], achievements: [], lastCheckin: '',
+            checkinDays: {}, streak: 0, streakFreeze: 0, createdAt: Date.now()
         };
     }
     const acc = accounts[name];
@@ -3901,7 +4026,7 @@ function updateCurrentAccount(mutator) {
         checkin: snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
-        artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', u: acc.artRingUntil || 0 }),
+        artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', s: !!acc.artRingUseSong, u: acc.artRingUntil || 0 }),
         inviteBy: snap(acc.inviteBy || ''),
         counters: snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -3922,7 +4047,7 @@ function updateCurrentAccount(mutator) {
         checkinChanged: before.checkin !== snap({ last: acc.lastCheckin, days: acc.checkinDays, streak: acc.streak, freeze: acc.streakFreeze }),
         xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
-        artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', u: acc.artRingUntil || 0 }),
+        artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', s: !!acc.artRingUseSong, u: acc.artRingUntil || 0 }),
         inviteChanged: before.inviteBy !== snap(acc.inviteBy || ''),
         countersChanged: before.counters !== snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -4030,11 +4155,11 @@ function formatRentCountdown(expMs) {
     const hh = String(h).padStart(2, '0');
     const mm = String(mi).padStart(2, '0');
     const ss = String(s).padStart(2, '0');
-    // Đầy đủ: ngày + giờ + phút + giây
+    // Đầy đủ viết hoa: NGÀY GIỜ PHÚT GIÂY
     if (day > 0) {
-        return 'THUÊ ' + day + 'n ' + hh + 'g ' + mm + 'p ' + ss + 's';
+        return 'THUÊ ' + day + ' NGÀY ' + hh + ' GIỜ ' + mm + ' PHÚT ' + ss + ' GIÂY';
     }
-    return 'THUÊ ' + hh + 'g ' + mm + 'p ' + ss + 's';
+    return 'THUÊ ' + hh + ' GIỜ ' + mm + ' PHÚT ' + ss + ' GIÂY';
 }
 
 function rentSong(songId, days) {
@@ -4273,6 +4398,7 @@ function doDailyCheckin(dayKeyOpt) {
     let streakMsg = '';
     updateCurrentAccount(acc => {
         if (!acc.checkinDays || typeof acc.checkinDays !== 'object') acc.checkinDays = {};
+        else acc.checkinDays = normalizeCheckinDays(acc.checkinDays);
         // Lưu timestamp (số) — merge Firebase ổn định hơn boolean true
         if (acc.lastCheckin && !acc.checkinDays[acc.lastCheckin]) {
             acc.checkinDays[acc.lastCheckin] = Date.now();

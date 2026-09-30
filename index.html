@@ -298,23 +298,34 @@
                     </div>
                 </div>
                 <div class="extras-section">
-                    <label class="extras-label">Vòng tên quanh art</label>
-                    <div class="art-ring-settings">
-                        <label class="art-ring-toggle-row">
-                            <input type="checkbox" id="art-ring-enabled" checked>
-                            <span>Hiện vòng chữ quanh ảnh bìa</span>
-                        </label>
-                        <input type="text" id="art-ring-text" class="art-ring-text-input" maxlength="28" placeholder="Trống = dùng username">
-                        <button type="button" id="art-ring-save-btn" class="extras-btn-primary" style="width:100%;margin-top:8px;">Lưu vòng tên</button>
-                        <p class="muted" style="font-size:0.72rem;margin-top:6px;opacity:0.75;">Cần thuê ở Cửa hàng → Vòng tên (1·3·5·7 ngày). Tối đa 28 ký tự.</p>
-                    </div>
-                </div>
-                <div class="extras-section">
                     <label class="extras-label">Khác</label>
                     <div class="extras-actions-grid extras-rank-grid extras-rank-compact">
                         <button type="button" class="extras-action-btn" data-x="badges"><i data-lucide="award"></i><span>Huy hiệu của tôi</span></button>
                         <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
                         <button type="button" class="extras-action-btn" data-x="checkin"><i data-lucide="calendar-check"></i><span>Điểm danh</span></button>
+                    </div>
+                </div>
+                <div class="extras-section">
+                    <label class="extras-label">Vòng tên quanh art</label>
+                    <div class="art-ring-settings">
+                        <div class="art-ring-toggle-row">
+                            <span>Hiện vòng chữ quanh ảnh bìa</span>
+                            <label class="art-ring-switch" title="Bật / Tắt">
+                                <input type="checkbox" id="art-ring-enabled" checked>
+                                <span class="art-ring-switch-track"><span class="art-ring-switch-knob"></span></span>
+                            </label>
+                        </div>
+                        <div class="art-ring-toggle-row">
+                            <span>Hiện tên bài hát</span>
+                            <label class="art-ring-switch" title="Dùng tên bài hát đang phát">
+                                <input type="checkbox" id="art-ring-use-song">
+                                <span class="art-ring-switch-track"><span class="art-ring-switch-knob"></span></span>
+                            </label>
+                        </div>
+                        <div class="extras-row art-ring-input-row">
+                            <input type="text" id="art-ring-text" class="art-ring-text-input" maxlength="28" placeholder="Trống = username · tối đa 28 ký tự">
+                            <button type="button" id="art-ring-save-btn" class="extras-btn-primary">Lưu</button>
+                        </div>
                     </div>
                 </div>
                 <div id="extras-result" class="extras-result"></div>

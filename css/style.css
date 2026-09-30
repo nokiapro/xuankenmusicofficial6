@@ -600,32 +600,96 @@ body.dark .album-art {
 .art-ring-settings {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
 }
 
 .art-ring-toggle-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    gap: 12px;
     font-size: 0.85rem;
-    cursor: pointer;
     user-select: none;
 }
 
-.art-ring-toggle-row input {
+.art-ring-toggle-row > span {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.35;
+}
+
+/* Viên nang on/off nhỏ gọn */
+.art-ring-switch {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    cursor: pointer;
+}
+.art-ring-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+.art-ring-switch-track {
+    display: block;
+    width: 42px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(128, 128, 128, 0.35);
+    border: 1px solid rgba(255,255,255,0.12);
+    transition: background 0.2s, border-color 0.2s;
+    position: relative;
+}
+.art-ring-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
     width: 18px;
     height: 18px;
-    accent-color: #8c00ff;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    transition: transform 0.2s;
+}
+.art-ring-switch input:checked + .art-ring-switch-track {
+    background: linear-gradient(135deg, #ff0040, #8c00ff);
+    border-color: transparent;
+}
+.art-ring-switch input:checked + .art-ring-switch-track .art-ring-switch-knob {
+    transform: translateX(18px);
+}
+.art-ring-switch input:disabled + .art-ring-switch-track {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.art-ring-input-row {
+    margin-bottom: 0 !important;
+}
+.art-ring-input-row .art-ring-text-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 44px;
+    box-sizing: border-box;
+}
+.art-ring-input-row .extras-btn-primary {
+    min-width: 64px;
 }
 
 .art-ring-text-input {
     width: 100%;
     padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.12);
-    background: rgba(0,0,0,0.25);
-    color: inherit;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--progress-bg);
+    color: var(--text-primary);
     font-size: 0.9rem;
+    font-family: inherit;
+}
+.art-ring-text-input:disabled {
+    opacity: 0.55;
 }
 
 .song-info-main {
@@ -2482,6 +2546,27 @@ body.dark .notification-message span[style*="background-clip"] {
 .shop-rent-btn {
     background: linear-gradient(135deg, #17adca, #8c00ff) !important;
 }
+/* Vòng tên packs: màu hợp sáng / tối */
+.shop-ring-pack.shop-rent-btn {
+    background: linear-gradient(135deg, #7c3aed, #2563eb) !important;
+    color: #fff !important;
+    border: none;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.28);
+}
+body.dark .shop-ring-pack.shop-rent-btn {
+    background: linear-gradient(135deg, #a78bfa, #38bdf8) !important;
+    color: #0f172a !important;
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.22);
+}
+.shop-ring-pack.shop-rent-btn:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+}
+.shop-ring-status-time {
+    letter-spacing: 0.3px;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+}
 
 .shop-rent-days {
     display: flex;
@@ -2502,7 +2587,18 @@ body.dark .notification-message span[style*="background-clip"] {
     padding: 16px 14px 20px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 14px;
+}
+.shop-ring-card .shop-ring-status {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+}
+.shop-ring-card .shop-ring-packs {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
 }
 
 .shop-ring-preview {
