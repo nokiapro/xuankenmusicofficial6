@@ -2312,9 +2312,16 @@ function resolveArtRingName(raw) {
     const useSong = !!(acc && acc.artRingUseSong);
     if (useSong) {
         try {
-            const song = (typeof songs !== 'undefined' && songs && typeof index === 'number' && songs[index])
-                ? songs[index]
-                : null;
+            let song = null;
+            if (typeof songs !== 'undefined' && songs && songs.length) {
+                if (typeof index === 'number' && index >= 0 && songs[index]) song = songs[index];
+            }
+            if (!song) {
+                // fallback: đọc từ DOM tiêu đề đang hiện
+                const el = document.getElementById('current-title');
+                const domName = el && (el.innerText || el.textContent) ? String(el.innerText || el.textContent).trim() : '';
+                if (domName) return domName.slice(0, 28);
+            }
             let sn = song && (song.name || song.title) ? String(song.name || song.title).trim() : '';
             if (sn) return sn.slice(0, 28);
         } catch (e) {}
@@ -2469,8 +2476,24 @@ function updateArtNameRing() {
         preferOn = acc.artRingOn !== false;
         custom = String(acc.artRingText || '');
         useSong = !!acc.artRingUseSong;
+        // Đã chọn "Hiện tên bài hát" nhưng tắt vòng chữ → tự bật lại vòng (local)
+        if (useSong && !preferOn) {
+            preferOn = true;
+            try {
+                acc.artRingOn = true;
+                const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
+                if (name && typeof getAllAccounts === 'function' && typeof saveAllAccounts === 'function') {
+                    const accounts = getAllAccounts();
+                    if (accounts[name]) {
+                        accounts[name].artRingOn = true;
+                        saveAllAccounts(accounts);
+                    }
+                }
+            } catch (e) {}
+        }
     }
     const access = hasArtRingAccess();
+    // Hiện vòng khi bật "Hiện vòng chữ" (preferOn)
     const on = access && preferOn;
 
     if (enEl) {
@@ -2482,9 +2505,16 @@ function updateArtNameRing() {
         songEl.disabled = !access;
     }
     if (txEl) {
-        if (document.activeElement !== txEl) txEl.value = custom;
-        txEl.disabled = !access || useSong;
-        txEl.placeholder = useSong ? 'Đang dùng tên bài hát' : 'Trống = username · tối đa 28 ký tự';
+        if (useSong) {
+            const live = resolveArtRingName(custom);
+            if (document.activeElement !== txEl) txEl.value = live;
+            txEl.disabled = true;
+            txEl.placeholder = 'Đang dùng tên bài hát';
+        } else {
+            if (document.activeElement !== txEl) txEl.value = custom;
+            txEl.disabled = !access;
+            txEl.placeholder = 'Trống = username · tối đa 28 ký tự';
+        }
     }
 
     wrap.classList.toggle('ring-off', !on);
@@ -2516,12 +2546,15 @@ function saveArtRingSettings() {
     const enEl = document.getElementById('art-ring-enabled');
     const txEl = document.getElementById('art-ring-text');
     const songEl = document.getElementById('art-ring-use-song');
-    const on = !!(enEl && enEl.checked);
+    let on = !!(enEl && enEl.checked);
     const useSong = !!(songEl && songEl.checked);
-    const text = (txEl && txEl.value || '').trim().slice(0, 28);
+    // Nếu chọn hiện tên bài hát thì luôn bật vòng chữ
+    if (useSong) on = true;
+    const textVal = (txEl && txEl.value || '').trim().slice(0, 28);
     updateCurrentAccount(acc => {
         acc.artRingOn = on;
-        acc.artRingText = text;
+        // Khi dùng tên bài không ghi đè artRingText bằng tên bài (giữ custom cũ)
+        if (!useSong) acc.artRingText = textVal;
         acc.artRingUseSong = useSong;
     });
     updateArtNameRing();
@@ -2529,7 +2562,7 @@ function saveArtRingSettings() {
         let label = 'Đã tắt';
         if (on) {
             if (useSong) label = 'Đã bật · tên bài hát';
-            else label = 'Đã bật · ' + (text || getCurrentUsername() || 'username');
+            else label = 'Đã bật · ' + (textVal || getCurrentUsername() || 'username');
         }
         showNotification('VÒNG TÊN:', label, '#4ade80', 'sparkles');
     } else if (typeof showToastMsg === 'function') {
@@ -2676,8 +2709,19 @@ function bindArtRingSettingsUI() {
                 showNotification('VÒNG TÊN:', 'CẦN THUÊ TRONG CỬA HÀNG', '#ff9800', 'clock');
                 return;
             }
-            updateCurrentAccount(acc => { acc.artRingUseSong = !!songEl.checked; });
+            const onSong = !!songEl.checked;
+            updateCurrentAccount(acc => {
+                acc.artRingUseSong = onSong;
+                // Bật "Hiện tên bài hát" → tự bật vòng chữ quanh art
+                if (onSong) acc.artRingOn = true;
+            });
+            const enEl2 = document.getElementById('art-ring-enabled');
+            if (onSong && enEl2) enEl2.checked = true;
             updateArtNameRing();
+            if (onSong && typeof showNotification === 'function') {
+                const nm = resolveArtRingName('');
+                showNotification('VÒNG TÊN:', 'Hiện tên bài · ' + (nm || '…'), '#4ade80', 'sparkles');
+            }
         };
     }
     updateArtNameRing();
