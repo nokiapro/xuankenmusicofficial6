@@ -2452,7 +2452,7 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    // Font mặc định đẹp; chỉ thu nhỏ khi tên dài
+    // Font theo độ dài
     const len = base.length;
     let fontPx = 10.5;
     if (len > 64) fontPx = 7.2;
@@ -2472,19 +2472,20 @@ function fitArtRingTextToPath(name) {
 
     const NS = 'http://www.w3.org/2000/svg';
     const XLINK = 'http://www.w3.org/1999/xlink';
+    const sep = ' · ';
 
-    function makeTp(content, offset) {
+    function makeTp(content) {
         const tp = document.createElementNS(NS, 'textPath');
         tp.setAttribute('href', '#art-ring-path');
         try { tp.setAttributeNS(XLINK, 'xlink:href', '#art-ring-path'); } catch (e) {}
-        tp.setAttribute('startOffset', String(Math.round(offset * 1000) / 1000));
+        tp.setAttribute('startOffset', '0');
         tp.textContent = content;
         return tp;
     }
 
     function measure(str) {
         textEl.innerHTML = '';
-        textEl.appendChild(makeTp(str, 0));
+        textEl.appendChild(makeTp(str));
         let mlen = 0;
         try { mlen = textEl.querySelector('textPath').getComputedTextLength(); } catch (e) {}
         return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.58));
@@ -2492,7 +2493,7 @@ function fitArtRingTextToPath(name) {
 
     const MIN_FONT = 6.5;
     let nameLen = measure(base);
-    // Tên dài: thu font để 1–2 vòng vừa chu vi (không cắt chữ)
+    // Tên dài: thu font để vừa 1–2 vòng
     let guard = 0;
     while (nameLen > pathLen * 0.48 && fontPx > MIN_FONT && guard < 14) {
         fontPx -= 0.3;
@@ -2505,20 +2506,17 @@ function fitArtRingTextToPath(name) {
         guard++;
     }
 
-    const sep = ' · ';
-    const sepLen = measure(sep);
-    const unit = nameLen + sepLen;
-    if (unit < 1) return;
+    const unitStr = base + sep;
+    const unitLen = measure(unitStr);
+    if (unitLen < 1) return;
 
-    // Tên NGẮN: lặp đủ để lấp đầy vòng (không giới hạn 2)
-    // Tên DÀI (> ~42% chu vi / mỗi cụm): tối đa 2 vòng
     const isLong = nameLen > pathLen * 0.42;
     let n;
     if (isLong) {
-        n = nameLen > pathLen * 0.92 ? 1 : 2;
-        // thu thêm nếu 2 vòng vẫn chật
+        // Tối đa 2 vòng
+        n = (nameLen * 2 + measure(sep)) <= pathLen * 0.98 ? 2 : 1;
         guard = 0;
-        while (n === 2 && (nameLen * 2 + sepLen) > pathLen * 0.98 && fontPx > MIN_FONT && guard < 10) {
+        while (n === 2 && (nameLen * 2) > pathLen * 0.92 && fontPx > MIN_FONT && guard < 10) {
             fontPx -= 0.25;
             textEl.style.fontSize = fontPx + 'px';
             updateArtRingPathRadius();
@@ -2528,28 +2526,31 @@ function fitArtRingTextToPath(name) {
             nameLen = measure(base);
             guard++;
         }
-        if ((nameLen * 2 + sepLen) > pathLen * 0.98) n = 1;
+        if (nameLen * 2 > pathLen * 0.95) n = 1;
     } else {
-        // Lấp đầy: bao nhiêu cụm "TÊN ·" vừa khít 1 vòng
-        n = Math.max(1, Math.floor(pathLen / (unit + 2)));
-        // Ít nhất 2 nếu còn chỗ (tránh 1 cụm lơ lửng)
-        if (n < 2 && unit * 2 < pathLen * 0.95) n = 2;
+        // Tên ngắn: lặp đủ lấp đầy vòng
+        n = Math.max(2, Math.floor(pathLen / Math.max(unitLen, 1)));
+        // Tránh quá dày
+        if (n > 12) n = 12;
     }
 
-    const slot = pathLen / n;
+    // Một chuỗi liên tục "TÊN · TÊN · …" — textLength = chu vi → dấu · căn đều, không lệch
+    let full = '';
+    for (let i = 0; i < n; i++) {
+        full += base;
+        if (i < n - 1 || n > 1) full += sep;
+    }
+    // Bỏ sep thừa cuối nếu chỉ 1 vòng không cần
+    if (n === 1) full = base;
 
     textEl.innerHTML = '';
-    for (let i = 0; i < n; i++) {
-        const nameStart = i * slot;
-        textEl.appendChild(makeTp(base, nameStart));
-        // Chấm phân cách giữa các cụm (kể cả n=1 cũng có thể bỏ)
-        if (n >= 1) {
-            const gap = Math.max(0, slot - nameLen);
-            const dotCenter = nameStart + nameLen + gap / 2;
-            const dotStart = Math.max(0, Math.min(pathLen - 0.5, dotCenter - sepLen / 2));
-            textEl.appendChild(makeTp(sep, dotStart));
-        }
-    }
+    const tp = makeTp(full);
+    // Dãn đều cả chuỗi quanh path → khoảng cách dấu · đồng đều
+    try {
+        tp.setAttribute('textLength', String(Math.round(pathLen * 100) / 100));
+        tp.setAttribute('lengthAdjust', 'spacing');
+    } catch (e) {}
+    textEl.appendChild(tp);
 }
 
 /** Gói thuê vòng tên quanh art (ngày) */
