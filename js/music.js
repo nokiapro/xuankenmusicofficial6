@@ -2452,16 +2452,16 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    const len = base.length;
+    // Font theo độ dài
+    const charCount = base.length;
     let fontPx = 10.5;
-    if (len > 64) fontPx = 7.2;
-    else if (len > 52) fontPx = 7.8;
-    else if (len > 40) fontPx = 8.5;
-    else if (len > 32) fontPx = 9.2;
-    else if (len > 24) fontPx = 9.8;
-    else if (len > 16) fontPx = 10.2;
+    if (charCount > 64) fontPx = 7.0;
+    else if (charCount > 52) fontPx = 7.6;
+    else if (charCount > 40) fontPx = 8.4;
+    else if (charCount > 28) fontPx = 9.2;
+    else if (charCount > 18) fontPx = 10.0;
     textEl.style.fontSize = fontPx + 'px';
-    textEl.style.letterSpacing = '0';
+    textEl.style.letterSpacing = '0.2px';
 
     updateArtRingPathRadius();
 
@@ -2471,14 +2471,12 @@ function fitArtRingTextToPath(name) {
 
     const NS = 'http://www.w3.org/2000/svg';
     const XLINK = 'http://www.w3.org/1999/xlink';
-    // Dấu phân cách gọn, không space thừa gây lệch
-    const sep = ' · ';
+    const sep = ' ·';
 
     function makeTp(content, offset) {
         const tp = document.createElementNS(NS, 'textPath');
         tp.setAttribute('href', '#art-ring-path');
         try { tp.setAttributeNS(XLINK, 'xlink:href', '#art-ring-path'); } catch (e) {}
-        // offset tuyệt đối theo độ dài path (user unit) — không dùng textLength
         tp.setAttribute('startOffset', String(Math.max(0, offset)));
         tp.textContent = content;
         return tp;
@@ -2490,13 +2488,13 @@ function fitArtRingTextToPath(name) {
         textEl.appendChild(tp);
         let mlen = 0;
         try { mlen = tp.getComputedTextLength(); } catch (e) {}
-        return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.58));
+        return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.55));
     }
 
     const MIN_FONT = 6.5;
     let nameLen = measure(base);
     let guard = 0;
-    while (nameLen > pathLen * 0.48 && fontPx > MIN_FONT && guard < 14) {
+    while (nameLen > pathLen * 0.46 && fontPx > MIN_FONT && guard < 14) {
         fontPx -= 0.3;
         textEl.style.fontSize = fontPx + 'px';
         updateArtRingPathRadius();
@@ -2507,16 +2505,18 @@ function fitArtRingTextToPath(name) {
         guard++;
     }
 
-    // Đo cả cụm "TÊN · " để chia slot đều
-    let unitLen = measure(base + sep);
-    if (unitLen < 1) unitLen = nameLen + fontPx;
+    // Đo cụm "TÊN ·" (mọi tên đều cùng công thức → dấu · luôn cùng vị trí tương đối)
+    const unit = base + sep;
+    let unitLen = measure(unit);
+    if (unitLen < 1) unitLen = nameLen + fontPx * 2;
 
-    const isLong = nameLen > pathLen * 0.42;
+    // Số vòng / số cụm
+    const isLong = nameLen > pathLen * 0.40;
     let n;
     if (isLong) {
-        n = (unitLen * 2 <= pathLen * 0.98) ? 2 : 1;
+        n = (unitLen * 2 <= pathLen * 0.99) ? 2 : 1;
         guard = 0;
-        while (n === 2 && unitLen * 2 > pathLen * 0.96 && fontPx > MIN_FONT && guard < 10) {
+        while (n === 2 && unitLen * 2 > pathLen * 0.98 && fontPx > MIN_FONT && guard < 10) {
             fontPx -= 0.25;
             textEl.style.fontSize = fontPx + 'px';
             updateArtRingPathRadius();
@@ -2524,30 +2524,35 @@ function fitArtRingTextToPath(name) {
                 ? pathGeom.getTotalLength()
                 : pathLen;
             nameLen = measure(base);
-            unitLen = measure(base + sep);
+            unitLen = measure(unit);
             guard++;
         }
-        if (unitLen * 2 > pathLen * 0.98) n = 1;
+        if (unitLen * 2 > pathLen * 0.99) n = 1;
     } else {
         n = Math.max(2, Math.floor(pathLen / unitLen));
-        if (n > 12) n = 12;
+        if (n > 16) n = 16;
     }
 
-    // Chia path thành n slot BẰNG NHAU; mỗi slot đặt "TÊN ·" căn giữa
-    // → khoảng cách giữa các dấu · đều tuyệt đối, không kéo giãn chữ
+    /*
+     * Chìa khóa: mỗi cụm chiếm ĐÚNG 1/n chu vi (textLength = slot).
+     * startOffset = i * slot. Mọi tên (ngắn/dài/ký tự gì) đều:
+     *   - bắt đầu đều nhau quanh vòng
+     *   - dấu · nằm cuối mỗi ô → khoảng cách giữa các dấu bằng nhau
+     */
     const slot = pathLen / n;
     textEl.innerHTML = '';
 
     for (let i = 0; i < n; i++) {
-        const content = (n === 1) ? base : (base + sep);
-        const contentLen = (n === 1) ? nameLen : unitLen;
-        // Căn giữa trong slot
-        let pad = (slot - contentLen) / 2;
-        if (pad < 0) pad = 0;
-        let offset = i * slot + pad;
-        // Giữ trong [0, pathLen)
-        if (offset >= pathLen) offset = offset % pathLen;
-        textEl.appendChild(makeTp(content, offset));
+        const content = (n === 1) ? base : unit;
+        const tp = makeTp(content, i * slot);
+        // Ép mỗi cụm đúng bằng 1 slot → dấu · cách đều bất kể nội dung tên
+        if (n >= 2) {
+            try {
+                tp.setAttribute('textLength', String(Math.round(slot * 1000) / 1000));
+                tp.setAttribute('lengthAdjust', 'spacing');
+            } catch (e) {}
+        }
+        textEl.appendChild(tp);
     }
 }
 
