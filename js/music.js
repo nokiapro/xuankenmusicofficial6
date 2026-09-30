@@ -2371,6 +2371,10 @@ audio.onpause = () => {
     persistListenTimeNow();
 };
 
+/** Độ dài tối đa chữ trên vòng art (tên bài có thể dài hơn username) */
+const ART_RING_MAX_LEN = 80;
+const ART_RING_MAX_LEN_CUSTOM = 48;
+
 function resolveArtRingName(raw) {
     const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
     const useSong = !!(acc && acc.artRingUseSong);
@@ -2384,10 +2388,10 @@ function resolveArtRingName(raw) {
                 // fallback: đọc từ DOM tiêu đề đang hiện
                 const el = document.getElementById('current-title');
                 const domName = el && (el.innerText || el.textContent) ? String(el.innerText || el.textContent).trim() : '';
-                if (domName) return domName.slice(0, 28);
+                if (domName) return domName.slice(0, ART_RING_MAX_LEN);
             }
             let sn = song && (song.name || song.title) ? String(song.name || song.title).trim() : '';
-            if (sn) return sn.slice(0, 28);
+            if (sn) return sn.slice(0, ART_RING_MAX_LEN);
         } catch (e) {}
     }
     let t = String(raw || '').trim();
@@ -2403,7 +2407,7 @@ function resolveArtRingName(raw) {
             t = 'XuanKen Music';
         }
     }
-    return t.slice(0, 28);
+    return t.slice(0, ART_RING_MAX_LEN_CUSTOM);
 }
 
 /**
@@ -2445,14 +2449,26 @@ function fitArtRingTextToPath(name) {
     const textEl = document.querySelector('#art-name-ring text.art-name-text');
     if (!pathGeom || !textEl) return;
 
-    updateArtRingPathRadius();
-
-    const pathLen = (typeof pathGeom.getTotalLength === 'function')
-        ? pathGeom.getTotalLength()
-        : (2 * Math.PI * 90);
-
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
+
+    // Font theo độ dài — tên rất dài vẫn hiện đủ 1 vòng
+    const len = base.length;
+    let fontPx = 10.5;
+    if (len > 64) fontPx = 6.2;
+    else if (len > 52) fontPx = 6.8;
+    else if (len > 40) fontPx = 7.5;
+    else if (len > 32) fontPx = 8.2;
+    else if (len > 24) fontPx = 9;
+    else if (len > 16) fontPx = 9.8;
+    textEl.style.fontSize = fontPx + 'px';
+    textEl.style.letterSpacing = len > 40 ? '0.2px' : '0';
+
+    updateArtRingPathRadius();
+
+    let pathLen = (typeof pathGeom.getTotalLength === 'function')
+        ? pathGeom.getTotalLength()
+        : (2 * Math.PI * 90);
 
     const NS = 'http://www.w3.org/2000/svg';
     const XLINK = 'http://www.w3.org/1999/xlink';
@@ -2469,27 +2485,43 @@ function fitArtRingTextToPath(name) {
     function measure(str) {
         textEl.innerHTML = '';
         textEl.appendChild(makeTp(str, 0));
-        let len = 0;
-        try { len = textEl.querySelector('textPath').getComputedTextLength(); } catch (e) {}
-        return (len && len > 1) ? len : Math.max(8, str.length * 7);
+        let mlen = 0;
+        try { mlen = textEl.querySelector('textPath').getComputedTextLength(); } catch (e) {}
+        return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.58));
     }
 
-    const nameLen = measure(base);
-    const sep = '·';
-    const sepLen = measure(sep);
+    // Thu nhỏ đến khi cả tên (không cắt) vừa ≤ 95% chu vi
+    let nameLen = measure(base);
+    let guard = 0;
+    while (nameLen > pathLen * 0.95 && fontPx > 5 && guard < 16) {
+        fontPx -= 0.35;
+        textEl.style.fontSize = fontPx + 'px';
+        updateArtRingPathRadius();
+        pathLen = (typeof pathGeom.getTotalLength === 'function')
+            ? pathGeom.getTotalLength()
+            : pathLen;
+        nameLen = measure(base);
+        guard++;
+    }
 
-    const minSlot = nameLen + sepLen + 8;
+    const sep = ' · ';
+    const sepLen = measure(sep);
+    const minSlot = nameLen + sepLen + 2;
     let n = Math.max(1, Math.floor(pathLen / minSlot));
+    // Tên dài: chỉ 1 bản đầy đủ, không lặp cắt chữ
+    if (nameLen > pathLen * 0.42) n = 1;
     const slot = pathLen / n;
 
     textEl.innerHTML = '';
     for (let i = 0; i < n; i++) {
         const nameStart = i * slot;
         textEl.appendChild(makeTp(base, nameStart));
-        const gap = Math.max(0, slot - nameLen);
-        const dotCenter = nameStart + nameLen + gap / 2;
-        const dotStart = Math.max(0, dotCenter - sepLen / 2);
-        textEl.appendChild(makeTp(sep, dotStart));
+        if (n > 1) {
+            const gap = Math.max(0, slot - nameLen);
+            const dotCenter = nameStart + nameLen + gap / 2;
+            const dotStart = Math.max(0, dotCenter - sepLen / 2);
+            textEl.appendChild(makeTp(sep, dotStart));
+        }
     }
 }
 
@@ -2577,7 +2609,7 @@ function updateArtNameRing() {
         } else {
             if (document.activeElement !== txEl) txEl.value = custom;
             txEl.disabled = !access;
-            txEl.placeholder = 'Trống = username · tối đa 28 ký tự';
+            txEl.placeholder = 'Trống = username · tối đa ' + ART_RING_MAX_LEN_CUSTOM + ' ký tự';
         }
     }
 
@@ -2614,7 +2646,7 @@ function saveArtRingSettings() {
     const useSong = !!(songEl && songEl.checked);
     // Nếu chọn hiện tên bài hát thì luôn bật vòng chữ
     if (useSong) on = true;
-    const textVal = (txEl && txEl.value || '').trim().slice(0, 28);
+    const textVal = (txEl && txEl.value || '').trim().slice(0, ART_RING_MAX_LEN_CUSTOM);
     updateCurrentAccount(acc => {
         acc.artRingOn = on;
         // Khi dùng tên bài không ghi đè artRingText bằng tên bài (giữ custom cũ)
@@ -4022,7 +4054,7 @@ async function pushUserToFirebase(username, account, options) {
         }
         if (opts.artRingChanged || forceAll) {
             scalarPayload.artRingOn = account.artRingOn !== false;
-            scalarPayload.artRingText = String(account.artRingText || '').slice(0, 28);
+            scalarPayload.artRingText = String(account.artRingText || '').slice(0, ART_RING_MAX_LEN_CUSTOM);
             scalarPayload.artRingUseSong = !!account.artRingUseSong;
             scalarPayload.artRingUntil = Math.max(0, Number(account.artRingUntil) || 0);
         }
