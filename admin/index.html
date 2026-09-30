@@ -2141,9 +2141,150 @@
             } catch (e) {}
 
             if (isRename) {
+                // 1) Chuyển songFulls old → new (nếu form không nhập full mới)
+                try {
+                    const oldFullSnap = await db().ref(dataPath('songFulls') + '/' + originalId).once('value');
+                    const oldFull = oldFullSnap.val() || {};
+                    const newFullSnap = await db().ref(dataPath('songFulls') + '/' + id).once('value');
+                    const newFull = newFullSnap.val() || {};
+                    const mergedFull = {
+                        audioFull: newFull.audioFull || audioFull || oldFull.audioFull || null,
+                        audioFull2: newFull.audioFull2 || audioFull2 || oldFull.audioFull2 || null
+                    };
+                    if (mergedFull.audioFull || mergedFull.audioFull2) {
+                        await db().ref(dataPath('songFulls') + '/' + id).set(mergedFull);
+                    }
+                } catch (e) { console.warn('migrate songFulls', e); }
+
+                // 2) Lưu alias ID cũ → ID mới (client vẫn nhận diện bài đã mua)
+                try {
+                    await db().ref(dataPath('songIdAliases') + '/' + originalId).set({
+                        to: id,
+                        at: Date.now()
+                    });
+                    // Nếu ID mới từng là alias của ai đó, dọn
+                    await db().ref(dataPath('songIdAliases') + '/' + id).remove();
+                } catch (e) { console.warn('songIdAliases', e); }
+
+                // 3) Chuyển owned / rentals / ownedMap / listenedSongs mọi user
+                let migratedUsers = 0;
+                const oid = String(originalId);
+                const oidLow = oid.toLowerCase();
+                const nid = String(id);
+                try {
+                    const usersSnap = await db().ref(dataPath('users')).once('value');
+                    const users = usersSnap.val() || {};
+                    const tasks = [];
+                    Object.keys(users).forEach(ukey => {
+                        const u = users[ukey] || {};
+                        let changed = false;
+                        const patch = {};
+
+                        // owned: array hoặc object
+                        let owned = parseOwnedField(u.owned);
+                        if (owned.some(x => x === oid || x.toLowerCase() === oidLow)) {
+                            owned = owned.map(x => (x === oid || x.toLowerCase() === oidLow) ? nid : x);
+                            const seen = new Set();
+                            owned = owned.filter(x => {
+                                const low = String(x).toLowerCase();
+                                if (seen.has(low)) return false;
+                                seen.add(low);
+                                return !!x;
+                            });
+                            patch.owned = owned;
+                            changed = true;
+                        }
+
+                        // ownedMap
+                        let ownedMap = (u.ownedMap && typeof u.ownedMap === 'object') ? { ...u.ownedMap } : {};
+                        let mapChanged = false;
+                        Object.keys(ownedMap).forEach(k => {
+                            if (k === oid || k.toLowerCase() === oidLow) {
+                                delete ownedMap[k];
+                                mapChanged = true;
+                            }
+                        });
+                        if (mapChanged || changed) {
+                            ownedMap[nid] = true;
+                            // rebuild from owned if we have it
+                            if (patch.owned) {
+                                ownedMap = {};
+                                patch.owned.forEach(x => { ownedMap[String(x)] = true; });
+                            }
+                            patch.ownedMap = ownedMap;
+                            changed = true;
+                        }
+
+                        // rentals
+                        if (u.rentals && typeof u.rentals === 'object') {
+                            const rentals = { ...u.rentals };
+                            let rChanged = false;
+                            let exp = null;
+                            Object.keys(rentals).forEach(k => {
+                                if (k === oid || k.toLowerCase() === oidLow) {
+                                    exp = rentals[k];
+                                    delete rentals[k];
+                                    rChanged = true;
+                                }
+                            });
+                            if (rChanged) {
+                                if (exp != null) rentals[nid] = exp;
+                                patch.rentals = rentals;
+                                changed = true;
+                            }
+                        }
+
+                        // listenedSongs
+                        if (u.listenedSongs && typeof u.listenedSongs === 'object') {
+                            const listened = { ...u.listenedSongs };
+                            let lChanged = false;
+                            let lv = null;
+                            Object.keys(listened).forEach(k => {
+                                if (k === oid || k.toLowerCase() === oidLow) {
+                                    lv = listened[k];
+                                    delete listened[k];
+                                    lChanged = true;
+                                }
+                            });
+                            if (lChanged) {
+                                if (lv != null) listened[nid] = lv;
+                                patch.listenedSongs = listened;
+                                changed = true;
+                            }
+                        }
+
+                        // favorites / likes / dislikes / myPlaylist
+                        ['favorites', 'likes', 'dislikes', 'myPlaylist'].forEach(field => {
+                            if (!Array.isArray(u[field])) return;
+                            let arr = u[field].map(String);
+                            if (!arr.some(x => x === oid || x.toLowerCase() === oidLow)) return;
+                            arr = arr.map(x => (x === oid || x.toLowerCase() === oidLow) ? nid : x);
+                            const seen = new Set();
+                            arr = arr.filter(x => {
+                                const low = x.toLowerCase();
+                                if (seen.has(low)) return false;
+                                seen.add(low);
+                                return true;
+                            });
+                            patch[field] = arr;
+                            changed = true;
+                        });
+
+                        if (changed) {
+                            migratedUsers++;
+                            tasks.push(db().ref(dataPath('users') + '/' + ukey).update(patch));
+                        }
+                    });
+                    await Promise.all(tasks);
+                } catch (e) {
+                    console.warn('migrate owned on rename', e);
+                }
+
+                // 4) Xóa bài + full cũ
                 await db().ref(dataPath('songs') + '/' + originalId).remove();
                 try { await db().ref(dataPath('songFulls') + '/' + originalId).remove(); } catch (e) {}
-                toast('Đã đổi ID ' + originalId + ' → ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
+
+                toast('Đã đổi ID ' + originalId + ' → ' + id + ' · chuyển sở hữu ' + migratedUsers + ' user · giữ ' + payload.listenCount + ' nghe');
             } else {
                 toast('Đã lưu bài ' + id + ' (giữ ' + payload.listenCount + ' lượt nghe)');
             }

@@ -299,6 +299,67 @@ function generateDataHash(data) {
 
 /** Cache link full (songFulls) — chỉ nạp khi user đã mua/thuê */
 const fullAudioCache = Object.create(null);
+/** Alias ID bài cũ → ID mới (khi admin đổi ID, ownership vẫn nhận) */
+let songIdAliases = Object.create(null); // oldId(lower) -> newId
+let songIdAliasesLoadedAt = 0;
+
+async function loadSongIdAliases(force) {
+    if (!force && songIdAliasesLoadedAt && (Date.now() - songIdAliasesLoadedAt < 60000)) {
+        return songIdAliases;
+    }
+    try {
+        const db = getDb();
+        if (!db) return songIdAliases;
+        const snap = await db.ref(dataPath('songIdAliases')).once('value');
+        const v = snap.val() || {};
+        const map = Object.create(null);
+        Object.keys(v).forEach(oldId => {
+            const to = v[oldId] && (v[oldId].to || v[oldId]);
+            if (!to) return;
+            map[String(oldId).toLowerCase()] = String(to);
+            map[String(oldId)] = String(to);
+        });
+        songIdAliases = map;
+        songIdAliasesLoadedAt = Date.now();
+    } catch (e) {
+        console.warn('loadSongIdAliases', e);
+    }
+    return songIdAliases;
+}
+
+/** Tập ID tương đương của 1 songId (id hiện tại + các id cũ alias tới nó) */
+function expandSongIdAliases(songId) {
+    const id = String(songId || '');
+    if (!id) return [];
+    const out = new Set([id, id.toLowerCase()]);
+    try {
+        Object.keys(songIdAliases || {}).forEach(oldK => {
+            const to = String(songIdAliases[oldK] || '');
+            if (to === id || to.toLowerCase() === id.toLowerCase()) {
+                out.add(oldK);
+                out.add(String(oldK).toLowerCase());
+            }
+            // chain: nếu owned có id và id là alias → new
+            if (String(oldK) === id || String(oldK).toLowerCase() === id.toLowerCase()) {
+                if (to) {
+                    out.add(to);
+                    out.add(to.toLowerCase());
+                }
+            }
+        });
+        // match song object
+        if (typeof songs !== 'undefined' && Array.isArray(songs)) {
+            const song = songs.find(s => s && (String(s.id) === id || String(s.id).toLowerCase() === id.toLowerCase()
+                || String(s._fbKey || '') === id));
+            if (song) {
+                out.add(String(song.id || ''));
+                out.add(String(song._fbKey || ''));
+            }
+        }
+    } catch (e) {}
+    return [...out].filter(Boolean);
+}
+
 
 function songsObjectToArray(obj) {
     if (!obj) return [];
@@ -513,6 +574,7 @@ async function checkForUpdates() {
             
             songs = newSongs;
             lastDataHash = newHash;
+            try { await loadSongIdAliases(true); migrateLocalOwnedViaAliases(); } catch (e) {}
             
             listenData = {};
             songs.forEach(song => {
@@ -724,8 +786,10 @@ async function loadSongsFromFirebase() {
             });
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
+            try { await loadSongIdAliases(true); } catch (e) {}
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
             try { await ensureFullAudioForOwned(); } catch (e) { console.warn('ensureFullAudioForOwned', e); }
+            try { migrateLocalOwnedViaAliases(); } catch (e) {}
             initPlayerAfterLoad();
             updateListenStatsModal();
             
@@ -3491,9 +3555,9 @@ function startUserProfileListener(uid) {
         const mapped = mapUserProfile(data, name);
         mapped.uid = id;
         const prev = accounts[name];
-        const remoteOwned = filterOwnedIds(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
+        const remoteOwned = dedupeIdList(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pending = consumePendingOwned(remoteOwned);
-        mapped.owned = filterOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned)));
+        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned)));
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
             mergeRentalsMap(mapped.rentals, prev && prev.rentals),
@@ -3584,9 +3648,9 @@ async function fetchUserByUid(uid, usernameHint) {
             mergeRentalsMap(mapped.rentals, prevLocal && prevLocal.rentals),
             pendingRent
         );
-        const remoteOwned = filterOwnedIds(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
+        const remoteOwned = dedupeIdList(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pendingOwned = consumePendingOwned(remoteOwned);
-        mapped.owned = filterOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned)));
+        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned)));
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
         mapped.achievements = unionIdArrays(mapped.achievements, prevLocal && prevLocal.achievements);
         const preferRemoteList = (remote, local) => {
@@ -3722,23 +3786,18 @@ function filterOwnedIds(ids) {
 }
 
 function scrubOwnedAgainstCatalog() {
+    // CHỈ cảnh báo — KHÔNG tự xóa owned khi catalog thiếu ID
+    // (tránh mất quyền mua khi admin sửa link / bài tạm ẩn / đang sync)
     try {
         if (!getCatalogSongIdSet().size) return;
-        const name = (typeof getCurrentUsername === 'function' && getCurrentUsername()) || '';
         const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
-        if (!acc || !Array.isArray(acc.owned)) return;
+        if (!acc || !Array.isArray(acc.owned) || !acc.owned.length) return;
         const before = acc.owned.map(String);
         const cleaned = filterOwnedIds(before);
-        if (cleaned.length === before.length) {
-            const b = new Set(before.map(x => x.toLowerCase()));
-            const c = new Set(cleaned.map(x => x.toLowerCase()));
-            if (b.size === c.size && [...b].every(x => c.has(x))) return;
+        if (cleaned.length < before.length) {
+            const lost = before.filter(id => !cleaned.some(c => c.toLowerCase() === id.toLowerCase()));
+            console.warn('[owned] ID không có trong catalog hiện tại (GIỮ nguyên owned):', lost);
         }
-        updateCurrentAccount(a => { a.owned = cleaned; });
-        if (name && typeof pushUserToFirebase === 'function') {
-            pushUserToFirebase(name, getCurrentAccount(), { ownedChanged: true });
-        }
-        console.log('[owned] đã lọc ID mồ côi:', before.length, '→', cleaned.length);
     } catch (e) {
         console.warn('[owned] scrub', e);
     }
@@ -3765,19 +3824,34 @@ function mergeNumericMaps(a, b) {
     return out;
 }
 
+function dedupeIdList(ids) {
+    const seen = new Set();
+    const out = [];
+    (Array.isArray(ids) ? ids : []).forEach(x => {
+        const id = String(x == null ? '' : x).trim();
+        if (!id) return;
+        const low = id.toLowerCase();
+        if (seen.has(low)) return;
+        seen.add(low);
+        out.push(id);
+    });
+    return out;
+}
+
 async function txUnionArrayField(db, uid, field, localArr) {
     const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
     let local = (Array.isArray(localArr) ? localArr : []).map(String);
-    if (field === 'owned') local = filterOwnedIds(local);
+    // owned: chỉ khử trùng, KHÔNG loại ID khỏi catalog (tránh mất bài đã mua khi sửa link)
+    if (field === 'owned') local = dedupeIdList(local);
     const tx = await ref.transaction((current) => {
         let remote = Array.isArray(current) ? current.map(String) : [];
-        if (field === 'owned') remote = filterOwnedIds(remote);
+        if (field === 'owned') remote = dedupeIdList(remote);
         const merged = unionIdArrays(remote, local);
-        return field === 'owned' ? filterOwnedIds(merged) : merged;
+        return field === 'owned' ? dedupeIdList(merged) : merged;
     });
     if (tx.committed) {
         const val = Array.isArray(tx.snapshot.val()) ? tx.snapshot.val().map(String) : local;
-        return field === 'owned' ? filterOwnedIds(val) : val;
+        return field === 'owned' ? dedupeIdList(val) : val;
     }
     return local;
 }
@@ -4124,21 +4198,90 @@ function loadOwnedSongs() {
 
 function saveOwnedSongs(ids) {
     updateCurrentAccount(acc => {
-        acc.owned = filterOwnedIds(ids);
+        // Chỉ khử trùng, KHÔNG xóa ID đã mua chỉ vì bài tạm ẩn / đang cập nhật
+        const raw = (Array.isArray(ids) ? ids : []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+        const seen = new Set();
+        const out = [];
+        raw.forEach(id => {
+            const low = id.toLowerCase();
+            if (seen.has(low)) return;
+            seen.add(low);
+            out.push(id);
+        });
+        acc.owned = out;
     });
+}
+
+
+/** Đổi ID trong owned/rentals local theo songIdAliases (HLTMV1 → HLTMHPV1) */
+function migrateLocalOwnedViaAliases() {
+    try {
+        const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
+        if (!name) return;
+        const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
+        if (!accounts || !accounts[name]) return;
+        const acc = accounts[name];
+        let changed = false;
+        if (Array.isArray(acc.owned) && acc.owned.length) {
+            const next = acc.owned.map(x => {
+                const s = String(x);
+                const to = songIdAliases[s] || songIdAliases[s.toLowerCase()];
+                return to ? String(to) : s;
+            });
+            const deduped = typeof dedupeIdList === 'function' ? dedupeIdList(next) : [...new Set(next)];
+            if (JSON.stringify(deduped) !== JSON.stringify(acc.owned.map(String))) {
+                acc.owned = deduped;
+                changed = true;
+            }
+        }
+        if (acc.rentals && typeof acc.rentals === 'object') {
+            const rentals = { ...acc.rentals };
+            Object.keys(acc.rentals).forEach(k => {
+                const to = songIdAliases[k] || songIdAliases[String(k).toLowerCase()];
+                if (to && to !== k) {
+                    const exp = rentals[k];
+                    delete rentals[k];
+                    rentals[to] = Math.max(Number(rentals[to]) || 0, Number(exp) || 0);
+                    changed = true;
+                }
+            });
+            acc.rentals = rentals;
+        }
+        if (changed) {
+            saveAllAccounts(accounts);
+            if (typeof pushUserToFirebase === 'function') {
+                pushUserToFirebase(name, acc, { ownedChanged: true, rentalsChanged: true });
+            }
+            console.log('[owned] đã map alias ID cũ → ID mới');
+        }
+    } catch (e) {
+        console.warn('migrateLocalOwnedViaAliases', e);
+    }
 }
 
 function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
     const id = String(songId);
-    if (loadOwnedSongs().includes(id)) return true;
-    if (_pendingOwnedAdds[id] && (Date.now() - (_pendingOwnedAdds[id] || 0) < PENDING_OWNED_MS)) {
-        return true;
-    }
+    const candidates = expandSongIdAliases(id);
+    const candLow = new Set(candidates.map(x => String(x).toLowerCase()));
+    const owned = loadOwnedSongs();
+    if (owned.some(x => candLow.has(String(x).toLowerCase()))) return true;
+    // pending buy
+    try {
+        for (const k of Object.keys(_pendingOwnedAdds || {})) {
+            if (candLow.has(String(k).toLowerCase()) && (Date.now() - (_pendingOwnedAdds[k] || 0) < PENDING_OWNED_MS)) {
+                return true;
+            }
+        }
+    } catch (e) {}
     const acc = getCurrentAccount();
-    if (acc && acc.rentals && acc.rentals[id]) {
-        const exp = Number(acc.rentals[id]) || 0;
-        if (exp > Date.now()) return true;
+    if (acc && acc.rentals) {
+        for (const k of Object.keys(acc.rentals)) {
+            if (candLow.has(String(k).toLowerCase())) {
+                const exp = Number(acc.rentals[k]) || 0;
+                if (exp > Date.now()) return true;
+            }
+        }
     }
     if (isSongRented(id)) return true;
     return false;
@@ -4543,7 +4686,7 @@ function buySong(songId) {
         acc.coins = (acc.coins | 0) - price;
         if (!Array.isArray(acc.owned)) acc.owned = [];
         acc.owned.push(String(songId));
-        acc.owned = [...new Set(acc.owned)];
+        acc.owned = dedupeIdList(acc.owned);
     });
     markPendingOwned(songId);
     showNotification(
