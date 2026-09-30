@@ -2452,7 +2452,7 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    // Font theo độ dài — ưu tiên đọc được, tối đa 2 vòng chữ
+    // Font mặc định đẹp; chỉ thu nhỏ khi tên dài
     const len = base.length;
     let fontPx = 10.5;
     if (len > 64) fontPx = 7.2;
@@ -2490,12 +2490,11 @@ function fitArtRingTextToPath(name) {
         return (mlen && mlen > 1) ? mlen : Math.max(8, str.length * (fontPx * 0.58));
     }
 
-    // Thu nhỏ font đến khi vừa 2 vòng (hoặc 1 vòng nếu vẫn dài) — không ép 3 vòng
-    const MAX_LOOPS = 2;
     const MIN_FONT = 6.5;
     let nameLen = measure(base);
+    // Tên dài: thu font để 1–2 vòng vừa chu vi (không cắt chữ)
     let guard = 0;
-    while (nameLen * MAX_LOOPS > pathLen * 0.98 && fontPx > MIN_FONT && guard < 14) {
+    while (nameLen > pathLen * 0.48 && fontPx > MIN_FONT && guard < 14) {
         fontPx -= 0.3;
         textEl.style.fontSize = fontPx + 'px';
         updateArtRingPathRadius();
@@ -2508,13 +2507,34 @@ function fitArtRingTextToPath(name) {
 
     const sep = ' · ';
     const sepLen = measure(sep);
-    const minSlot = nameLen + sepLen + 2;
+    const unit = nameLen + sepLen;
+    if (unit < 1) return;
 
-    // Số vòng: 1 hoặc 2 thôi (không 3)
-    let n = Math.max(1, Math.floor(pathLen / minSlot));
-    if (n > MAX_LOOPS) n = MAX_LOOPS;
-    // Tên quá dài so với chu vi → chỉ 1 vòng đầy đủ
-    if (nameLen > pathLen * 0.48) n = 1;
+    // Tên NGẮN: lặp đủ để lấp đầy vòng (không giới hạn 2)
+    // Tên DÀI (> ~42% chu vi / mỗi cụm): tối đa 2 vòng
+    const isLong = nameLen > pathLen * 0.42;
+    let n;
+    if (isLong) {
+        n = nameLen > pathLen * 0.92 ? 1 : 2;
+        // thu thêm nếu 2 vòng vẫn chật
+        guard = 0;
+        while (n === 2 && (nameLen * 2 + sepLen) > pathLen * 0.98 && fontPx > MIN_FONT && guard < 10) {
+            fontPx -= 0.25;
+            textEl.style.fontSize = fontPx + 'px';
+            updateArtRingPathRadius();
+            pathLen = (typeof pathGeom.getTotalLength === 'function')
+                ? pathGeom.getTotalLength()
+                : pathLen;
+            nameLen = measure(base);
+            guard++;
+        }
+        if ((nameLen * 2 + sepLen) > pathLen * 0.98) n = 1;
+    } else {
+        // Lấp đầy: bao nhiêu cụm "TÊN ·" vừa khít 1 vòng
+        n = Math.max(1, Math.floor(pathLen / (unit + 2)));
+        // Ít nhất 2 nếu còn chỗ (tránh 1 cụm lơ lửng)
+        if (n < 2 && unit * 2 < pathLen * 0.95) n = 2;
+    }
 
     const slot = pathLen / n;
 
@@ -2522,10 +2542,11 @@ function fitArtRingTextToPath(name) {
     for (let i = 0; i < n; i++) {
         const nameStart = i * slot;
         textEl.appendChild(makeTp(base, nameStart));
-        if (n > 1) {
+        // Chấm phân cách giữa các cụm (kể cả n=1 cũng có thể bỏ)
+        if (n >= 1) {
             const gap = Math.max(0, slot - nameLen);
             const dotCenter = nameStart + nameLen + gap / 2;
-            const dotStart = Math.max(0, dotCenter - sepLen / 2);
+            const dotStart = Math.max(0, Math.min(pathLen - 0.5, dotCenter - sepLen / 2));
             textEl.appendChild(makeTp(sep, dotStart));
         }
     }
