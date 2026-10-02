@@ -754,11 +754,13 @@ body.dark .album-art {
     align-items: center;
     width: 100%;
     padding: 10px 16px;
-    background: var(--progress-bg);
-    border-radius: 40px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     margin-top: 12px;
     margin-bottom: 0;
-    transition: background 0.3s ease;
+    transition: none;
     flex-shrink: 0;
     position: relative;
     z-index: 2;
@@ -4761,9 +4763,10 @@ body.skin-aura .artist-name {
 
 body.skin-aura .current-lyric,
 body.skin-aura #lyric-container {
-    background: var(--aura-pill) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 999px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     color: #d1d5db !important;
 }
 
