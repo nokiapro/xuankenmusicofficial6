@@ -404,10 +404,18 @@ function songsObjectToArray(obj) {
 function applyFullCacheToSongs() {
     if (!Array.isArray(songs)) return;
     songs.forEach(s => {
-        const f = fullAudioCache[String(s.id)];
+        const sid = String(s.id || '');
+        let f = fullAudioCache[sid];
+        if (!f && typeof expandSongIdAliases === 'function') {
+            const exp = expandSongIdAliases(sid);
+            for (let i = 0; i < exp.length; i++) {
+                if (fullAudioCache[exp[i]]) { f = fullAudioCache[exp[i]]; break; }
+            }
+        }
         if (f) {
             s.audioFull = f.audioFull || '';
             s.audioFull2 = f.audioFull2 || '';
+            fullAudioCache[sid] = f;
         }
     });
 }
@@ -415,30 +423,44 @@ function applyFullCacheToSongs() {
 async function fetchSongFull(songId) {
     const id = String(songId || '');
     if (!id) return null;
-    if (fullAudioCache[id] && (fullAudioCache[id].audioFull || fullAudioCache[id].audioFull2)) {
-        return fullAudioCache[id];
+    const candidates = (typeof expandSongIdAliases === 'function')
+        ? expandSongIdAliases(id)
+        : [id];
+    // Cache hit qua id hoặc alias
+    for (let i = 0; i < candidates.length; i++) {
+        const c = String(candidates[i] || '');
+        if (c && fullAudioCache[c] && (fullAudioCache[c].audioFull || fullAudioCache[c].audioFull2)) {
+            fullAudioCache[id] = fullAudioCache[c];
+            return fullAudioCache[id];
+        }
     }
     const db = getDb();
     if (!db) return null;
     try {
-        const snap = await db.ref(dataPath('songFulls') + '/' + id).once('value');
-        const v = snap.val();
-        if (v && (v.audioFull || v.audioFull2)) {
-            fullAudioCache[id] = {
-                audioFull: v.audioFull || '',
-                audioFull2: v.audioFull2 || ''
-            };
-            return fullAudioCache[id];
+        for (let i = 0; i < candidates.length; i++) {
+            const tryId = String(candidates[i] || '');
+            if (!tryId) continue;
+            const snap = await db.ref(dataPath('songFulls') + '/' + tryId).once('value');
+            const v = snap.val();
+            if (v && (v.audioFull || v.audioFull2)) {
+                const entry = { audioFull: v.audioFull || '', audioFull2: v.audioFull2 || '' };
+                fullAudioCache[id] = entry;
+                fullAudioCache[tryId] = entry;
+                return entry;
+            }
         }
         // Legacy fallback: full còn nằm trong songs (trước khi migrate)
-        const leg = await db.ref(dataPath('songs') + '/' + id).once('value');
-        const ls = leg.val() || {};
-        if (ls.audioFull || ls.audioFull2) {
-            fullAudioCache[id] = {
-                audioFull: ls.audioFull || '',
-                audioFull2: ls.audioFull2 || ''
-            };
-            return fullAudioCache[id];
+        for (let i = 0; i < candidates.length; i++) {
+            const tryId = String(candidates[i] || '');
+            if (!tryId) continue;
+            const leg = await db.ref(dataPath('songs') + '/' + tryId).once('value');
+            const ls = leg.val() || {};
+            if (ls.audioFull || ls.audioFull2) {
+                const entry = { audioFull: ls.audioFull || '', audioFull2: ls.audioFull2 || '' };
+                fullAudioCache[id] = entry;
+                fullAudioCache[tryId] = entry;
+                return entry;
+            }
         }
     } catch (e) {
         console.warn('[songFulls] fetch', id, e && (e.code || e.message));
@@ -949,9 +971,10 @@ function autoScaleNotificationMessage() {
 }
 
 function forceScaleNotification() {
-    autoScaleNotificationMessage();
-    setTimeout(() => autoScaleNotificationMessage(), 40);
-    setTimeout(() => autoScaleNotificationMessage(), 120);
+    // 1 lần sau paint — tránh 3 lần đo layout chồng với animation vòng tên
+    requestAnimationFrame(() => {
+        try { autoScaleNotificationMessage(); } catch (e) {}
+    });
 }
 
 function hideNotification() {
@@ -1025,10 +1048,17 @@ function showNotification(title, message, color = "#4ade80", icon = "headphones"
         if (msgEl) msgEl.innerHTML = formattedMessage;
     }
 
-    noti.classList.remove('show');
-    void noti.offsetHeight;
-    noti.classList.add('show');
-    forceScaleNotification();
+    // Không force reflow (void offsetHeight) — tránh giật khi vòng tên đang quay
+    if (noti.classList.contains('show')) {
+        noti.classList.remove('show');
+        requestAnimationFrame(() => {
+            noti.classList.add('show');
+            forceScaleNotification();
+        });
+    } else {
+        noti.classList.add('show');
+        forceScaleNotification();
+    }
 
     notificationTimeout = setTimeout(() => {
         noti.classList.remove('show');
@@ -2444,6 +2474,8 @@ function updateArtRingPathRadius() {
     return rVb;
 }
 
+let _artRingFitCache = { key: '', w: 0 };
+
 function fitArtRingTextToPath(name) {
     const pathGeom = document.getElementById('art-ring-path');
     const textEl = document.querySelector('#art-name-ring text.art-name-text');
@@ -2452,7 +2484,17 @@ function fitArtRingTextToPath(name) {
     const base = String(name || 'XuanKen').trim().replace(/\s+/g, ' ');
     if (!base) return;
 
-    // Font theo độ dài
+    // Bỏ qua nếu cùng tên + cùng kích thước wrap (tránh đo layout liên tục khi toast)
+    try {
+        const wrap = document.getElementById('album-art-wrap');
+        const w = wrap ? (wrap.clientWidth | 0) : 0;
+        const key = base + '|' + (textEl.style.fontSize || '');
+        if (_artRingFitCache.key === key && _artRingFitCache.w === w && textEl.childNodes.length) {
+            return;
+        }
+        _artRingFitCache = { key, w };
+    } catch (e) {}
+
     const charCount = base.length;
     let fontPx = 10.5;
     if (charCount > 64) fontPx = 7.0;
@@ -2461,7 +2503,7 @@ function fitArtRingTextToPath(name) {
     else if (charCount > 28) fontPx = 9.2;
     else if (charCount > 18) fontPx = 10.0;
     textEl.style.fontSize = fontPx + 'px';
-    textEl.style.letterSpacing = '0.2px';
+    textEl.style.letterSpacing = '0.15px';
 
     updateArtRingPathRadius();
 
@@ -2471,7 +2513,7 @@ function fitArtRingTextToPath(name) {
 
     const NS = 'http://www.w3.org/2000/svg';
     const XLINK = 'http://www.w3.org/1999/xlink';
-    const sep = ' ·';
+    const sep = '·';
 
     function makeTp(content, offset) {
         const tp = document.createElementNS(NS, 'textPath');
@@ -2505,18 +2547,15 @@ function fitArtRingTextToPath(name) {
         guard++;
     }
 
-    // Đo cụm "TÊN ·" (mọi tên đều cùng công thức → dấu · luôn cùng vị trí tương đối)
-    const unit = base + sep;
-    let unitLen = measure(unit);
-    if (unitLen < 1) unitLen = nameLen + fontPx * 2;
+    const sepLen = measure(sep);
+    const minUnit = nameLen + sepLen + 6;
 
-    // Số vòng / số cụm
-    const isLong = nameLen > pathLen * 0.40;
     let n;
-    if (isLong) {
-        n = (unitLen * 2 <= pathLen * 0.99) ? 2 : 1;
+    if (nameLen > pathLen * 0.40) {
+        // Tên dài: tối đa 2 vòng
+        n = (minUnit * 2 <= pathLen) ? 2 : 1;
         guard = 0;
-        while (n === 2 && unitLen * 2 > pathLen * 0.98 && fontPx > MIN_FONT && guard < 10) {
+        while (n === 2 && minUnit * 2 > pathLen * 0.98 && fontPx > MIN_FONT && guard < 10) {
             fontPx -= 0.25;
             textEl.style.fontSize = fontPx + 'px';
             updateArtRingPathRadius();
@@ -2524,35 +2563,35 @@ function fitArtRingTextToPath(name) {
                 ? pathGeom.getTotalLength()
                 : pathLen;
             nameLen = measure(base);
-            unitLen = measure(unit);
             guard++;
         }
-        if (unitLen * 2 > pathLen * 0.99) n = 1;
+        if ((nameLen + sepLen + 4) * 2 > pathLen * 0.99) n = 1;
     } else {
-        n = Math.max(2, Math.floor(pathLen / unitLen));
-        if (n > 16) n = 16;
+        // Tên ngắn: lặp lấp đầy vòng
+        n = Math.max(2, Math.floor(pathLen / minUnit));
+        if (n > 14) n = 14;
     }
 
     /*
-     * Chìa khóa: mỗi cụm chiếm ĐÚNG 1/n chu vi (textLength = slot).
-     * startOffset = i * slot. Mọi tên (ngắn/dài/ký tự gì) đều:
-     *   - bắt đầu đều nhau quanh vòng
-     *   - dấu · nằm cuối mỗi ô → khoảng cách giữa các dấu bằng nhau
+     * Tên bắt đầu đều quanh vòng (i * slot).
+     * Dấu · đặt GIỮA khoảng trống sau tên → trước tên kế.
+     * → khoảng cách giữa các · bằng nhau với mọi nội dung tên.
+     * Không dùng textLength/lengthAdjust (tránh kéo lệch trong chữ Việt).
      */
     const slot = pathLen / n;
     textEl.innerHTML = '';
 
     for (let i = 0; i < n; i++) {
-        const content = (n === 1) ? base : unit;
-        const tp = makeTp(content, i * slot);
-        // Ép mỗi cụm đúng bằng 1 slot → dấu · cách đều bất kể nội dung tên
-        if (n >= 2) {
-            try {
-                tp.setAttribute('textLength', String(Math.round(slot * 1000) / 1000));
-                tp.setAttribute('lengthAdjust', 'spacing');
-            } catch (e) {}
+        const nameOff = i * slot;
+        textEl.appendChild(makeTp(base, nameOff));
+
+        const residual = slot - nameLen;
+        if (residual > sepLen + 2) {
+            let sepOff = nameOff + nameLen + (residual - sepLen) / 2;
+            if (sepOff + sepLen > nameOff + slot) sepOff = nameOff + slot - sepLen;
+            if (sepOff < nameOff + nameLen) sepOff = nameOff + nameLen + 1;
+            textEl.appendChild(makeTp(sep, sepOff));
         }
-        textEl.appendChild(tp);
     }
 }
 
@@ -2587,7 +2626,17 @@ function hasArtRingAccess() {
     return getArtRingUntil() > Date.now();
 }
 
-function updateArtNameRing() {
+let _artRingUpdateTimer = null;
+function updateArtNameRing(immediate) {
+    // Chỉ chạy ngay khi truyền đúng true (tránh event object làm immediate)
+    if (immediate !== true) {
+        if (_artRingUpdateTimer) clearTimeout(_artRingUpdateTimer);
+        _artRingUpdateTimer = setTimeout(() => {
+            _artRingUpdateTimer = null;
+            updateArtNameRing(true);
+        }, 50);
+        return;
+    }
     const wrap = document.getElementById('album-art-wrap');
     const textEl = document.querySelector('#art-name-ring text.art-name-text');
     const enEl = document.getElementById('art-ring-enabled');
@@ -2647,11 +2696,14 @@ function updateArtNameRing() {
     wrap.classList.toggle('ring-off', !on);
     if (on) {
         const name = resolveArtRingName(custom);
+        // fit trong rAF riêng — không block frame toast
         requestAnimationFrame(() => {
             try { fitArtRingTextToPath(name); } catch (e) {
                 console.warn('fitArtRingTextToPath', e);
             }
         });
+    } else {
+        _artRingFitCache = { key: '', w: 0 };
     }
     if (isPlaying && on) wrap.classList.add('ring-playing');
     else wrap.classList.remove('ring-playing');
@@ -3288,6 +3340,7 @@ function toggleTheme() {
 
 if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 loadTheme();
+try { applyPlayerSkin(getActiveSkin()); } catch (e) {}
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     const savedTheme = localStorage.getItem(storageKey(STORAGE_THEME));
     if (!savedTheme) {
@@ -3439,7 +3492,9 @@ function ensureUserAccount(username) {
             artRingOn: true,
             artRingText: '',
             artRingUseSong: false,
-            artRingUntil: 0
+            artRingUntil: 0,
+            ownedSkins: ['default'],
+            activeSkin: 'default'
         };
         saveAllAccounts(accounts);
     } else {
@@ -3457,6 +3512,9 @@ function ensureUserAccount(username) {
         if (a.artRingText == null) a.artRingText = '';
         if (a.artRingUseSong == null) a.artRingUseSong = false;
         if (a.artRingUntil == null) a.artRingUntil = 0;
+        if (!Array.isArray(a.ownedSkins)) a.ownedSkins = ['default'];
+        else if (!a.ownedSkins.map(String).includes('default')) a.ownedSkins = ['default'].concat(a.ownedSkins);
+        if (!a.activeSkin) a.activeSkin = 'default';
         saveAllAccounts(accounts);
     }
     return accounts[name];
@@ -3519,7 +3577,9 @@ function mapUserProfile(data, name) {
         artRingOn: d.artRingOn !== false,
         artRingText: typeof d.artRingText === 'string' ? d.artRingText : '',
         artRingUseSong: !!d.artRingUseSong,
-        artRingUntil: Number(d.artRingUntil) || 0
+        artRingUntil: Number(d.artRingUntil) || 0,
+        ownedSkins: Array.isArray(d.ownedSkins) ? d.ownedSkins.map(String) : ['default'],
+        activeSkin: d.activeSkin ? String(d.activeSkin) : 'default'
     };
 }
 
@@ -3627,6 +3687,12 @@ function startUserProfileListener(uid) {
             pendingRent
         );
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prev && prev.ownedThumbs);
+        mapped.ownedSkins = unionIdArrays(mapped.ownedSkins || ['default'], (typeof prev !== 'undefined' && prev && prev.ownedSkins) ? prev.ownedSkins : ((typeof prevLocal !== 'undefined' && prevLocal && prevLocal.ownedSkins) ? prevLocal.ownedSkins : ['default']));
+        if (!mapped.activeSkin) {
+            if (typeof prev !== 'undefined' && prev && prev.activeSkin) mapped.activeSkin = prev.activeSkin;
+            else if (typeof prevLocal !== 'undefined' && prevLocal && prevLocal.activeSkin) mapped.activeSkin = prevLocal.activeSkin;
+            else mapped.activeSkin = 'default';
+        }
         mapped.achievements = unionIdArrays(mapped.achievements, prev && prev.achievements);
         const preferRemoteList = (remote, local) => {
             const r = Array.isArray(remote) ? remote.map(String) : [];
@@ -3715,6 +3781,12 @@ async function fetchUserByUid(uid, usernameHint) {
         const pendingOwned = consumePendingOwned(remoteOwned);
         mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned)));
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
+        mapped.ownedSkins = unionIdArrays(mapped.ownedSkins || ['default'], (typeof prev !== 'undefined' && prev && prev.ownedSkins) ? prev.ownedSkins : ((typeof prevLocal !== 'undefined' && prevLocal && prevLocal.ownedSkins) ? prevLocal.ownedSkins : ['default']));
+        if (!mapped.activeSkin) {
+            if (typeof prev !== 'undefined' && prev && prev.activeSkin) mapped.activeSkin = prev.activeSkin;
+            else if (typeof prevLocal !== 'undefined' && prevLocal && prevLocal.activeSkin) mapped.activeSkin = prevLocal.activeSkin;
+            else mapped.activeSkin = 'default';
+        }
         mapped.achievements = unionIdArrays(mapped.achievements, prevLocal && prevLocal.achievements);
         const preferRemoteList = (remote, local) => {
             const r = Array.isArray(remote) ? remote.map(String) : [];
@@ -3841,7 +3913,18 @@ function filterOwnedIds(ids) {
     raw.forEach(id => {
         const low = id.toLowerCase();
         if (seen.has(low)) return;
-        if (catalog.size > 0 && !catalog.has(id) && !catalog.has(low)) return;
+        if (catalog.size > 0) {
+            // Giữ ID nếu bản thân hoặc bất kỳ alias nào còn trong catalog
+            let ok = catalog.has(id) || catalog.has(low);
+            if (!ok && typeof expandSongIdAliases === 'function') {
+                const exp = expandSongIdAliases(id);
+                for (let i = 0; i < exp.length; i++) {
+                    const e = String(exp[i] || '');
+                    if (catalog.has(e) || catalog.has(e.toLowerCase())) { ok = true; break; }
+                }
+            }
+            if (!ok) return;
+        }
         seen.add(low);
         out.push(id);
     });
@@ -4089,6 +4172,16 @@ async function pushUserToFirebase(username, account, options) {
             scalarPayload.artRingUseSong = !!account.artRingUseSong;
             scalarPayload.artRingUntil = Math.max(0, Number(account.artRingUntil) || 0);
         }
+        if (opts.skinsChanged || forceAll) {
+            if (Array.isArray(account.ownedSkins)) {
+                try {
+                    const merged = await txUnionArrayField(db, uid, 'ownedSkins', account.ownedSkins);
+                    account.ownedSkins = merged && merged.length ? merged : account.ownedSkins;
+                    if (accounts[name]) { accounts[name].ownedSkins = account.ownedSkins; saveAllAccounts(accounts); }
+                } catch (e) { console.warn('[skins] merge', e); }
+            }
+            scalarPayload.activeSkin = account.activeSkin ? String(account.activeSkin) : 'default';
+        }
         if (opts.inviteChanged || forceAll) {
             if (account.inviteBy) scalarPayload.inviteBy = account.inviteBy;
         }
@@ -4208,6 +4301,7 @@ function updateCurrentAccount(mutator) {
         xp: snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumb: snap({ t: acc.activeThumb, f: acc.frame }),
         artRing: snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', s: !!acc.artRingUseSong, u: acc.artRingUntil || 0 }),
+        skins: snap({ o: (acc.ownedSkins || []).map(String).sort(), a: acc.activeSkin || 'default' }),
         inviteBy: snap(acc.inviteBy || ''),
         counters: snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -4229,6 +4323,7 @@ function updateCurrentAccount(mutator) {
         xpChanged: before.xp !== snap({ xp: acc.xp, level: acc.level, seasonXp: acc.seasonXp }),
         activeThumbChanged: before.activeThumb !== snap({ t: acc.activeThumb, f: acc.frame }),
         artRingChanged: before.artRing !== snap({ on: acc.artRingOn !== false, t: acc.artRingText || '', s: !!acc.artRingUseSong, u: acc.artRingUntil || 0 }),
+        skinsChanged: before.skins !== snap({ o: (acc.ownedSkins || []).map(String).sort(), a: acc.activeSkin || 'default' }),
         inviteChanged: before.inviteBy !== snap(acc.inviteBy || ''),
         countersChanged: before.counters !== snap({ gift: acc.giftClaimCount, chat: acc.chatCount })
     };
@@ -4322,6 +4417,13 @@ function migrateLocalOwnedViaAliases() {
     }
 }
 
+function isSongPermanentlyOwned(songId) {
+    if (songId == null || songId === '') return false;
+    const candidates = expandSongIdAliases(String(songId));
+    const candLow = new Set(candidates.map(x => String(x).toLowerCase()));
+    return loadOwnedSongs().some(x => candLow.has(String(x).toLowerCase()));
+}
+
 function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
     const id = String(songId);
@@ -4351,20 +4453,23 @@ function isSongOwned(songId) {
 }
 
 function isSongRented(songId) {
-    const id = String(songId);
-    const now = Date.now();
-    const acc = getCurrentAccount();
-    const fromAcc = acc && acc.rentals ? Number(acc.rentals[id]) || 0 : 0;
-    const fromPending = Number(_pendingRentals[id]) || 0;
-    return Math.max(fromAcc, fromPending) > now;
+    return getRentExpiry(songId) > Date.now();
 }
 
 function getRentExpiry(songId) {
-    const id = String(songId);
+    // Nhận cả ID cũ qua alias (đổi ID bài trong admin vẫn còn hạn thuê)
+    const candidates = (typeof expandSongIdAliases === 'function')
+        ? expandSongIdAliases(songId)
+        : [String(songId || '')];
     const acc = getCurrentAccount();
-    const fromAcc = acc && acc.rentals ? Number(acc.rentals[id]) || 0 : 0;
-    const fromPending = Number(_pendingRentals[id]) || 0;
-    return Math.max(fromAcc, fromPending);
+    let best = 0;
+    for (let i = 0; i < candidates.length; i++) {
+        const id = String(candidates[i] || '');
+        if (!id) continue;
+        if (acc && acc.rentals) best = Math.max(best, Number(acc.rentals[id]) || 0);
+        try { best = Math.max(best, Number(_pendingRentals[id]) || 0); } catch (e) {}
+    }
+    return best;
 }
 
 /** Gói thuê: 1 / 3 / 5 / 7 ngày */
@@ -4422,7 +4527,7 @@ function rentSong(songId, days) {
         showNotification('LỖI:', 'KHÔNG TÌM THẤY BÀI HÁT', '#ff4444', 'alert-circle');
         return false;
     }
-    if (loadOwnedSongs().includes(String(songId))) {
+    if (typeof isSongPermanentlyOwned === 'function' ? isSongPermanentlyOwned(songId) : loadOwnedSongs().includes(String(songId))) {
         showNotification('CỬA HÀNG:', 'BẠN ĐÃ MUA BÀI NÀY', '#4ade80', 'check');
         return false;
     }
@@ -4847,6 +4952,7 @@ function updateShopUserProfile() {
 
 function updateUsernameBadge() {
     updateShopUserProfile();
+    try { if (typeof applyPlayerSkin === 'function') applyPlayerSkin(getActiveSkin()); } catch (e) {}
 }
 
 function updateCheckinButtonUI() {
@@ -4885,7 +4991,7 @@ function renderShopList(highlightSongId) {
         const isFocus = focusId && id === focusId;
         const rented = isSongRented(id);
         const rentP1 = getRentPriceForDays(s, 1);
-        const permanentlyOwned = loadOwnedSongs().includes(id);
+        const permanentlyOwned = (typeof isSongPermanentlyOwned === 'function') ? isSongPermanentlyOwned(id) : loadOwnedSongs().includes(id);
         let action = '';
         if (permanentlyOwned) {
             action = `<span class="shop-owned-badge">ĐÃ MUA</span>`;
@@ -5210,6 +5316,7 @@ function openShopModal(highlightSongId) {
     renderShopList(highlightSongId);
     if (typeof renderShopThumbs === "function") renderShopThumbs();
     if (typeof renderShopRing === "function") renderShopRing();
+    if (typeof renderShopSkins === "function") renderShopSkins();
     modal.classList.remove('show');
     void modal.offsetWidth;
     requestAnimationFrame(() => {
@@ -5733,6 +5840,7 @@ function initShopTabs() {
             });
             if (key === 'thumb' && typeof renderShopThumbs === 'function') renderShopThumbs();
             if (key === 'ring' && typeof renderShopRing === 'function') renderShopRing();
+            if (key === 'skin' && typeof renderShopSkins === 'function') renderShopSkins();
             if (typeof lucide !== 'undefined') {
                 try { lucide.createIcons({ nodes: Array.from(bar.querySelectorAll('[data-lucide]')) }); } catch (e) {}
             }
@@ -5895,7 +6003,156 @@ if (closeMyPlaylistBtn && myPlaylistOverlay) {
     closeMyPlaylistBtn.onclick = () => myPlaylistOverlay.classList.remove('active');
 }
 
+
+
+/** Giao diện player bán trong cửa hàng (chỉ skin CSS, giữ nguyên tính năng) */
+const PLAYER_SKINS = [
+    {
+        id: 'default',
+        name: 'Cổ điển',
+        price: 0,
+        desc: 'Giao diện mặc định XuanKen',
+        previewClass: 'skin-default',
+        icon: '🎵'
+    },
+    {
+        id: 'aura',
+        name: 'Aura Sound',
+        price: 80,
+        desc: 'Glass · vàng tím · đĩa vinyl glow',
+        previewClass: 'skin-aura',
+        icon: '✨'
+    }
+];
+
+function getOwnedSkins() {
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    const list = (acc && Array.isArray(acc.ownedSkins)) ? acc.ownedSkins.map(String) : ['default'];
+    if (!list.includes('default')) list.unshift('default');
+    return list;
+}
+
+function getActiveSkin() {
+    const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
+    const id = (acc && acc.activeSkin) ? String(acc.activeSkin) : 'default';
+    const owned = getOwnedSkins();
+    return owned.includes(id) ? id : 'default';
+}
+
+function applyPlayerSkin(skinId) {
+    const id = String(skinId || 'default');
+    // Gỡ mọi class skin-* trên body
+    try {
+        const toRemove = [];
+        document.body.classList.forEach(c => { if (c.indexOf('skin-') === 0) toRemove.push(c); });
+        toRemove.forEach(c => document.body.classList.remove(c));
+    } catch (e) {
+        document.body.className = document.body.className.replace(/\bskin-\S+/g, '').trim();
+    }
+    if (id && id !== 'default') {
+        document.body.classList.add('skin-' + id);
+    }
+}
+
+function buyPlayerSkin(skinId) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
+    const skin = PLAYER_SKINS.find(s => s.id === String(skinId));
+    if (!skin) {
+        showNotification('LỖI:', 'KHÔNG TÌM THẤY GIAO DIỆN', '#ff4444', 'alert-circle');
+        return false;
+    }
+    if (getOwnedSkins().includes(skin.id)) {
+        showNotification('CỬA HÀNG:', 'BẠN ĐÃ SỞ HỮU GIAO DIỆN NÀY', '#4ade80', 'check');
+        return false;
+    }
+    const price = Math.max(0, Number(skin.price) || 0);
+    const coins = loadCoins();
+    if (coins < price) {
+        showNotification('THIẾU XK:', 'CẦN ' + price + ' XK — ĐANG CÓ ' + coins + ' XK', '#ff9800', 'coins');
+        return false;
+    }
+    updateCurrentAccount(acc => {
+        acc.coins = (acc.coins | 0) - price;
+        if (!Array.isArray(acc.ownedSkins)) acc.ownedSkins = ['default'];
+        if (!acc.ownedSkins.map(String).includes(skin.id)) acc.ownedSkins.push(skin.id);
+        acc.activeSkin = skin.id;
+    });
+    applyPlayerSkin(skin.id);
+    showNotification('MUA GIAO DIỆN:', skin.name.toUpperCase(), '#4ade80', 'palette');
+    updateShopBalanceUI();
+    if (typeof renderShopSkins === 'function') renderShopSkins();
+    return true;
+}
+
+function usePlayerSkin(skinId) {
+    if (!getCurrentUsername()) {
+        showNotification('LỖI:', 'CHƯA ĐĂNG NHẬP USERNAME', '#ff4444', 'user');
+        return false;
+    }
+    const id = String(skinId || 'default');
+    if (!getOwnedSkins().includes(id)) {
+        showNotification('CỬA HÀNG:', 'CHƯA SỞ HỮU GIAO DIỆN NÀY', '#ff9800', 'lock');
+        return false;
+    }
+    updateCurrentAccount(acc => { acc.activeSkin = id; });
+    applyPlayerSkin(id);
+    const skin = PLAYER_SKINS.find(s => s.id === id);
+    showNotification('GIAO DIỆN:', (skin ? skin.name : id).toUpperCase(), '#4ade80', 'palette');
+    if (typeof renderShopSkins === 'function') renderShopSkins();
+    return true;
+}
+
+function renderShopSkins() {
+    const list = document.getElementById('shop-skin-list');
+    if (!list) return;
+    const owned = new Set(getOwnedSkins());
+    const active = getActiveSkin();
+    list.innerHTML = PLAYER_SKINS.map(skin => {
+        const has = owned.has(skin.id);
+        const isActive = active === skin.id;
+        let btn = '';
+        if (isActive) {
+            btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>';
+        } else if (has) {
+            btn = '<button type="button" class="shop-buy-btn" data-use-skin="' + skin.id + '">DÙNG</button>';
+        } else if (Number(skin.price) <= 0) {
+            btn = '<button type="button" class="shop-buy-btn" data-use-skin="' + skin.id + '">DÙNG</button>';
+        } else {
+            btn = '<button type="button" class="shop-buy-btn" data-buy-skin="' + skin.id + '">MUA ' + skin.price + ' XK</button>';
+        }
+        return '<div class="shop-skin-item' + (isActive ? ' active-skin' : '') + '" data-skin-id="' + skin.id + '">'
+            + '<div class="shop-skin-preview ' + (skin.previewClass || '') + '">' + (skin.icon || '🎨') + '</div>'
+            + '<div class="shop-skin-meta">'
+            + '<div class="shop-skin-name">' + skin.name + '</div>'
+            + '<div class="shop-skin-desc">' + (skin.desc || '') + (Number(skin.price) > 0 ? ' · ' + skin.price + ' XK' : ' · Miễn phí') + '</div>'
+            + '</div>'
+            + '<div class="shop-skin-actions">' + btn + '</div>'
+            + '</div>';
+    }).join('');
+
+    list.querySelectorAll('[data-buy-skin]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            buyPlayerSkin(btn.getAttribute('data-buy-skin'));
+        };
+    });
+    list.querySelectorAll('[data-use-skin]').forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            usePlayerSkin(btn.getAttribute('data-use-skin'));
+        };
+    });
+}
+
+
 window.buySong = buySong;
+window.applyPlayerSkin = applyPlayerSkin;
+window.renderShopSkins = renderShopSkins;
+window.buyPlayerSkin = buyPlayerSkin;
+window.usePlayerSkin = usePlayerSkin;
 window.rentSong = rentSong;
 window.isSongOwned = isSongOwned;
 window.openShopModal = openShopModal;

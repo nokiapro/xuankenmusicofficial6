@@ -523,6 +523,7 @@ body.dark .top-bar-icons .btn-icon {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    contain: layout style;
 }
 
 .album-art {
@@ -556,6 +557,9 @@ body.dark .album-art {
     animation: rotate 20s linear infinite;
     animation-play-state: paused;
     transition: transform 0.3s ease;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .art-name-ring {
@@ -568,6 +572,10 @@ body.dark .album-art {
     overflow: visible;
     animation: art-ring-spin 28s linear infinite;
     animation-play-state: paused;
+    /* Tách layer GPU — tránh giật khi toast/layout */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .album-art-wrap.ring-playing .art-name-ring {
@@ -1989,9 +1997,11 @@ body.dark .hint-decoration {
     position: fixed;
     top: 0;
     left: 50%;
-    transform: translateX(-50%) translateY(-100%);
+    transform: translate3d(-50%, -100%, 0);
     background: var(--card-bg);
-    backdrop-filter: blur(20px);
+    /* blur nhẹ hơn — giảm jank khi vòng tên đang quay */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-radius: 0 0 24px 24px;
     padding: 12px 24px;
     max-width: 90%;
@@ -2001,19 +2011,21 @@ body.dark .hint-decoration {
     z-index: 10001;
     opacity: 0;
     visibility: hidden;
-    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+    transition: transform 0.28s ease, opacity 0.28s ease, visibility 0.28s ease;
     display: flex;
     gap: 12px;
     align-items: center;
     justify-content: center;
     pointer-events: none;
     white-space: nowrap;
+    will-change: transform, opacity;
+    contain: layout style;
 }
 
 .notification.show {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(0);
+    transform: translate3d(-50%, 0, 0);
 }
 
 .notification-icon {
@@ -4640,4 +4652,205 @@ body.night-soft .player-container { filter: saturate(0.85) brightness(0.92); }
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
+}
+
+
+/* ========== SKIN: Aura Sound (shop) — chỉ giao diện, giữ nguyên layout/ID ========== */
+body.skin-aura {
+    --aura-gold: #f3c06b;
+    --aura-purple: #a78bfa;
+    --aura-pill: #272732;
+    --aura-btn: #2d2d3c;
+    --aura-bg: #0b0f17;
+    --aura-card: rgba(18, 20, 29, 0.88);
+    --bg-color: #0b0f17;
+    --card-bg: rgba(18, 20, 29, 0.9);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f3f4f6;
+    --text-secondary: #c4b5fd;
+    --text-tertiary: #9ca3af;
+    --btn-bg: rgba(45, 45, 60, 0.9);
+    --btn-hover: rgba(54, 54, 70, 1);
+    --btn-active-bg: rgba(243, 192, 107, 0.18);
+    --progress-bg: rgba(255, 255, 255, 0.12);
+    --playlist-bg: rgba(18, 20, 29, 0.98);
+    --playlist-header-bg: rgba(18, 20, 29, 0.98);
+    --song-item-hover: rgba(255, 255, 255, 0.06);
+    --input-bg: rgba(255, 255, 255, 0.06);
+    --modal-bg: rgba(18, 20, 29, 0.96);
+    --icon-gradient: linear-gradient(135deg, #f3c06b, #a78bfa, #f3c06b);
+    --icon-gradient-hover: linear-gradient(135deg, #fde68a, #c4b5fd, #fde68a);
+    --icon-gradient-active: linear-gradient(135deg, #f3c06b, #ff6b9d, #f3c06b);
+    --icon-active-stroke: #f3c06b;
+    --accent-color: #f3c06b;
+    background: #0b0f17 !important;
+}
+
+body.skin-aura .player-container,
+body.skin-aura .pc-layout {
+    background: var(--aura-card) !important;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55) !important;
+    border-radius: 28px !important;
+}
+
+body.skin-aura .top-bar-icons {
+    gap: 6px;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body.skin-aura .top-bar-icons .btn-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px !important;
+    background: var(--aura-btn) !important;
+    color: #d1d5db;
+    box-shadow: none;
+}
+
+body.skin-aura .top-bar-icons .btn-icon:hover {
+    background: #363646 !important;
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+body.skin-aura .top-bar-icons .btn-icon.active {
+    background: rgba(243, 192, 107, 0.2) !important;
+    color: var(--aura-gold);
+}
+
+body.skin-aura .album-art-wrap {
+    position: relative;
+}
+
+body.skin-aura .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(243, 192, 107, 0.14);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+    animation: auraPulseGlow 3s ease-in-out infinite;
+}
+
+@keyframes auraPulseGlow {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+body.skin-aura .album-art {
+    border-color: rgba(243, 192, 107, 0.35) !important;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+    background: linear-gradient(135deg, #1a1a22, #121216) !important;
+}
+
+body.skin-aura .song-title {
+    color: #fde68a !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+body.skin-aura .artist-name {
+    color: rgba(196, 181, 253, 0.9) !important;
+}
+
+body.skin-aura .current-lyric,
+body.skin-aura #lyric-container {
+    background: var(--aura-pill) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 999px !important;
+    color: #d1d5db !important;
+}
+
+body.skin-aura .progress-bar-container {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-radius: 999px;
+}
+
+body.skin-aura .progress-filled {
+    background: linear-gradient(90deg, #f3c06b, #a78bfa) !important;
+}
+
+body.skin-aura .main-actions .btn-icon {
+    border-radius: 999px !important;
+    background: var(--aura-btn) !important;
+}
+
+body.skin-aura .main-actions .play-btn {
+    background: linear-gradient(135deg, rgba(243, 192, 107, 0.35), rgba(167, 139, 250, 0.35)) !important;
+    color: #fff;
+}
+
+body.skin-aura .playlist,
+body.skin-aura .shop-modal,
+body.skin-aura .timer-modal,
+body.skin-aura .checkin-modal {
+    background: rgba(18, 20, 29, 0.96) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.skin-aura .shop-tab.active {
+    color: var(--aura-gold) !important;
+    border-bottom-color: var(--aura-gold) !important;
+}
+
+body.skin-aura .shop-skin-item {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+body.skin-aura .shop-skin-item.active-skin {
+    border-color: rgba(243, 192, 107, 0.5);
+    background: rgba(243, 192, 107, 0.1);
+}
+
+/* Shop skin cards (mọi theme) */
+.shop-skin-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    background: var(--btn-bg);
+    margin-bottom: 10px;
+}
+.shop-skin-preview {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    overflow: hidden;
+}
+.shop-skin-preview.skin-default {
+    background: linear-gradient(135deg, #fcfcfc, #e8e8e8);
+    color: #333;
+}
+body.dark .shop-skin-preview.skin-default {
+    background: linear-gradient(135deg, #2a2a2a, #1a1a1a);
+    color: #eee;
+}
+.shop-skin-preview.skin-aura {
+    background: linear-gradient(135deg, #1a1a22 0%, #2d1f4e 50%, #3d2a1a 100%);
+    color: #f3c06b;
+    box-shadow: inset 0 0 20px rgba(167, 139, 250, 0.25);
+}
+.shop-skin-meta { flex: 1; min-width: 0; }
+.shop-skin-name { font-weight: 800; font-size: 0.9rem; color: var(--text-primary); }
+.shop-skin-desc { font-size: 0.72rem; color: var(--text-tertiary); margin-top: 2px; }
+.shop-skin-actions { flex-shrink: 0; }
+.shop-skin-item.active-skin .shop-skin-name::after {
+    content: ' · ĐANG DÙNG';
+    font-size: 0.65rem;
+    color: #4ade80;
+    font-weight: 700;
 }
