@@ -3741,10 +3741,17 @@ function startUserProfileListener(uid) {
         let fromMap = [];
         try {
             const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
-            fromMap = Object.keys(om).filter(k => om[k]).map(String);
+            fromMap = Object.keys(om).filter(k => om[k]).map(k => {
+                const s = String(k);
+                const to = (songIdAliases && (songIdAliases[s] || songIdAliases[s.toLowerCase()])) || s;
+                return String(to);
+            });
         } catch (e) {}
         mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pending, prev && prev.owned))));
-        mapped.ownedMap = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
+        // ownedMap canonical: chỉ ID sau alias
+        const omCanon = {};
+        mapped.owned.forEach(id => { omCanon[String(id)] = true; });
+        mapped.ownedMap = omCanon;
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
             mergeRentalsMap(mapped.rentals, prev && prev.rentals),
@@ -3846,10 +3853,17 @@ async function fetchUserByUid(uid, usernameHint) {
         let fromMap = [];
         try {
             const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
-            fromMap = Object.keys(om).filter(k => om[k]).map(String);
+            fromMap = Object.keys(om).filter(k => om[k]).map(k => {
+                const s = String(k);
+                const to = (songIdAliases && (songIdAliases[s] || songIdAliases[s.toLowerCase()])) || s;
+                return String(to);
+            });
         } catch (e) {}
         mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned))));
-        mapped.ownedMap = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
+        // ownedMap canonical: chỉ ID sau alias
+        const omCanon = {};
+        mapped.owned.forEach(id => { omCanon[String(id)] = true; });
+        mapped.ownedMap = omCanon;
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
         mapped.ownedSkins = unionIdArrays(mapped.ownedSkins || ['default'], (typeof prev !== 'undefined' && prev && prev.ownedSkins) ? prev.ownedSkins : ((typeof prevLocal !== 'undefined' && prevLocal && prevLocal.ownedSkins) ? prevLocal.ownedSkins : ['default']));
         if (!mapped.activeSkin) {
@@ -4465,17 +4479,41 @@ function migrateLocalOwnedViaAliases() {
         if (!accounts || !accounts[name]) return;
         const acc = accounts[name];
         let changed = false;
+        const resolveId = (x) => {
+            const s = String(x == null ? '' : x).trim();
+            if (!s) return '';
+            const to = songIdAliases[s] || songIdAliases[s.toLowerCase()];
+            return to ? String(to) : s;
+        };
         if (Array.isArray(acc.owned) && acc.owned.length) {
-            const next = acc.owned.map(x => {
-                const s = String(x);
-                const to = songIdAliases[s] || songIdAliases[s.toLowerCase()];
-                return to ? String(to) : s;
-            });
+            const next = acc.owned.map(resolveId).filter(Boolean);
             const deduped = typeof dedupeIdList === 'function' ? dedupeIdList(next) : [...new Set(next)];
             if (JSON.stringify(deduped) !== JSON.stringify(acc.owned.map(String))) {
                 acc.owned = deduped;
                 changed = true;
             }
+        }
+        // ownedMap cũng phải map alias — nếu không, load profile lại đẩy ID cũ vào owned → admin báo mồ côi
+        if (acc.ownedMap && typeof acc.ownedMap === 'object') {
+            const nm = {};
+            let mapChanged = false;
+            Object.keys(acc.ownedMap).forEach(k => {
+                if (!acc.ownedMap[k]) return;
+                const to = resolveId(k);
+                if (!to) return;
+                if (to !== k) mapChanged = true;
+                nm[to] = true;
+            });
+            // Đồng bộ key theo mảng owned hiện tại
+            (acc.owned || []).forEach(id => { nm[String(id)] = true; });
+            if (mapChanged || Object.keys(nm).length !== Object.keys(acc.ownedMap).length) {
+                acc.ownedMap = nm;
+                changed = true;
+            }
+        } else if (Array.isArray(acc.owned) && acc.owned.length) {
+            acc.ownedMap = {};
+            acc.owned.forEach(id => { acc.ownedMap[String(id)] = true; });
+            changed = true;
         }
         if (acc.rentals && typeof acc.rentals === 'object') {
             const rentals = { ...acc.rentals };
@@ -4495,7 +4533,7 @@ function migrateLocalOwnedViaAliases() {
             if (typeof pushUserToFirebase === 'function') {
                 pushUserToFirebase(name, acc, { ownedChanged: true, rentalsChanged: true });
             }
-            console.log('[owned] đã map alias ID cũ → ID mới');
+            console.log('[owned] đã map alias ID cũ → ID mới (+ ownedMap)');
         }
     } catch (e) {
         console.warn('migrateLocalOwnedViaAliases', e);

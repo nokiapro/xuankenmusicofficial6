@@ -1723,6 +1723,26 @@
             return [];
         }
 
+        let songIdAliasesCache = Object.create(null);
+
+        async function loadSongIdAliasesAdmin() {
+            try {
+                const snap = await db().ref(dataPath('songIdAliases')).once('value');
+                const v = snap.val() || {};
+                const map = Object.create(null);
+                Object.keys(v).forEach(oldId => {
+                    const to = v[oldId] && (v[oldId].to || v[oldId]);
+                    if (!to) return;
+                    map[String(oldId)] = String(to);
+                    map[String(oldId).toLowerCase()] = String(to);
+                });
+                songIdAliasesCache = map;
+            } catch (e) {
+                console.warn('loadSongIdAliasesAdmin', e);
+            }
+            return songIdAliasesCache;
+        }
+
         function getSongIdSet() {
             const set = new Set();
             songsCache.forEach(s => {
@@ -1739,12 +1759,24 @@
                     }
                 }
             });
+            // ID cũ trong alias trỏ tới bài còn tồn tại → không tính mồ côi
+            Object.keys(songIdAliasesCache || {}).forEach(oldId => {
+                const to = songIdAliasesCache[oldId];
+                if (!to) return;
+                if (set.has(String(to)) || set.has(String(to).toLowerCase())) {
+                    set.add(String(oldId));
+                    set.add(String(oldId).toLowerCase());
+                }
+            });
             return set;
         }
 
         function ownedIdInCatalog(sid, songIds) {
             if (!sid) return false;
             if (songIds.has(sid) || songIds.has(sid.toLowerCase())) return true;
+            // alias → id mới còn trong catalog
+            const to = songIdAliasesCache[sid] || songIdAliasesCache[String(sid).toLowerCase()];
+            if (to && (songIds.has(String(to)) || songIds.has(String(to).toLowerCase()))) return true;
             return false;
         }
 
@@ -1756,9 +1788,11 @@
             parseOwnedField(owned).forEach(raw => {
                 const sid = String(raw == null ? '' : raw).trim();
                 if (!sid) { empty++; return; }
-                const canon = sid;
-                const canonLower = sid.toLowerCase();
-                if (!ownedIdInCatalog(sid, ids)) { orphans++; return; }
+                // Map alias cũ → ID mới nếu có
+                const mapped = songIdAliasesCache[sid] || songIdAliasesCache[sid.toLowerCase()] || sid;
+                const canon = String(mapped);
+                const canonLower = canon.toLowerCase();
+                if (!ownedIdInCatalog(sid, ids) && !ownedIdInCatalog(canon, ids)) { orphans++; return; }
                 if (seen.has(canonLower)) { dupes++; return; }
                 seen.add(canonLower);
                 cleaned.push(canon);
@@ -1776,7 +1810,8 @@
             return sanitizeOwnedList(owned).cleaned.length;
         }
 
-        function refreshStats() {
+        async function refreshStats() {
+            try { await loadSongIdAliasesAdmin(); } catch (e) {}
             const users = Object.keys(usersCache);
             const songIds = getSongIdSet();
             let totalCoins = 0, totalOwned = 0, totalRawOwned = 0, totalOrphans = 0, totalDupes = 0, totalEmpty = 0;
@@ -2304,6 +2339,7 @@
         if (cleanupOwnedBtn) {
             cleanupOwnedBtn.onclick = async () => {
                 const logEl = document.getElementById('cleanup-owned-log');
+                try { await loadSongIdAliasesAdmin(); } catch (e) {}
                 const songIds = getSongIdSet();
                 if (!songIds.size) {
                     toast('Chưa load được list bài hát — thử F5');
