@@ -789,15 +789,16 @@ body.dark .lyric-container {
     color: #e8e8ed;
     font-weight: 600;
     text-align: center;
-    font-size: 0.82rem;
+    font-size: 16px;
     letter-spacing: 0.02em;
     white-space: nowrap;
     display: inline-block;
     transform-origin: center center;
-    transition: color 0.3s ease;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    transition: color 0.25s ease, font-size 0.15s ease;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.25;
 }
 
 .controls-bar {

@@ -1779,28 +1779,59 @@ function autoScaleSongTitle() {
 
 function adjustLyricFontSize(text) {
     if (!lyricDisplay || !lyricContainer) return;
+    const raw = (text == null) ? '' : String(text);
     lyricDisplay.style.transform = 'none';
+    lyricDisplay.style.webkitTransform = 'none';
     lyricDisplay.style.fontSize = '16px';
-    lyricDisplay.innerText = text;
+    lyricDisplay.textContent = raw;
 
+    const pad = 24; // padding khung lyric 2 bên
     const containerWidth = lyricContainer.clientWidth;
-    if (containerWidth <= 0) return;
+    if (containerWidth <= 0) {
+        // Layout chưa sẵn — thử lại sau
+        requestAnimationFrame(() => {
+            try { adjustLyricFontSize(raw); } catch (e) {}
+        });
+        return;
+    }
+    const maxW = Math.max(40, containerWidth - pad);
 
-    const textWidth = lyricDisplay.scrollWidth;
-
-    if (textWidth > containerWidth - 20) {
-        const scale = (containerWidth - 20) / textWidth;
-        const finalScale = Math.max(scale, 0.5);
-        lyricDisplay.style.transform = `scale(${finalScale})`;
-        lyricDisplay.style.fontSize = '16px';
+    // Co font-size dần cho vừa khung (không cắt chữ)
+    let size = 16;
+    const minSize = 9;
+    lyricDisplay.style.fontSize = size + 'px';
+    // Binary search font size
+    let lo = minSize, hi = 18;
+    size = hi;
+    lyricDisplay.style.fontSize = size + 'px';
+    if (lyricDisplay.scrollWidth <= maxW) {
+        // Có thể to hơn một chút nếu chữ ngắn
+        while (size < 18) {
+            size += 1;
+            lyricDisplay.style.fontSize = size + 'px';
+            if (lyricDisplay.scrollWidth > maxW) {
+                size -= 1;
+                lyricDisplay.style.fontSize = size + 'px';
+                break;
+            }
+        }
+        lyricDisplay.style.transform = 'none';
+        return;
+    }
+    // Chữ dài: giảm font
+    while (size > minSize && lyricDisplay.scrollWidth > maxW) {
+        size -= 0.5;
+        lyricDisplay.style.fontSize = size + 'px';
+    }
+    // Vẫn dài sau minSize → scale thêm (giữ nguyên nội dung, không ellipsis)
+    if (lyricDisplay.scrollWidth > maxW) {
+        const tw = lyricDisplay.scrollWidth;
+        const scale = Math.max(0.42, maxW / tw);
+        lyricDisplay.style.transform = 'scale(' + scale + ')';
+        lyricDisplay.style.webkitTransform = 'scale(' + scale + ')';
     } else {
         lyricDisplay.style.transform = 'none';
-        let currentFontSize = 16;
-        const maxFontSize = Math.min(20, 16 + (containerWidth - textWidth) / 10);
-        while (lyricDisplay.scrollWidth < containerWidth - 30 && currentFontSize < maxFontSize) {
-            currentFontSize += 1;
-            lyricDisplay.style.fontSize = currentFontSize + 'px';
-        }
+        lyricDisplay.style.webkitTransform = 'none';
     }
 }
 
