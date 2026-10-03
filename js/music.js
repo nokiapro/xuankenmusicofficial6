@@ -160,6 +160,14 @@ const STORAGE_ADMIN_SETTINGS = 'xuanken_admin_settings';
 const STORAGE_SONG_PRICES = 'xuanken_song_prices';
 const STORAGE_LISTENS = 'xuanken_listens';
 const STORAGE_THEME = 'xuanken_theme';
+/** iPhone/iPad — giảm tải animation */
+function isIOSDevice() {
+    try {
+        const ua = navigator.userAgent || '';
+        return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    } catch (e) { return false; }
+}
+
 const STORAGE_DEVICE_ID = 'xuanken_device_id';
 const STORAGE_PIN_TRUST = 'xuanken_pin_trust';
 const PIN_TRUST_MS = 7 * 24 * 60 * 60 * 1000;
@@ -2284,7 +2292,9 @@ audio.ontimeupdate = () => {
         if (timeCurrent) timeCurrent.innerText = formatTime(cur);
         if (timeTotal) timeTotal.innerText = formatTime(dur);
     }
-    if (now - lastProgressUiAt > 80) {
+    // iOS: cập nhật progress thưa hơn → mượt animation đĩa/vòng tên
+    const progMs = (typeof isIOSDevice === 'function' && isIOSDevice()) ? 160 : 80;
+    if (now - lastProgressUiAt > progMs) {
         lastProgressUiAt = now;
         updateProgressUI();
     }
@@ -2631,10 +2641,11 @@ function updateArtNameRing(immediate) {
     // Chỉ chạy ngay khi truyền đúng true (tránh event object làm immediate)
     if (immediate !== true) {
         if (_artRingUpdateTimer) clearTimeout(_artRingUpdateTimer);
+        const delay = (typeof isIOSDevice === 'function' && isIOSDevice()) ? 140 : 50;
         _artRingUpdateTimer = setTimeout(() => {
             _artRingUpdateTimer = null;
             updateArtNameRing(true);
-        }, 50);
+        }, delay);
         return;
     }
     const wrap = document.getElementById('album-art-wrap');
@@ -3314,7 +3325,42 @@ function loadTheme() {
     applyGradientToArtistName();
 }
 
+function skinSupportsBothModes(skinId) {
+    const skin = (typeof PLAYER_SKINS !== 'undefined')
+        ? PLAYER_SKINS.find(s => s.id === String(skinId || 'default'))
+        : null;
+    const modes = (skin && Array.isArray(skin.modes)) ? skin.modes : ['light', 'dark'];
+    return modes.includes('light') && modes.includes('dark');
+}
+
+function updateThemeToggleVisibility() {
+    if (!themeToggle) return;
+    const id = (typeof getActiveSkin === 'function') ? getActiveSkin() : 'default';
+    const both = skinSupportsBothModes(id);
+    themeToggle.style.display = both ? '' : 'none';
+    themeToggle.style.pointerEvents = both ? '' : 'none';
+    themeToggle.setAttribute('aria-hidden', both ? 'false' : 'true');
+    if (!both) {
+        const skin = PLAYER_SKINS.find(s => s.id === String(id));
+        const modes = (skin && skin.modes) ? skin.modes : ['dark'];
+        const forceDark = modes.includes('dark') && !modes.includes('light');
+        if (forceDark) {
+            document.body.classList.add('dark');
+            setThemeIcon(true);
+        } else {
+            document.body.classList.remove('dark');
+            setThemeIcon(false);
+        }
+    }
+}
+
 function toggleTheme() {
+    const activeId = (typeof getActiveSkin === 'function') ? getActiveSkin() : 'default';
+    if (!skinSupportsBothModes(activeId)) {
+        const skin = PLAYER_SKINS.find(s => s.id === String(activeId));
+        showNotification('GIAO DIỆN:', (skin ? skin.name : activeId) + ' KHÔNG ĐỔI SÁNG/TỐI', '#ff9800', 'palette');
+        return;
+    }
     document.body.classList.add('no-transition');
     
     if (document.body.classList.contains('dark')) {
@@ -3341,6 +3387,7 @@ function toggleTheme() {
 if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 loadTheme();
 try { applyPlayerSkin(getActiveSkin()); } catch (e) {}
+try { updateThemeToggleVisibility(); } catch (e) {}
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     const savedTheme = localStorage.getItem(storageKey(STORAGE_THEME));
     if (!savedTheme) {
@@ -3569,6 +3616,7 @@ function mapUserProfile(data, name) {
         listenedSongs: (d.listenedSongs && typeof d.listenedSongs === 'object') ? d.listenedSongs : {},
         listenTime: (d.listenTime && typeof d.listenTime === 'object') ? d.listenTime : { total: 0, byDay: {} },
         ownedThumbs: Array.isArray(d.ownedThumbs) ? d.ownedThumbs.map(String) : [],
+        ownedMap: (d.ownedMap && typeof d.ownedMap === 'object') ? d.ownedMap : {},
         activeThumb: d.activeThumb || '',
         inviteBy: d.inviteBy || '',
         giftClaimCount: Number(d.giftClaimCount) || 0,
@@ -3680,7 +3728,14 @@ function startUserProfileListener(uid) {
         const prev = accounts[name];
         const remoteOwned = dedupeIdList(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pending = consumePendingOwned(remoteOwned);
-        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(pending, prev && prev.owned)));
+        // Bổ sung ID từ ownedMap (phòng mảng owned thiếu sau khi admin sửa link)
+        let fromMap = [];
+        try {
+            const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
+            fromMap = Object.keys(om).filter(k => om[k]).map(String);
+        } catch (e) {}
+        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pending, prev && prev.owned))));
+        mapped.ownedMap = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
         const pendingRent = consumePendingRentals(mapped.rentals);
         mapped.rentals = mergeRentalsMap(
             mergeRentalsMap(mapped.rentals, prev && prev.rentals),
@@ -3779,7 +3834,13 @@ async function fetchUserByUid(uid, usernameHint) {
         );
         const remoteOwned = dedupeIdList(Array.isArray(mapped.owned) ? mapped.owned.map(String) : []);
         const pendingOwned = consumePendingOwned(remoteOwned);
-        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned)));
+        let fromMap = [];
+        try {
+            const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
+            fromMap = Object.keys(om).filter(k => om[k]).map(String);
+        } catch (e) {}
+        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned))));
+        mapped.ownedMap = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
         mapped.ownedThumbs = unionIdArrays(mapped.ownedThumbs, prevLocal && prevLocal.ownedThumbs);
         mapped.ownedSkins = unionIdArrays(mapped.ownedSkins || ['default'], (typeof prev !== 'undefined' && prev && prev.ownedSkins) ? prev.ownedSkins : ((typeof prevLocal !== 'undefined' && prevLocal && prevLocal.ownedSkins) ? prevLocal.ownedSkins : ['default']));
         if (!mapped.activeSkin) {
@@ -3816,9 +3877,20 @@ async function fetchUserByUid(uid, usernameHint) {
         _profileSyncedFromRemote = true;
         startUserProfileListener(id);
         try {
+            // Chỉ upload phần local có dữ liệu — không forceAll toàn bộ (tránh xóa điểm danh/owned trên cloud)
+            const hasCheckin = mapped.checkinDays && Object.keys(mapped.checkinDays).length > 0;
+            const hasOwned = Array.isArray(mapped.owned) && mapped.owned.length > 0;
             pushUserToFirebase(name, mapped, {
-                forceAll: true,
-                coinsDelta: 0
+                forceAll: false,
+                coinsDelta: 0,
+                checkinChanged: !!hasCheckin,
+                ownedChanged: !!hasOwned,
+                rentalsChanged: !!(mapped.rentals && Object.keys(mapped.rentals).length),
+                ownedThumbsChanged: !!(mapped.ownedThumbs && mapped.ownedThumbs.length),
+                achievementsChanged: !!(mapped.achievements && mapped.achievements.length),
+                listenedSongsChanged: !!(mapped.listenedSongs && Object.keys(mapped.listenedSongs).length),
+                listenTimeChanged: !!(mapped.listenTime && (mapped.listenTime.total || (mapped.listenTime.byDay && Object.keys(mapped.listenTime.byDay).length))),
+                skinsChanged: !!(mapped.ownedSkins && mapped.ownedSkins.length)
             });
         } catch (e) {}
         return accounts[name];
@@ -3906,25 +3978,13 @@ function getCatalogSongIdSet() {
 }
 
 function filterOwnedIds(ids) {
+    // CHỈ khử trùng — KHÔNG bao giờ xóa ID đã mua (admin sửa link / ẩn bài / catalog tạm thiếu)
     const raw = (Array.isArray(ids) ? ids : []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
-    const catalog = getCatalogSongIdSet();
     const seen = new Set();
     const out = [];
     raw.forEach(id => {
         const low = id.toLowerCase();
         if (seen.has(low)) return;
-        if (catalog.size > 0) {
-            // Giữ ID nếu bản thân hoặc bất kỳ alias nào còn trong catalog
-            let ok = catalog.has(id) || catalog.has(low);
-            if (!ok && typeof expandSongIdAliases === 'function') {
-                const exp = expandSongIdAliases(id);
-                for (let i = 0; i < exp.length; i++) {
-                    const e = String(exp[i] || '');
-                    if (catalog.has(e) || catalog.has(e.toLowerCase())) { ok = true; break; }
-                }
-            }
-            if (!ok) return;
-        }
         seen.add(low);
         out.push(id);
     });
@@ -4028,11 +4088,17 @@ async function pushUserToFirebase(username, account, options) {
             const merged = await txUnionArrayField(db, uid, 'owned', account.owned);
             account.owned = merged;
             if (accounts[name]) { accounts[name].owned = merged; saveAllAccounts(accounts); }
-            // ownedMap phục vụ Firebase Rules đọc songFulls
+            // ownedMap phục vụ Firebase Rules — merge union, không xóa key remote
             try {
-                const map = {};
-                (merged || []).forEach(id => { map[String(id)] = true; });
-                await db.ref(dataPath('users') + '/' + uid + '/ownedMap').set(map);
+                const mapRef = db.ref(dataPath('users') + '/' + uid + '/ownedMap');
+                await mapRef.transaction((cur) => {
+                    const out = (cur && typeof cur === 'object') ? { ...cur } : {};
+                    (merged || []).forEach(id => {
+                        const k = String(id || '').trim();
+                        if (k) out[k] = true;
+                    });
+                    return out;
+                });
             } catch (e) { console.warn('ownedMap sync', e); }
         }
 
@@ -4081,7 +4147,16 @@ async function pushUserToFirebase(username, account, options) {
             const ref = db.ref(dataPath('users') + '/' + uid + '/' + field);
             const tx = await ref.transaction((current) => {
                 if (field === 'checkinDays') {
-                    return mergeNumericMaps(normalizeCheckinDays(current), local);
+                    const remote = normalizeCheckinDays(current);
+                    // forceAll + local rỗng → giữ nguyên remote (tránh xóa điểm danh khi deploy)
+                    if (forceAll && !opts[changedFlag] && Object.keys(local).length === 0) {
+                        return Object.keys(remote).length ? remote : (current == null ? {} : current);
+                    }
+                    return mergeNumericMaps(remote, local);
+                }
+                // listenedSongs: local rỗng + forceAll → không ghi đè remote
+                if (forceAll && !opts[changedFlag] && (!local || !Object.keys(local).length)) {
+                    if (current && typeof current === 'object' && Object.keys(current).length) return current;
                 }
                 return mergeNumericMaps(current, local);
             });
@@ -4124,7 +4199,8 @@ async function pushUserToFirebase(username, account, options) {
                 const lastRef = db.ref(dataPath('users') + '/' + uid + '/lastCheckin');
                 const lastTx = await lastRef.transaction((cur) => {
                     const c = String(cur || '');
-                    if (!lastLocal) return c || null;
+                    // Local trống (deploy/máy mới) → tuyệt đối giữ remote
+                    if (!lastLocal) return c ? c : null;
                     if (!c) return lastLocal;
                     return lastLocal > c ? lastLocal : c;
                 });
@@ -4431,6 +4507,19 @@ function isSongOwned(songId) {
     const candLow = new Set(candidates.map(x => String(x).toLowerCase()));
     const owned = loadOwnedSongs();
     if (owned.some(x => candLow.has(String(x).toLowerCase()))) return true;
+    // ownedMap (Firebase rules) — dự phòng khi mảng owned chưa kịp sync
+    try {
+        const accOm = getCurrentAccount();
+        const om = accOm && accOm.ownedMap && typeof accOm.ownedMap === 'object' ? accOm.ownedMap : null;
+        if (om) {
+            for (const c of candidates) {
+                if (om[c] || om[String(c).toLowerCase()]) return true;
+            }
+            for (const k of Object.keys(om)) {
+                if (om[k] && candLow.has(String(k).toLowerCase())) return true;
+            }
+        }
+    } catch (e) {}
     // pending buy
     try {
         for (const k of Object.keys(_pendingOwnedAdds || {})) {
@@ -4855,6 +4944,8 @@ function buySong(songId) {
         if (!Array.isArray(acc.owned)) acc.owned = [];
         acc.owned.push(String(songId));
         acc.owned = dedupeIdList(acc.owned);
+        if (!acc.ownedMap || typeof acc.ownedMap !== 'object') acc.ownedMap = {};
+        acc.ownedMap[String(songId)] = true;
     });
     markPendingOwned(songId);
     showNotification(
@@ -6005,21 +6096,78 @@ if (closeMyPlaylistBtn && myPlaylistOverlay) {
 
 
 
+
 /** Giao diện player bán trong cửa hàng (chỉ skin CSS, giữ nguyên tính năng) */
 const PLAYER_SKINS = [
     {
         id: 'default',
         name: 'Cổ điển',
         price: 0,
-        desc: 'Giao diện mặc định XuanKen',
+        desc: 'Mặc định · Sáng & Tối',
+        modes: ['light', 'dark'],
         previewClass: 'skin-default',
         icon: '🎵'
+    },
+    {
+        id: 'sakura',
+        name: 'Sakura Light',
+        price: 50,
+        desc: 'Hồng đào minimal · Chỉ sáng',
+        modes: ['light'],
+        previewClass: 'skin-sakura',
+        icon: '🌸'
+    },
+    {
+        id: 'pearl',
+        name: 'Pearl White',
+        price: 50,
+        desc: 'Ngọc trai glass · Chỉ sáng',
+        modes: ['light'],
+        previewClass: 'skin-pearl',
+        icon: '💎'
+    },
+    {
+        id: 'cyber',
+        name: 'Cyber Neon',
+        price: 80,
+        desc: 'Synthwave neon · Chỉ tối',
+        modes: ['dark'],
+        previewClass: 'skin-cyber',
+        icon: '⚡'
+    },
+    {
+        id: 'nebula',
+        name: 'Vũ Trụ Nebula',
+        price: 80,
+        desc: 'Galaxy tím xanh · Chỉ tối',
+        modes: ['dark'],
+        previewClass: 'skin-nebula',
+        icon: '🌌'
+    },
+    {
+        id: 'emerald',
+        name: 'Emerald Nature',
+        price: 60,
+        desc: 'Thiên nhiên emerald · Chỉ tối',
+        modes: ['dark'],
+        previewClass: 'skin-emerald',
+        icon: '🍃'
+    },
+    {
+        id: 'retro',
+        name: 'Retro Cassette',
+        price: 60,
+        desc: 'Cassette ấm cổ điển · Chỉ tối',
+        modes: ['dark'],
+        previewClass: 'skin-retro',
+        icon: '📼'
     },
     {
         id: 'aura',
         name: 'Aura Sound',
         price: 80,
-        desc: 'Glass · vàng tím · đĩa vinyl glow',
+        desc: 'Glass vàng tím · Chỉ tối',
+        modes: ['dark'],
         previewClass: 'skin-aura',
         icon: '✨'
     }
@@ -6041,7 +6189,6 @@ function getActiveSkin() {
 
 function applyPlayerSkin(skinId) {
     const id = String(skinId || 'default');
-    // Gỡ mọi class skin-* trên body
     try {
         const toRemove = [];
         document.body.classList.forEach(c => { if (c.indexOf('skin-') === 0) toRemove.push(c); });
@@ -6052,6 +6199,24 @@ function applyPlayerSkin(skinId) {
     if (id && id !== 'default') {
         document.body.classList.add('skin-' + id);
     }
+    // Ép sáng/tối theo modes của theme
+    const skin = PLAYER_SKINS.find(s => s.id === id);
+    const modes = (skin && Array.isArray(skin.modes)) ? skin.modes : ['light', 'dark'];
+    const both = modes.includes('light') && modes.includes('dark');
+    if (!both) {
+        if (modes.includes('dark') && !modes.includes('light')) {
+            document.body.classList.add('dark');
+            setThemeIcon(true);
+        } else {
+            document.body.classList.remove('dark');
+            setThemeIcon(false);
+        }
+    }
+    if (typeof updateThemeToggleVisibility === 'function') updateThemeToggleVisibility();
+    try {
+        applyGradientToSongTitle();
+        applyGradientToArtistName();
+    } catch (e) {}
 }
 
 function buyPlayerSkin(skinId) {
@@ -6093,7 +6258,7 @@ function usePlayerSkin(skinId) {
         return false;
     }
     const id = String(skinId || 'default');
-    if (!getOwnedSkins().includes(id)) {
+    if (!getOwnedSkins().includes(id) && id !== 'default') {
         showNotification('CỬA HÀNG:', 'CHƯA SỞ HỮU GIAO DIỆN NÀY', '#ff9800', 'lock');
         return false;
     }
@@ -6113,12 +6278,14 @@ function renderShopSkins() {
     list.innerHTML = PLAYER_SKINS.map(skin => {
         const has = owned.has(skin.id);
         const isActive = active === skin.id;
+        const modes = Array.isArray(skin.modes) ? skin.modes : [];
+        const modeLabel = (modes.includes('light') && modes.includes('dark'))
+            ? 'Sáng & Tối'
+            : (modes.includes('light') ? 'Chỉ sáng' : 'Chỉ tối');
         let btn = '';
         if (isActive) {
             btn = '<span class="shop-owned-badge">ĐANG DÙNG</span>';
-        } else if (has) {
-            btn = '<button type="button" class="shop-buy-btn" data-use-skin="' + skin.id + '">DÙNG</button>';
-        } else if (Number(skin.price) <= 0) {
+        } else if (has || Number(skin.price) <= 0) {
             btn = '<button type="button" class="shop-buy-btn" data-use-skin="' + skin.id + '">DÙNG</button>';
         } else {
             btn = '<button type="button" class="shop-buy-btn" data-buy-skin="' + skin.id + '">MUA ' + skin.price + ' XK</button>';
@@ -6127,7 +6294,8 @@ function renderShopSkins() {
             + '<div class="shop-skin-preview ' + (skin.previewClass || '') + '">' + (skin.icon || '🎨') + '</div>'
             + '<div class="shop-skin-meta">'
             + '<div class="shop-skin-name">' + skin.name + '</div>'
-            + '<div class="shop-skin-desc">' + (skin.desc || '') + (Number(skin.price) > 0 ? ' · ' + skin.price + ' XK' : ' · Miễn phí') + '</div>'
+            + '<div class="shop-skin-desc">' + (skin.desc || '') + ' · ' + modeLabel
+            + (Number(skin.price) > 0 ? ' · ' + skin.price + ' XK' : ' · Miễn phí') + '</div>'
             + '</div>'
             + '<div class="shop-skin-actions">' + btn + '</div>'
             + '</div>';

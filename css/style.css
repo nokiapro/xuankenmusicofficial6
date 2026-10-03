@@ -558,8 +558,11 @@ body.dark .album-art {
     animation-play-state: paused;
     transition: transform 0.3s ease;
     will-change: transform;
-    transform: translateZ(0);
+    transform: translate3d(0,0,0);
     backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    perspective: 1000px;
+    -webkit-perspective: 1000px;
 }
 
 .art-name-ring {
@@ -572,10 +575,11 @@ body.dark .album-art {
     overflow: visible;
     animation: art-ring-spin 28s linear infinite;
     animation-play-state: paused;
-    /* Tách layer GPU — tránh giật khi toast/layout */
     will-change: transform;
-    transform: translateZ(0);
+    transform: translate3d(0,0,0);
     backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    contain: layout style;
 }
 
 .album-art-wrap.ring-playing .art-name-ring {
@@ -596,13 +600,13 @@ body.dark .album-art {
 }
 
 @keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from { transform: translate3d(0,0,0) rotate(0deg); }
+    to { transform: translate3d(0,0,0) rotate(360deg); }
 }
 
 @keyframes art-ring-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(-360deg); }
+    from { transform: translate3d(0,0,0) rotate(0deg); }
+    to { transform: translate3d(0,0,0) rotate(-360deg); }
 }
 
 .art-ring-settings {
@@ -748,19 +752,22 @@ body.dark .album-art {
 }
 
 .lyric-container {
-    min-height: 56px;
+    min-height: 44px;
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    padding: 10px 16px;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    margin-top: 12px;
+    width: fit-content;
+    max-width: 92%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 12px 22px;
+    background: rgba(55, 55, 62, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    margin-top: 14px;
     margin-bottom: 0;
-    transition: none;
+    transition: background 0.3s ease, border-color 0.3s ease;
     flex-shrink: 0;
     position: relative;
     z-index: 2;
@@ -768,15 +775,29 @@ body.dark .album-art {
     overflow: hidden;
 }
 
+body:not(.dark) .lyric-container {
+    background: rgba(40, 40, 48, 0.88);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+body.dark .lyric-container {
+    background: rgba(48, 48, 56, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
 .current-lyric {
-    color: var(--text-tertiary);
-    font-weight: 500;
+    color: #e8e8ed;
+    font-weight: 600;
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
     white-space: nowrap;
     display: inline-block;
     transform-origin: center center;
     transition: color 0.3s ease;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .controls-bar {
@@ -4761,13 +4782,15 @@ body.skin-aura .artist-name {
     color: rgba(196, 181, 253, 0.9) !important;
 }
 
-body.skin-aura .current-lyric,
+body.skin-aura .lyric-container,
 body.skin-aura #lyric-container {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    color: #d1d5db !important;
+    background: rgba(39, 39, 50, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 999px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+}
+body.skin-aura .current-lyric {
+    color: #e5e7eb !important;
 }
 
 body.skin-aura .progress-bar-container {
@@ -4857,3 +4880,487 @@ body.dark .shop-skin-preview.skin-default {
     color: #4ade80;
     font-weight: 700;
 }
+
+
+/* ========== 6 THEME SKINS (shop) ========== */
+.shop-skin-preview.skin-sakura {
+    background: linear-gradient(135deg, #fff5f5, #fecdd3);
+    color: #e11d48;
+}
+.shop-skin-preview.skin-pearl {
+    background: linear-gradient(135deg, #ffffff, #e0f2fe);
+    color: #0284c7;
+}
+.shop-skin-preview.skin-cyber {
+    background: linear-gradient(135deg, #0a0118, #16092b);
+    color: #00f0ff;
+    box-shadow: inset 0 0 16px rgba(255, 0, 127, 0.35);
+}
+.shop-skin-preview.skin-nebula {
+    background: linear-gradient(135deg, #1e1b4b, #020617);
+    color: #c084fc;
+}
+.shop-skin-preview.skin-emerald {
+    background: linear-gradient(135deg, #022c22, #064e3b);
+    color: #34d399;
+}
+.shop-skin-preview.skin-retro {
+    background: linear-gradient(135deg, #1c1917, #443831);
+    color: #f97316;
+}
+
+/* --- Sakura Light (chỉ sáng) --- */
+body.skin-sakura {
+    --bg-color: #fff5f5;
+    --card-bg: rgba(255, 255, 255, 0.92);
+    --border-color: rgba(244, 63, 94, 0.15);
+    --text-primary: #881337;
+    --text-secondary: #9f1239;
+    --text-tertiary: #be123c;
+    --btn-bg: rgba(244, 63, 94, 0.08);
+    --btn-hover: rgba(244, 63, 94, 0.16);
+    --btn-active-bg: rgba(225, 29, 72, 0.2);
+    --progress-bg: rgba(244, 63, 94, 0.12);
+    --playlist-bg: rgba(255, 255, 255, 0.98);
+    --playlist-header-bg: rgba(255, 241, 242, 0.98);
+    --song-item-hover: rgba(244, 63, 94, 0.06);
+    --input-bg: #fff1f2;
+    --modal-bg: rgba(255, 255, 255, 0.96);
+    --accent-color: #e11d48;
+    --icon-gradient: linear-gradient(135deg, #fb7185, #e11d48, #fb7185);
+    --icon-gradient-hover: linear-gradient(135deg, #fda4af, #be185d, #fda4af);
+    --icon-gradient-active: linear-gradient(135deg, #e11d48, #f43f5e, #e11d48);
+    --icon-active-stroke: #e11d48;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe4e6 50%, #fecdd3 100%) !important;
+}
+body.skin-sakura .player-container,
+body.skin-sakura .pc-layout {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(244, 63, 94, 0.15) !important;
+    box-shadow: 0 20px 50px rgba(225, 29, 72, 0.12) !important;
+    border-radius: 28px !important;
+}
+body.skin-sakura .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: rgba(244, 63, 94, 0.08) !important;
+}
+body.skin-sakura .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(225, 29, 72, 0.18);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-sakura .song-title { color: #881337 !important; }
+body.skin-sakura .artist-name { color: #be185d !important; }
+body.skin-sakura .progress-filled {
+    background: linear-gradient(90deg, #fb7185, #e11d48) !important;
+}
+body.skin-sakura .main-actions .play-btn {
+    background: linear-gradient(135deg, #fb7185, #e11d48) !important;
+    color: #fff !important;
+}
+
+/* --- Pearl White (chỉ sáng) --- */
+body.skin-pearl {
+    --bg-color: #f1f5f9;
+    --card-bg: rgba(255, 255, 255, 0.88);
+    --border-color: rgba(14, 165, 233, 0.2);
+    --text-primary: #0369a1;
+    --text-secondary: #0284c7;
+    --text-tertiary: #0ea5e9;
+    --btn-bg: rgba(2, 132, 199, 0.08);
+    --btn-hover: rgba(2, 132, 199, 0.16);
+    --btn-active-bg: rgba(14, 165, 233, 0.2);
+    --progress-bg: rgba(2, 132, 199, 0.12);
+    --playlist-bg: rgba(255, 255, 255, 0.98);
+    --playlist-header-bg: rgba(224, 242, 254, 0.95);
+    --song-item-hover: rgba(2, 132, 199, 0.06);
+    --input-bg: #e0f2fe;
+    --modal-bg: rgba(255, 255, 255, 0.96);
+    --accent-color: #0284c7;
+    --icon-gradient: linear-gradient(135deg, #38bdf8, #0284c7, #38bdf8);
+    --icon-gradient-hover: linear-gradient(135deg, #7dd3fc, #0369a1, #7dd3fc);
+    --icon-gradient-active: linear-gradient(135deg, #0284c7, #0ea5e9, #0284c7);
+    --icon-active-stroke: #0284c7;
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 50%, #e0f2fe 100%) !important;
+}
+body.skin-pearl .player-container,
+body.skin-pearl .pc-layout {
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(14, 165, 233, 0.2) !important;
+    box-shadow: 0 20px 50px rgba(2, 132, 199, 0.12) !important;
+    border-radius: 28px !important;
+}
+body.skin-pearl .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: rgba(2, 132, 199, 0.08) !important;
+}
+body.skin-pearl .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(56, 189, 248, 0.22);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-pearl .song-title { color: #0369a1 !important; }
+body.skin-pearl .artist-name { color: #0284c7 !important; }
+body.skin-pearl .progress-filled {
+    background: linear-gradient(90deg, #38bdf8, #0284c7) !important;
+}
+body.skin-pearl .main-actions .play-btn {
+    background: linear-gradient(135deg, #38bdf8, #0284c7) !important;
+    color: #fff !important;
+}
+
+/* --- Cyber Neon (chỉ tối) --- */
+body.skin-cyber {
+    --bg-color: #0a0118;
+    --card-bg: rgba(22, 9, 43, 0.92);
+    --border-color: rgba(0, 240, 255, 0.25);
+    --text-primary: #ffffff;
+    --text-secondary: #00f0ff;
+    --text-tertiary: #ff007f;
+    --btn-bg: rgba(255, 0, 127, 0.15);
+    --btn-hover: rgba(0, 240, 255, 0.25);
+    --btn-active-bg: rgba(0, 240, 255, 0.3);
+    --progress-bg: rgba(255, 0, 127, 0.2);
+    --playlist-bg: rgba(22, 9, 43, 0.98);
+    --playlist-header-bg: rgba(22, 9, 43, 0.98);
+    --song-item-hover: rgba(0, 240, 255, 0.1);
+    --input-bg: rgba(255, 0, 127, 0.1);
+    --modal-bg: rgba(22, 9, 43, 0.96);
+    --accent-color: #00f0ff;
+    --icon-gradient: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff);
+    --icon-gradient-hover: linear-gradient(135deg, #67e8f9, #f472b6, #67e8f9);
+    --icon-gradient-active: linear-gradient(135deg, #00f0ff, #ff007f, #00f0ff);
+    --icon-active-stroke: #00f0ff;
+    background: #0a0118 !important;
+}
+body.skin-cyber .player-container,
+body.skin-cyber .pc-layout {
+    background: rgba(22, 9, 43, 0.92) !important;
+    border: 1px solid rgba(0, 240, 255, 0.25) !important;
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.12), 0 25px 60px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 28px !important;
+}
+body.skin-cyber .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: rgba(255, 0, 127, 0.15) !important;
+    color: #00f0ff;
+}
+body.skin-cyber .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.25);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-cyber .song-title { color: #00f0ff !important; }
+body.skin-cyber .artist-name { color: #ff007f !important; }
+body.skin-cyber .progress-filled {
+    background: linear-gradient(90deg, #00f0ff, #ff007f) !important;
+}
+body.skin-cyber .main-actions .play-btn {
+    background: linear-gradient(135deg, #00f0ff, #ff007f) !important;
+    color: #0a0118 !important;
+}
+
+/* --- Vũ Trụ Nebula (chỉ tối) --- */
+body.skin-nebula {
+    --bg-color: #0f172a;
+    --card-bg: rgba(15, 23, 42, 0.9);
+    --border-color: rgba(168, 85, 247, 0.2);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #c084fc;
+    --btn-bg: rgba(192, 132, 252, 0.12);
+    --btn-hover: rgba(56, 189, 248, 0.25);
+    --btn-active-bg: rgba(168, 85, 247, 0.25);
+    --progress-bg: rgba(192, 132, 252, 0.15);
+    --playlist-bg: rgba(15, 23, 42, 0.98);
+    --playlist-header-bg: rgba(15, 23, 42, 0.98);
+    --song-item-hover: rgba(255, 255, 255, 0.06);
+    --input-bg: rgba(30, 41, 59, 0.8);
+    --modal-bg: rgba(15, 23, 42, 0.96);
+    --accent-color: #38bdf8;
+    --icon-gradient: linear-gradient(135deg, #38bdf8, #c084fc, #38bdf8);
+    --icon-gradient-hover: linear-gradient(135deg, #7dd3fc, #e9d5ff, #7dd3fc);
+    --icon-gradient-active: linear-gradient(135deg, #38bdf8, #a855f7, #38bdf8);
+    --icon-active-stroke: #38bdf8;
+    background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 60%, #020617 100%) !important;
+}
+body.skin-nebula .player-container,
+body.skin-nebula .pc-layout {
+    background: rgba(15, 23, 42, 0.88) !important;
+    border: 1px solid rgba(168, 85, 247, 0.2) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45) !important;
+    border-radius: 28px !important;
+}
+body.skin-nebula .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: rgba(192, 132, 252, 0.12) !important;
+}
+body.skin-nebula .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(192, 132, 252, 0.25);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-nebula .song-title { color: #38bdf8 !important; }
+body.skin-nebula .artist-name { color: #c084fc !important; }
+body.skin-nebula .progress-filled {
+    background: linear-gradient(90deg, #38bdf8, #a855f7) !important;
+}
+body.skin-nebula .main-actions .play-btn {
+    background: linear-gradient(135deg, #38bdf8, #a855f7) !important;
+    color: #0f172a !important;
+}
+
+/* --- Emerald Nature (chỉ tối) --- */
+body.skin-emerald {
+    --bg-color: #022c22;
+    --card-bg: rgba(6, 78, 59, 0.88);
+    --border-color: rgba(52, 211, 153, 0.2);
+    --text-primary: #ecfdf5;
+    --text-secondary: #a7f3d0;
+    --text-tertiary: #6ee7b7;
+    --btn-bg: rgba(52, 211, 153, 0.12);
+    --btn-hover: rgba(52, 211, 153, 0.25);
+    --btn-active-bg: rgba(16, 185, 129, 0.3);
+    --progress-bg: rgba(52, 211, 153, 0.18);
+    --playlist-bg: rgba(6, 78, 59, 0.96);
+    --playlist-header-bg: rgba(6, 78, 59, 0.96);
+    --song-item-hover: rgba(52, 211, 153, 0.1);
+    --input-bg: #065f46;
+    --modal-bg: rgba(6, 78, 59, 0.95);
+    --accent-color: #34d399;
+    --icon-gradient: linear-gradient(135deg, #34d399, #059669, #34d399);
+    --icon-gradient-hover: linear-gradient(135deg, #6ee7b7, #10b981, #6ee7b7);
+    --icon-gradient-active: linear-gradient(135deg, #34d399, #a7f3d0, #34d399);
+    --icon-active-stroke: #34d399;
+    background: linear-gradient(135deg, #022c22 0%, #064e3b 50%, #0f172a 100%) !important;
+}
+body.skin-emerald .player-container,
+body.skin-emerald .pc-layout {
+    background: rgba(6, 78, 59, 0.85) !important;
+    border: 1px solid rgba(52, 211, 153, 0.2) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4) !important;
+    border-radius: 28px !important;
+}
+body.skin-emerald .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: rgba(52, 211, 153, 0.12) !important;
+}
+body.skin-emerald .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(52, 211, 153, 0.22);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-emerald .song-title { color: #34d399 !important; }
+body.skin-emerald .artist-name { color: #a7f3d0 !important; }
+body.skin-emerald .progress-filled {
+    background: linear-gradient(90deg, #34d399, #059669) !important;
+}
+body.skin-emerald .main-actions .play-btn {
+    background: linear-gradient(135deg, #34d399, #059669) !important;
+    color: #022c22 !important;
+}
+
+/* --- Retro Cassette (chỉ tối) --- */
+body.skin-retro {
+    --bg-color: #1c1917;
+    --card-bg: rgba(44, 36, 32, 0.95);
+    --border-color: rgba(249, 115, 22, 0.2);
+    --text-primary: #fef3c7;
+    --text-secondary: #d6d3d1;
+    --text-tertiary: #f59e0b;
+    --btn-bg: #443831;
+    --btn-hover: #57483f;
+    --btn-active-bg: rgba(249, 115, 22, 0.25);
+    --progress-bg: rgba(249, 115, 22, 0.18);
+    --playlist-bg: rgba(44, 36, 32, 0.98);
+    --playlist-header-bg: rgba(44, 36, 32, 0.98);
+    --song-item-hover: rgba(249, 115, 22, 0.1);
+    --input-bg: #352c26;
+    --modal-bg: rgba(44, 36, 32, 0.96);
+    --accent-color: #f97316;
+    --icon-gradient: linear-gradient(135deg, #f97316, #f59e0b, #f97316);
+    --icon-gradient-hover: linear-gradient(135deg, #fb923c, #fbbf24, #fb923c);
+    --icon-gradient-active: linear-gradient(135deg, #f97316, #ea580c, #f97316);
+    --icon-active-stroke: #f97316;
+    background: #1c1917 !important;
+}
+body.skin-retro .player-container,
+body.skin-retro .pc-layout {
+    background: rgba(44, 36, 32, 0.95) !important;
+    border: 1px solid rgba(249, 115, 22, 0.2) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 28px !important;
+}
+body.skin-retro .top-bar-icons .btn-icon {
+    border-radius: 999px !important;
+    background: #443831 !important;
+}
+body.skin-retro .album-art-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: rgba(249, 115, 22, 0.2);
+    filter: blur(28px);
+    z-index: 0;
+    pointer-events: none;
+}
+body.skin-retro .song-title { color: #fef3c7 !important; }
+body.skin-retro .artist-name { color: #f59e0b !important; }
+body.skin-retro .progress-filled {
+    background: linear-gradient(90deg, #f97316, #ea580c) !important;
+}
+body.skin-retro .main-actions .play-btn {
+    background: linear-gradient(135deg, #f97316, #ea580c) !important;
+    color: #fff !important;
+}
+
+
+/* ========== iOS / Safari: mượt như Android — giữ animation, bỏ thứ đắt ========== */
+@supports (-webkit-touch-callout: none) {
+    /* 1) Bỏ blur backdrop (nguyên nhân giật #1 trên Safari) — animation vẫn chạy */
+    body,
+    .player-container,
+    .pc-layout,
+    .playlist,
+    .shop-modal,
+    .timer-modal,
+    .checkin-modal,
+    .notification,
+    .btn-icon,
+    .glass-panel,
+    .modal-overlay {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+    }
+
+    /* 2) Glow skin: không filter blur — dùng solid alpha (rẻ hơn 10x) */
+    body[class*="skin-"] .album-art-wrap::before {
+        filter: none !important;
+        -webkit-filter: none !important;
+        opacity: 0.4;
+        animation: none !important;
+    }
+
+    /* 3) Shadow nhẹ hơn khi đang quay (shadow lớn + transform = repaint) */
+    .album-art {
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+    }
+    .player-container,
+    .pc-layout {
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22) !important;
+    }
+
+    /* 4) Icon gradient infinite — tắt (không phải animation chính, rất tốn) */
+    .btn-icon i,
+    .btn-icon svg,
+    .btn-icon.active i,
+    .btn-icon.active svg,
+    .play-btn.playing i,
+    .play-btn.playing svg {
+        animation: none !important;
+    }
+
+    /* 5) Progress: gradient tĩnh, vẫn mượt khi kéo */
+    .progress-filled {
+        animation: none !important;
+        background-size: 100% 100% !important;
+    }
+
+    /* 6) ĐĨA + VÒNG TÊN: vẫn quay, layer GPU riêng, isolation */
+    .album-art-wrap {
+        isolation: isolate;
+        contain: layout style;
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+    }
+    .album-art {
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+        overflow: hidden;
+    }
+    .album-art img {
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        will-change: transform;
+        /* Quay chậm hơn một chút = mượt cảm giác trên 60Hz */
+        animation-duration: 24s !important;
+        animation-timing-function: linear !important;
+    }
+    .art-name-ring {
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        will-change: transform;
+        animation-duration: 32s !important;
+        animation-timing-function: linear !important;
+        /* SVG compositing nhẹ hơn khi không force repaint text */
+        pointer-events: none;
+    }
+
+    /* 7) Toast: solid bg, GPU slide — không blur */
+    .notification {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        background: var(--modal-bg, rgba(30, 30, 35, 0.96)) !important;
+        -webkit-transform: translate3d(0,0,0);
+        transform: translate3d(0,0,0);
+        will-change: transform, opacity;
+    }
+
+    /* 8) Title/artist gradient animation — tắt trên iOS */
+    .song-title,
+    .artist-name {
+        animation: none !important;
+    }
+}
+
+/* User bật Reduce Motion → dừng quay */
+@media (prefers-reduced-motion: reduce) {
+    .album-art img,
+    .art-name-ring {
+        animation: none !important;
+    }
+    .btn-icon i,
+    .btn-icon svg,
+    .progress-filled {
+        animation: none !important;
+    }
+}
+
+/* Touch: không scale hover (gây jank) */
+@media (hover: none) and (pointer: coarse) {
+    .album-art:hover { transform: none !important; }
+    .btn-icon:hover { transform: none !important; }
+    .top-bar-icons .btn-icon:hover { transform: none !important; }
+}
+
