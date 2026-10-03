@@ -1815,6 +1815,7 @@
             const users = Object.keys(usersCache);
             const songIds = getSongIdSet();
             let totalCoins = 0, totalOwned = 0, totalRawOwned = 0, totalOrphans = 0, totalDupes = 0, totalEmpty = 0;
+            const orphanSamples = [];
             users.forEach(n => {
                 totalCoins += usersCache[n].coins | 0;
                 const raw = usersCache[n].owned || [];
@@ -1824,19 +1825,30 @@
                 totalOrphans += s.orphans;
                 totalDupes += s.dupes;
                 totalEmpty += s.empty;
+                // Lấy mẫu ID mồ côi để debug
+                parseOwnedField(raw).forEach(id => {
+                    if (!ownedIdInCatalog(id, songIds) && orphanSamples.length < 12) {
+                        orphanSamples.push(n + ':' + id);
+                    }
+                });
             });
             const totalListens = songsCache.reduce((s, x) => s + (x.listenCount || 0), 0);
             const junk = totalOrphans + totalDupes;
             const buyLabel = junk > 0
                 ? `Lượt mua <span style="opacity:.65;font-size:0.65em;">(−${junk} rác)</span>`
                 : 'Lượt mua';
+            const tip = 'Thô: ' + totalRawOwned + ' · Hợp lệ: ' + totalOwned + ' · Mồ côi: ' + totalOrphans + ' · Trùng: ' + totalDupes
+                + (orphanSamples.length ? ' · VD: ' + orphanSamples.join(', ') : '');
             document.getElementById('stats-grid').innerHTML = `
                 <div class="stat"><div class="n">${users.length}</div><div class="l">Người dùng</div></div>
                 <div class="stat"><div class="n">${songsCache.length}</div><div class="l">Bài hát</div></div>
                 <div class="stat"><div class="n">${totalCoins}</div><div class="l">Tổng XK</div></div>
-                <div class="stat" title="Thô: ${totalRawOwned} · Hợp lệ: ${totalOwned} · Mồ côi: ${totalOrphans} · Trùng: ${totalDupes} · Trống: ${totalEmpty}"><div class="n">${totalOwned}</div><div class="l">${buyLabel}</div></div>
+                <div class="stat" title="${tip.replace(/"/g, '&quot;')}"><div class="n">${totalOwned}</div><div class="l">${buyLabel}</div></div>
                 <div class="stat"><div class="n">${totalListens}</div><div class="l">Lượt nghe</div></div>
             `;
+            if (totalOrphans > 0) {
+                console.warn('[admin] ID mồ côi mẫu:', orphanSamples);
+            }
         }
 
         async function fillSongForm(song) {
@@ -2386,7 +2398,9 @@
                         const s = sanitizeOwnedList(u.owned, songIds);
                         if (s.removed === 0) continue;
                         const key = u.key || sanitizeKey(name);
-                        await db().ref(dataPath('users') + '/' + key + '/owned').set(s.cleaned);
+                        const om = {};
+                        s.cleaned.forEach(id => { om[String(id)] = true; });
+                        await db().ref(dataPath('users') + '/' + key).update({ owned: s.cleaned, ownedMap: om });
                         u.owned = s.cleaned;
                         fixedUsers++;
                         totalRemoved += s.removed;

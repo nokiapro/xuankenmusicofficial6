@@ -311,6 +311,44 @@ const fullAudioCache = Object.create(null);
 let songIdAliases = Object.create(null); // oldId(lower) -> newId
 let songIdAliasesLoadedAt = 0;
 
+/** Toàn bộ ID bài trên Firebase (kể cả ẩn / chưa có audio) — dùng dọn owned */
+async function fetchAllSongIdsFromFirebase() {
+    const set = new Set();
+    try {
+        const db = getDb();
+        if (!db) return set;
+        const snap = await db.ref(dataPath('songs')).once('value');
+        const obj = snap.val() || {};
+        Object.keys(obj).forEach(k => {
+            const key = String(k || '').trim();
+            if (key) {
+                set.add(key);
+                set.add(key.toLowerCase());
+            }
+            const s = obj[k] || {};
+            const sid = String(s.id || '').trim();
+            if (sid) {
+                set.add(sid);
+                set.add(sid.toLowerCase());
+            }
+        });
+        // Alias: ID cũ trỏ tới bài còn tồn tại → vẫn hợp lệ
+        try {
+            await loadSongIdAliases(true);
+            Object.keys(songIdAliases || {}).forEach(oldId => {
+                const to = String(songIdAliases[oldId] || '');
+                if (to && (set.has(to) || set.has(to.toLowerCase()))) {
+                    set.add(String(oldId));
+                    set.add(String(oldId).toLowerCase());
+                }
+            });
+        } catch (e) {}
+    } catch (e) {
+        console.warn('fetchAllSongIdsFromFirebase', e);
+    }
+    return set;
+}
+
 async function loadSongIdAliases(force) {
     if (!force && songIdAliasesLoadedAt && (Date.now() - songIdAliasesLoadedAt < 60000)) {
         return songIdAliases;
@@ -817,20 +855,30 @@ async function loadSongsFromFirebase() {
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
             try { await loadSongIdAliases(true); } catch (e) {}
-            try { await loadSongIdAliases(true); } catch (e) {}
             try { migrateLocalOwnedViaAliases(); } catch (e) {}
             try {
-                // Map alias + đồng bộ ownedMap đúng với owned (xóa key thừa trong ownedMap)
+                // Dọn owned: alias → ID mới; bỏ ID không còn trên Firebase songs; ownedMap = đúng owned
                 const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
                 const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
                 if (name && accounts && accounts[name] && Array.isArray(accounts[name].owned)) {
                     const before = accounts[name].owned.map(String);
-                    const cleaned = canonicalizeOwnedIds(before);
+                    let cleaned = canonicalizeOwnedIds(before);
+                    const allIds = await fetchAllSongIdsFromFirebase();
+                    if (allIds && allIds.size > 0) {
+                        const kept = [];
+                        const dropped = [];
+                        cleaned.forEach(id => {
+                            if (allIds.has(id) || allIds.has(String(id).toLowerCase())) kept.push(id);
+                            else dropped.push(id);
+                        });
+                        if (dropped.length) console.warn('[owned] bỏ ID không còn trong songs:', dropped);
+                        cleaned = kept;
+                    }
                     const newMap = {};
                     cleaned.forEach(id => { newMap[String(id)] = true; });
                     const mapKeys = Object.keys(accounts[name].ownedMap || {});
-                    const mapDirty = mapKeys.length !== cleaned.length || mapKeys.some(k => !newMap[k]);
-                    const listDirty = JSON.stringify(cleaned) !== JSON.stringify(before);
+                    const mapDirty = mapKeys.length !== Object.keys(newMap).length || mapKeys.some(k => !newMap[k]);
+                    const listDirty = JSON.stringify(cleaned.map(String).sort()) !== JSON.stringify(before.map(String).sort());
                     if (listDirty || mapDirty) {
                         accounts[name].owned = cleaned;
                         accounts[name].ownedMap = newMap;
@@ -838,10 +886,10 @@ async function loadSongsFromFirebase() {
                         if (typeof pushUserToFirebase === 'function') {
                             pushUserToFirebase(name, accounts[name], { ownedChanged: true });
                         }
-                        if (listDirty) console.log('[owned] canonical alias:', before, '→', cleaned);
+                        console.log('[owned] sync sau load:', before.length, '→', cleaned.length, cleaned);
                     }
                 }
-            } catch (e) { console.warn('[owned] canonicalize after load', e); }
+            } catch (e) { console.warn('[owned] prune after load', e); }
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
             try { await ensureFullAudioForOwned(); } catch (e) { console.warn('ensureFullAudioForOwned', e); }
             initPlayerAfterLoad();
@@ -3918,12 +3966,12 @@ async function fetchUserByUid(uid, usernameHint) {
         try {
             // Chỉ upload phần local có dữ liệu — không forceAll toàn bộ (tránh xóa điểm danh/owned trên cloud)
             const hasCheckin = mapped.checkinDays && Object.keys(mapped.checkinDays).length > 0;
-            const hasOwned = Array.isArray(mapped.owned) && mapped.owned.length > 0;
+            // Không push owned mỗi lần login (tránh đụng ID / báo mồ côi) — chỉ sync khi loadSongs prune
             pushUserToFirebase(name, mapped, {
                 forceAll: false,
                 coinsDelta: 0,
                 checkinChanged: !!hasCheckin,
-                ownedChanged: !!hasOwned,
+                ownedChanged: false,
                 rentalsChanged: !!(mapped.rentals && Object.keys(mapped.rentals).length),
                 ownedThumbsChanged: !!(mapped.ownedThumbs && mapped.ownedThumbs.length),
                 achievementsChanged: !!(mapped.achievements && mapped.achievements.length),
