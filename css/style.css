@@ -756,10 +756,10 @@ body.dark .album-art {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: fit-content;
-    max-width: 92%;
-    margin-left: auto;
-    margin-right: auto;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
     padding: 12px 22px;
     background: rgba(55, 55, 62, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.08);
