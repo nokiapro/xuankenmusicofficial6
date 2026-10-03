@@ -817,9 +817,33 @@ async function loadSongsFromFirebase() {
             
             console.log(`ĐÃ TẢI ${songs.length} BÀI HÁT TỪ FIREBASE`);
             try { await loadSongIdAliases(true); } catch (e) {}
+            try { await loadSongIdAliases(true); } catch (e) {}
+            try { migrateLocalOwnedViaAliases(); } catch (e) {}
+            try {
+                // Map alias + đồng bộ ownedMap đúng với owned (xóa key thừa trong ownedMap)
+                const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
+                const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
+                if (name && accounts && accounts[name] && Array.isArray(accounts[name].owned)) {
+                    const before = accounts[name].owned.map(String);
+                    const cleaned = canonicalizeOwnedIds(before);
+                    const newMap = {};
+                    cleaned.forEach(id => { newMap[String(id)] = true; });
+                    const mapKeys = Object.keys(accounts[name].ownedMap || {});
+                    const mapDirty = mapKeys.length !== cleaned.length || mapKeys.some(k => !newMap[k]);
+                    const listDirty = JSON.stringify(cleaned) !== JSON.stringify(before);
+                    if (listDirty || mapDirty) {
+                        accounts[name].owned = cleaned;
+                        accounts[name].ownedMap = newMap;
+                        saveAllAccounts(accounts);
+                        if (typeof pushUserToFirebase === 'function') {
+                            pushUserToFirebase(name, accounts[name], { ownedChanged: true });
+                        }
+                        if (listDirty) console.log('[owned] canonical alias:', before, '→', cleaned);
+                    }
+                }
+            } catch (e) { console.warn('[owned] canonicalize after load', e); }
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
             try { await ensureFullAudioForOwned(); } catch (e) { console.warn('ensureFullAudioForOwned', e); }
-            try { migrateLocalOwnedViaAliases(); } catch (e) {}
             initPlayerAfterLoad();
             updateListenStatsModal();
             
@@ -3741,14 +3765,10 @@ function startUserProfileListener(uid) {
         let fromMap = [];
         try {
             const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
-            fromMap = Object.keys(om).filter(k => om[k]).map(k => {
-                const s = String(k);
-                const to = (songIdAliases && (songIdAliases[s] || songIdAliases[s.toLowerCase()])) || s;
-                return String(to);
-            });
+            fromMap = Object.keys(om).filter(k => om[k]).map(String);
         } catch (e) {}
-        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pending, prev && prev.owned))));
-        // ownedMap canonical: chỉ ID sau alias
+        // Gộp rồi canonicalize (alias + bỏ ID mồ côi khi catalog đã có)
+        mapped.owned = canonicalizeOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pending, prev && prev.owned))));
         const omCanon = {};
         mapped.owned.forEach(id => { omCanon[String(id)] = true; });
         mapped.ownedMap = omCanon;
@@ -3853,14 +3873,10 @@ async function fetchUserByUid(uid, usernameHint) {
         let fromMap = [];
         try {
             const om = (data && data.ownedMap && typeof data.ownedMap === 'object') ? data.ownedMap : (mapped.ownedMap || {});
-            fromMap = Object.keys(om).filter(k => om[k]).map(k => {
-                const s = String(k);
-                const to = (songIdAliases && (songIdAliases[s] || songIdAliases[s.toLowerCase()])) || s;
-                return String(to);
-            });
+            fromMap = Object.keys(om).filter(k => om[k]).map(String);
         } catch (e) {}
-        mapped.owned = dedupeIdList(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned))));
-        // ownedMap canonical: chỉ ID sau alias
+        // Gộp rồi canonicalize (alias + bỏ ID mồ côi khi catalog đã có)
+        mapped.owned = canonicalizeOwnedIds(unionIdArrays(remoteOwned, unionIdArrays(fromMap, unionIdArrays(pendingOwned, prevLocal && prevLocal.owned))));
         const omCanon = {};
         mapped.owned.forEach(id => { omCanon[String(id)] = true; });
         mapped.ownedMap = omCanon;
@@ -4111,17 +4127,14 @@ async function pushUserToFirebase(username, account, options) {
             const merged = await txUnionArrayField(db, uid, 'owned', account.owned);
             account.owned = merged;
             if (accounts[name]) { accounts[name].owned = merged; saveAllAccounts(accounts); }
-            // ownedMap phục vụ Firebase Rules — merge union, không xóa key remote
+            // ownedMap = ảnh đúng của mảng owned (SET, không giữ ID cũ → tránh admin báo mồ côi)
             try {
-                const mapRef = db.ref(dataPath('users') + '/' + uid + '/ownedMap');
-                await mapRef.transaction((cur) => {
-                    const out = (cur && typeof cur === 'object') ? { ...cur } : {};
-                    (merged || []).forEach(id => {
-                        const k = String(id || '').trim();
-                        if (k) out[k] = true;
-                    });
-                    return out;
+                const map = {};
+                (merged || []).forEach(id => {
+                    const k = String(id || '').trim();
+                    if (k) map[k] = true;
                 });
+                await db.ref(dataPath('users') + '/' + uid + '/ownedMap').set(map);
             } catch (e) { console.warn('ownedMap sync', e); }
         }
 
@@ -4471,6 +4484,19 @@ function saveOwnedSongs(ids) {
 
 
 /** Đổi ID trong owned/rentals local theo songIdAliases (HLTMV1 → HLTMHPV1) */
+
+/** Chuẩn hoá owned: map alias cũ → ID mới, khử trùng. KHÔNG xóa ID (bài ẩn/xóa tạm vẫn giữ quyền). */
+function canonicalizeOwnedIds(ids) {
+    const raw = (Array.isArray(ids) ? ids : []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+    const resolved = raw.map(s => {
+        const to = (typeof songIdAliases !== 'undefined' && songIdAliases)
+            ? (songIdAliases[s] || songIdAliases[s.toLowerCase()])
+            : null;
+        return to ? String(to) : s;
+    });
+    return typeof dedupeIdList === 'function' ? dedupeIdList(resolved) : [...new Set(resolved)];
+}
+
 function migrateLocalOwnedViaAliases() {
     try {
         const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
@@ -4486,8 +4512,7 @@ function migrateLocalOwnedViaAliases() {
             return to ? String(to) : s;
         };
         if (Array.isArray(acc.owned) && acc.owned.length) {
-            const next = acc.owned.map(resolveId).filter(Boolean);
-            const deduped = typeof dedupeIdList === 'function' ? dedupeIdList(next) : [...new Set(next)];
+            const deduped = canonicalizeOwnedIds(acc.owned);
             if (JSON.stringify(deduped) !== JSON.stringify(acc.owned.map(String))) {
                 acc.owned = deduped;
                 changed = true;
