@@ -998,7 +998,7 @@
                     </div>
                     <div>
                         <label>Ca sĩ</label>
-                        <input id="s-artist" placeholder="XuanKen">
+                        <input id="s-artist" placeholder="XuanKen Official" value="XuanKen Official">
                     </div>
                     <div>
                         <label>Giá mua XK</label>
@@ -1050,7 +1050,7 @@
                     </div>
                     <div class="full">
                         <label>Link ảnh bìa</label>
-                        <input id="s-art" placeholder="https://.../anh.jpg">
+                        <input id="s-art" placeholder="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png" value="https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png">
                     </div>
                     <div class="full">
                         <label>Lyric LRC 1 (text hoặc URL)</label>
@@ -1856,9 +1856,9 @@
             const sidEl = document.getElementById('s-id');
             sidEl.value = song.id || '';
             // Khóa ID khi sửa bài — tránh đổi ID nhầm → mất sở hữu / phải mua lại
-            sidEl.readOnly = true;
-            sidEl.title = 'ID khóa khi sửa (đổi ID: xóa bài cũ + tạo mới, hoặc bỏ readOnly tạm)';
-            sidEl.style.opacity = '0.75';
+            sidEl.readOnly = false;
+            sidEl.title = 'Có thể đổi ID — hệ thống sẽ chuyển sở hữu user sang ID mới';
+            sidEl.style.opacity = '';
             document.getElementById('s-name').value = song.name || '';
             document.getElementById('s-artist').value = song.artist || '';
             document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
@@ -1913,6 +1913,8 @@
                 sidEl.title = '';
                 sidEl.style.opacity = '';
             }
+            document.getElementById('s-artist').value = 'XuanKen Official';
+            document.getElementById('s-art').value = 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png';
             document.getElementById('s-price').value = settingsCache.songPrice;
             document.getElementById('s-hidden').checked = false;
         }
@@ -2125,8 +2127,7 @@
         }
 
         document.getElementById('save-song-btn').onclick = async () => {
-            // Khi đang sửa: luôn dùng ID gốc (không cho đổi ID từ form → tránh mất owned)
-            const id = (editingSongId ? String(editingSongId) : document.getElementById('s-id').value).trim();
+            const id = document.getElementById('s-id').value.trim();
             const name = document.getElementById('s-name').value.trim();
             const audio = document.getElementById('s-audio').value.trim();
             if (!id || !name || !audio) {
@@ -2149,6 +2150,12 @@
             const originalId = editingSongId;
             const isRename = originalId && originalId !== id;
 
+            if (isRename) {
+                if (!confirm('Đổi ID bài từ "' + originalId + '" → "' + id + '"?\n\nHệ thống sẽ chuyển sở hữu (owned) sang ID mới. Chỉ đổi ID khi thật sự cần — sửa link audio thì giữ nguyên ID.')) {
+                    return;
+                }
+            }
+
             if (isRename && songsCache.some(s => s.id === id)) {
                 toast('ID mới "' + id + '" đã tồn tại — chọn ID khác');
                 return;
@@ -2164,9 +2171,9 @@
             const payload = {
                 id,
                 name,
-                artist: document.getElementById('s-artist').value.trim(),
+                artist: document.getElementById('s-artist').value.trim() || 'XuanKen Official',
                 audio,
-                albumArt: document.getElementById('s-art').value.trim(),
+                albumArt: document.getElementById('s-art').value.trim() || 'https://raw.githubusercontent.com/nokiapro/xuankenofficial/main/logoofficial.png',
                 lrc1: document.getElementById('s-lrc1').value,
                 lrc2: document.getElementById('s-lrc2').value,
                 price: Math.max(0, parseInt(document.getElementById('s-price').value, 10) || 0),
