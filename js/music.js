@@ -857,23 +857,12 @@ async function loadSongsFromFirebase() {
             try { await loadSongIdAliases(true); } catch (e) {}
             try { migrateLocalOwnedViaAliases(); } catch (e) {}
             try {
-                // Dọn owned: alias → ID mới; bỏ ID không còn trên Firebase songs; ownedMap = đúng owned
+                // CHỈ map alias + đồng bộ ownedMap — KHÔNG xóa ID owned (tránh mất bài đã mua khi sửa link)
                 const name = typeof getCurrentUsername === 'function' ? getCurrentUsername() : '';
                 const accounts = typeof getAllAccounts === 'function' ? getAllAccounts() : null;
                 if (name && accounts && accounts[name] && Array.isArray(accounts[name].owned)) {
                     const before = accounts[name].owned.map(String);
-                    let cleaned = canonicalizeOwnedIds(before);
-                    const allIds = await fetchAllSongIdsFromFirebase();
-                    if (allIds && allIds.size > 0) {
-                        const kept = [];
-                        const dropped = [];
-                        cleaned.forEach(id => {
-                            if (allIds.has(id) || allIds.has(String(id).toLowerCase())) kept.push(id);
-                            else dropped.push(id);
-                        });
-                        if (dropped.length) console.warn('[owned] bỏ ID không còn trong songs:', dropped);
-                        cleaned = kept;
-                    }
+                    const cleaned = canonicalizeOwnedIds(before);
                     const newMap = {};
                     cleaned.forEach(id => { newMap[String(id)] = true; });
                     const mapKeys = Object.keys(accounts[name].ownedMap || {});
@@ -886,10 +875,10 @@ async function loadSongsFromFirebase() {
                         if (typeof pushUserToFirebase === 'function') {
                             pushUserToFirebase(name, accounts[name], { ownedChanged: true });
                         }
-                        console.log('[owned] sync sau load:', before.length, '→', cleaned.length, cleaned);
+                        if (listDirty) console.log('[owned] alias sync:', before, '→', cleaned);
                     }
                 }
-            } catch (e) { console.warn('[owned] prune after load', e); }
+            } catch (e) { console.warn('[owned] alias sync after load', e); }
             try { scrubOwnedAgainstCatalog(); } catch (e) {}
             try { await ensureFullAudioForOwned(); } catch (e) { console.warn('ensureFullAudioForOwned', e); }
             initPlayerAfterLoad();
@@ -4079,21 +4068,27 @@ function filterOwnedIds(ids) {
 }
 
 function scrubOwnedAgainstCatalog() {
-    // CHỈ cảnh báo — KHÔNG tự xóa owned khi catalog thiếu ID
-    // (tránh mất quyền mua khi admin sửa link / bài tạm ẩn / đang sync)
+    // Chỉ cảnh báo — KHÔNG xóa owned (sửa link / ẩn bài không được mất quyền mua)
     try {
-        if (!getCatalogSongIdSet().size) return;
+        if (!Array.isArray(songs) || !songs.length) return;
         const acc = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
         if (!acc || !Array.isArray(acc.owned) || !acc.owned.length) return;
-        const before = acc.owned.map(String);
-        const cleaned = filterOwnedIds(before);
-        if (cleaned.length < before.length) {
-            const lost = before.filter(id => !cleaned.some(c => c.toLowerCase() === id.toLowerCase()));
-            console.warn('[owned] ID không có trong catalog hiện tại (GIỮ nguyên owned):', lost);
-        }
-    } catch (e) {
-        console.warn('[owned] scrub', e);
-    }
+        const catalog = new Set();
+        songs.forEach(s => {
+            if (!s) return;
+            if (s.id) { catalog.add(String(s.id)); catalog.add(String(s.id).toLowerCase()); }
+            if (s._fbKey) { catalog.add(String(s._fbKey)); catalog.add(String(s._fbKey).toLowerCase()); }
+        });
+        Object.keys(songIdAliases || {}).forEach(oldId => {
+            const to = songIdAliases[oldId];
+            if (to && (catalog.has(String(to)) || catalog.has(String(to).toLowerCase()))) {
+                catalog.add(String(oldId));
+                catalog.add(String(oldId).toLowerCase());
+            }
+        });
+        const lost = acc.owned.map(String).filter(id => !catalog.has(id) && !catalog.has(id.toLowerCase()));
+        if (lost.length) console.warn('[owned] ID không có trong catalog hiện tại (GIỮ nguyên owned):', lost);
+    } catch (e) {}
 }
 
 function mergeNumericMaps(a, b) {
@@ -4622,42 +4617,39 @@ function isSongPermanentlyOwned(songId) {
 
 function isSongOwned(songId) {
     if (songId == null || songId === '') return true;
-    const id = String(songId);
+    const id = String(songId).trim();
+    if (!id) return true;
     const candidates = expandSongIdAliases(id);
+    // Thêm _fbKey nếu bài đang trong catalog
+    try {
+        if (typeof songs !== 'undefined' && Array.isArray(songs)) {
+            const song = songs.find(s => s && (
+                String(s.id) === id || String(s.id).toLowerCase() === id.toLowerCase()
+                || String(s._fbKey || '') === id || String(s._fbKey || '').toLowerCase() === id.toLowerCase()
+            ));
+            if (song) {
+                if (song.id) candidates.push(String(song.id), String(song.id).toLowerCase());
+                if (song._fbKey) candidates.push(String(song._fbKey), String(song._fbKey).toLowerCase());
+            }
+        }
+    } catch (e) {}
     const candLow = new Set(candidates.map(x => String(x).toLowerCase()));
     const owned = loadOwnedSongs();
     if (owned.some(x => candLow.has(String(x).toLowerCase()))) return true;
-    // ownedMap (Firebase rules) — dự phòng khi mảng owned chưa kịp sync
+    // ownedMap dự phòng
     try {
-        const accOm = getCurrentAccount();
+        const accOm = typeof getCurrentAccount === 'function' ? getCurrentAccount() : null;
         const om = accOm && accOm.ownedMap && typeof accOm.ownedMap === 'object' ? accOm.ownedMap : null;
         if (om) {
-            for (const c of candidates) {
-                if (om[c] || om[String(c).toLowerCase()]) return true;
-            }
             for (const k of Object.keys(om)) {
-                if (om[k] && candLow.has(String(k).toLowerCase())) return true;
+                if (!om[k]) continue;
+                if (candLow.has(String(k).toLowerCase())) return true;
             }
         }
     } catch (e) {}
-    // pending buy
     try {
-        for (const k of Object.keys(_pendingOwnedAdds || {})) {
-            if (candLow.has(String(k).toLowerCase()) && (Date.now() - (_pendingOwnedAdds[k] || 0) < PENDING_OWNED_MS)) {
-                return true;
-            }
-        }
+        if (typeof isSongRented === 'function' && isSongRented(id)) return true;
     } catch (e) {}
-    const acc = getCurrentAccount();
-    if (acc && acc.rentals) {
-        for (const k of Object.keys(acc.rentals)) {
-            if (candLow.has(String(k).toLowerCase())) {
-                const exp = Number(acc.rentals[k]) || 0;
-                if (exp > Date.now()) return true;
-            }
-        }
-    }
-    if (isSongRented(id)) return true;
     return false;
 }
 

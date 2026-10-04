@@ -1853,7 +1853,12 @@
 
         async function fillSongForm(song) {
             editingSongId = song.id || null;
-            document.getElementById('s-id').value = song.id || '';
+            const sidEl = document.getElementById('s-id');
+            sidEl.value = song.id || '';
+            // Khóa ID khi sửa bài — tránh đổi ID nhầm → mất sở hữu / phải mua lại
+            sidEl.readOnly = true;
+            sidEl.title = 'ID khóa khi sửa (đổi ID: xóa bài cũ + tạo mới, hoặc bỏ readOnly tạm)';
+            sidEl.style.opacity = '0.75';
             document.getElementById('s-name').value = song.name || '';
             document.getElementById('s-artist').value = song.artist || '';
             document.getElementById('s-price').value = song.price != null ? song.price : settingsCache.songPrice;
@@ -1902,6 +1907,12 @@
             ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            const sidEl = document.getElementById('s-id');
+            if (sidEl) {
+                sidEl.readOnly = false;
+                sidEl.title = '';
+                sidEl.style.opacity = '';
+            }
             document.getElementById('s-price').value = settingsCache.songPrice;
             document.getElementById('s-hidden').checked = false;
         }
@@ -2114,7 +2125,8 @@
         }
 
         document.getElementById('save-song-btn').onclick = async () => {
-            const id = document.getElementById('s-id').value.trim();
+            // Khi đang sửa: luôn dùng ID gốc (không cho đổi ID từ form → tránh mất owned)
+            const id = (editingSongId ? String(editingSongId) : document.getElementById('s-id').value).trim();
             const name = document.getElementById('s-name').value.trim();
             const audio = document.getElementById('s-audio').value.trim();
             if (!id || !name || !audio) {

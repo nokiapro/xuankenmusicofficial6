@@ -761,10 +761,10 @@ body.dark .album-art {
     margin-left: 0;
     margin-right: 0;
     padding: 12px 22px;
-    background: rgba(55, 55, 62, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--progress-bg, rgba(55, 55, 62, 0.92));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
     border-radius: 999px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     margin-top: 14px;
     margin-bottom: 0;
     transition: background 0.3s ease, border-color 0.3s ease;
@@ -776,17 +776,17 @@ body.dark .album-art {
 }
 
 body:not(.dark) .lyric-container {
-    background: rgba(40, 40, 48, 0.88);
-    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
 }
 
 body.dark .lyric-container {
-    background: rgba(48, 48, 56, 0.95);
+    background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.1);
 }
 
 .current-lyric {
-    color: #e8e8ed;
+    color: var(--text-secondary, #888);
     font-weight: 500;
     text-align: center;
     font-size: 16px;
@@ -794,10 +794,11 @@ body.dark .lyric-container {
     display: inline-block;
     transform-origin: center center;
     transition: color 0.3s ease;
-    /* Co chữ bằng JS scale() — không ellipsis, không overflow ẩn */
     max-width: none;
     overflow: visible;
 }
+body:not(.dark) .current-lyric { color: #333; }
+body.dark .current-lyric { color: #e8e8ed; }
 
 .controls-bar {
     padding: 0 24px 14px 24px; /* đáy ~14px — sát mép dưới như header */
@@ -5363,3 +5364,67 @@ body.skin-retro .main-actions .play-btn {
     .top-bar-icons .btn-icon:hover { transform: none !important; }
 }
 
+
+
+/* === theme-aware shop / buttons === */
+.shop-buy-btn,
+.shop-rent-btn,
+button.shop-buy-btn,
+button.shop-rent-btn {
+    color: #fff !important;
+}
+body:not(.dark) .shop-buy-btn:not([disabled]),
+body:not(.dark) .shop-item .shop-buy-btn {
+    background: linear-gradient(135deg, #111, #333) !important;
+    border-color: transparent !important;
+}
+body.dark .shop-buy-btn:not([disabled]) {
+    background: linear-gradient(135deg, #f0f0f0, #d0d0d0) !important;
+    color: #111 !important;
+}
+.shop-buy-btn[disabled],
+.shop-item .owned-badge {
+    opacity: 0.85;
+}
+body:not(.dark) .shop-item .owned-badge {
+    color: #0a7a3e;
+}
+body.dark .shop-item .owned-badge {
+    color: #4ade80;
+}
+
+/* Icon buttons follow theme accent on skins */
+body[class*="skin-"]:not(.skin-default) .btn-icon svg {
+    color: var(--text-secondary, inherit);
+}
+body[class*="skin-"]:not(.skin-default) .btn-icon.active svg,
+body[class*="skin-"]:not(.skin-default) .play-btn.playing svg {
+    color: var(--accent-color, inherit);
+    stroke: var(--accent-color, inherit);
+}
+
+/* Skin lyric overrides keep readable */
+body.skin-sakura .lyric-container,
+body.skin-pearl .lyric-container {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+body.skin-sakura .current-lyric,
+body.skin-pearl .current-lyric {
+    color: #444 !important;
+}
+body.skin-cyber .lyric-container,
+body.skin-nebula .lyric-container,
+body.skin-emerald .lyric-container,
+body.skin-retro .lyric-container,
+body.skin-aura .lyric-container {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+body.skin-cyber .current-lyric,
+body.skin-nebula .current-lyric,
+body.skin-emerald .current-lyric,
+body.skin-retro .current-lyric,
+body.skin-aura .current-lyric {
+    color: #e8e8ed !important;
+}
