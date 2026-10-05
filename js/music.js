@@ -168,6 +168,29 @@ function isIOSDevice() {
     } catch (e) { return false; }
 }
 
+/** Player nhỏ gọn + tối ưu mượt riêng cho iPhone/iPad */
+function applyIOSCompactPlayer() {
+    try {
+        if (!isIOSDevice()) return;
+        document.documentElement.classList.add('ios-compact');
+        document.body.classList.add('ios-compact');
+        // Vòng tên SVG tốn compositing — tắt mặc định trên iOS (đĩa vẫn quay)
+        const wrap = document.getElementById('album-art-wrap');
+        if (wrap) wrap.classList.add('ring-off');
+        // Meta viewport đã có; thêm class cho safe-area
+        document.documentElement.style.setProperty('--ios-safe-bottom', 'env(safe-area-inset-bottom, 0px)');
+        console.log('[ui] iOS compact player ON');
+    } catch (e) {
+        console.warn('applyIOSCompactPlayer', e);
+    }
+}
+try { applyIOSCompactPlayer(); } catch (e) {}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { try { applyIOSCompactPlayer(); } catch (e) {} });
+} else {
+    try { applyIOSCompactPlayer(); } catch (e) {}
+}
+
 const STORAGE_DEVICE_ID = 'xuanken_device_id';
 const STORAGE_PIN_TRUST = 'xuanken_pin_trust';
 const PIN_TRUST_MS = 7 * 24 * 60 * 60 * 1000;
@@ -3837,6 +3860,7 @@ function startUserProfileListener(uid) {
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prev && prev.level) || 1);
         mapped.seasonXp = Math.max(Number(prev && prev.seasonXp) || 0, Number(mapped.seasonXp) || 0);
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prev && prev.streak) || 0);
+        try { recomputeStreakFromCheckinDays(mapped); } catch (e) {}
         mapped.giftClaimCount = Math.max(Number(mapped.giftClaimCount) || 0, Number(prev && prev.giftClaimCount) || 0);
         mapped.chatCount = Math.max(Number(mapped.chatCount) || 0, Number(prev && prev.chatCount) || 0);
         if (prev && prev.lastCheckin && (!mapped.lastCheckin || String(prev.lastCheckin) > String(mapped.lastCheckin))) {
@@ -3940,6 +3964,7 @@ async function fetchUserByUid(uid, usernameHint) {
         mapped.level = Math.max(Number(mapped.level) || 1, Number(prevLocal && prevLocal.level) || 1);
         mapped.seasonXp = Math.max(Number(mapped.seasonXp) || 0, Number(prevLocal && prevLocal.seasonXp) || 0);
         mapped.streak = Math.max(Number(mapped.streak) || 0, Number(prevLocal && prevLocal.streak) || 0);
+        try { recomputeStreakFromCheckinDays(mapped); } catch (e) {}
         mapped.giftClaimCount = Math.max(Number(mapped.giftClaimCount) || 0, Number(prevLocal && prevLocal.giftClaimCount) || 0);
         mapped.chatCount = Math.max(Number(mapped.chatCount) || 0, Number(prevLocal && prevLocal.chatCount) || 0);
         if (prevLocal && prevLocal.lastCheckin && (!mapped.lastCheckin || String(prevLocal.lastCheckin) > String(mapped.lastCheckin))) {
@@ -3954,12 +3979,12 @@ async function fetchUserByUid(uid, usernameHint) {
         startUserProfileListener(id);
         try {
             // Chỉ upload phần local có dữ liệu — không forceAll toàn bộ (tránh xóa điểm danh/owned trên cloud)
-            const hasCheckin = mapped.checkinDays && Object.keys(mapped.checkinDays).length > 0;
-            // Không push owned mỗi lần login (tránh đụng ID / báo mồ côi) — chỉ sync khi loadSongs prune
+            // Ưu tiên cloud cho điểm danh — không push checkin khi login (tránh iPhone local rỗng / lệch TZ ghi đè)
+            try { recomputeStreakFromCheckinDays(mapped); } catch (e) {}
             pushUserToFirebase(name, mapped, {
                 forceAll: false,
                 coinsDelta: 0,
-                checkinChanged: !!hasCheckin,
+                checkinChanged: false,
                 ownedChanged: false,
                 rentalsChanged: !!(mapped.rentals && Object.keys(mapped.rentals).length),
                 ownedThumbsChanged: !!(mapped.ownedThumbs && mapped.ownedThumbs.length),
@@ -4227,8 +4252,8 @@ async function pushUserToFirebase(username, account, options) {
             const tx = await ref.transaction((current) => {
                 if (field === 'checkinDays') {
                     const remote = normalizeCheckinDays(current);
-                    // forceAll + local rỗng → giữ nguyên remote (tránh xóa điểm danh khi deploy)
-                    if (forceAll && !opts[changedFlag] && Object.keys(local).length === 0) {
+                    // Local rỗng → tuyệt đối giữ remote (iPhone máy mới / Safari clear storage)
+                    if (Object.keys(local).length === 0) {
                         return Object.keys(remote).length ? remote : (current == null ? {} : current);
                     }
                     return mergeNumericMaps(remote, local);
@@ -4488,8 +4513,74 @@ function updateCurrentAccount(mutator) {
 }
 
 function getTodayKey() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // Cố định múi giờ VN — PC / Android / iPhone cùng 1 ngày lịch
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric', month: '2-digit', day: '2-digit'
+        }).formatToParts(new Date());
+        const y = parts.find(p => p.type === 'year').value;
+        const mo = parts.find(p => p.type === 'month').value;
+        const da = parts.find(p => p.type === 'day').value;
+        return y + '-' + mo + '-' + da;
+    } catch (e) {
+        const d = new Date();
+        const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+        const vn = new Date(utc + 7 * 3600000);
+        return vn.getFullYear() + '-' + String(vn.getMonth() + 1).padStart(2, '0') + '-' + String(vn.getDate()).padStart(2, '0');
+    }
+}
+
+function getDateKeyOffset(offsetDays) {
+    // offsetDays: 0 = hôm nay (VN), -1 = hôm qua (VN)
+    try {
+        const now = new Date();
+        // Lấy Y-M-D VN rồi cộng/trừ ngày trên lịch
+        const [y, m, d] = getTodayKey().split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d + (offsetDays || 0)));
+        return dt.getUTCFullYear() + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' + String(dt.getUTCDate()).padStart(2, '0');
+    } catch (e) {
+        const d = new Date();
+        d.setDate(d.getDate() + (offsetDays || 0));
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+}
+
+/** Tính streak từ checkinDays (source of truth trên cloud) */
+function recomputeStreakFromCheckinDays(acc) {
+    if (!acc) return 0;
+    const days = normalizeCheckinDays(acc.checkinDays);
+    const keys = Object.keys(days).sort();
+    if (!keys.length) {
+        acc.streak = 0;
+        return 0;
+    }
+    // lastCheckin = ngày điểm danh mới nhất
+    const last = keys[keys.length - 1];
+    if (!acc.lastCheckin || String(acc.lastCheckin) < last) acc.lastCheckin = last;
+    const today = getTodayKey();
+    const yesterday = getDateKeyOffset(-1);
+    // Nếu chưa điểm hôm nay và cũng không điểm hôm qua → streak đứt (hiển thị 0 cho đến khi điểm lại)
+    if (last !== today && last !== yesterday) {
+        // Giữ streak số trên server nếu last gần đây? — theo lịch: đứt
+        // Không ghi đè 0 lên cloud nếu chỉ xem; chỉ cập nhật local display
+        const remoteStreak = Number(acc.streak) || 0;
+        // Nếu last quá cũ so với hôm qua → coi như đứt
+        acc.streak = 0;
+        return 0;
+    }
+    // Đếm ngược liên tiếp từ last
+    let streak = 0;
+    let cursor = last;
+    const daySet = new Set(keys);
+    while (daySet.has(cursor)) {
+        streak++;
+        const [y, m, d] = cursor.split('-').map(Number);
+        const prev = new Date(Date.UTC(y, m - 1, d - 1));
+        cursor = prev.getUTCFullYear() + '-' + String(prev.getUTCMonth() + 1).padStart(2, '0') + '-' + String(prev.getUTCDate()).padStart(2, '0');
+    }
+    acc.streak = Math.max(streak, Number(acc.streak) || 0);
+    return acc.streak;
 }
 
 function loadCoins() {
@@ -4962,8 +5053,7 @@ function doDailyCheckin(dayKeyOpt) {
         acc.checkinDays[dayKey] = Date.now();
         let streak = Number(acc.streak) || 0;
         if (!isMakeup) {
-            const y = new Date(); y.setDate(y.getDate() - 1);
-            const yKey = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+            const yKey = (typeof getDateKeyOffset === 'function') ? getDateKeyOffset(-1) : (function(){ const y=new Date(); y.setDate(y.getDate()-1); return y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0'); })();
             if (acc.lastCheckin === yKey || acc.checkinDays[yKey]) streak += 1;
             else if ((Number(acc.streakFreeze) || 0) > 0) {
                 acc.streakFreeze = (Number(acc.streakFreeze) || 0) - 1;

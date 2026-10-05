@@ -5428,3 +5428,172 @@ body.skin-retro .current-lyric,
 body.skin-aura .current-lyric {
     color: #e8e8ed !important;
 }
+
+
+/* ========== iOS Compact Player — nhỏ gọn, đẹp, mượt ========== */
+html.ios-compact,
+body.ios-compact {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+}
+
+body.ios-compact .player-container {
+    max-width: 100%;
+    width: 100%;
+    margin: 0 auto;
+    border-radius: 24px;
+    padding-bottom: calc(8px + var(--ios-safe-bottom, 0px));
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    overflow: hidden;
+}
+
+body.ios-compact .header-section {
+    padding: 10px 16px 6px 16px !important;
+}
+
+body.ios-compact .header-top-spacer {
+    height: 4px !important;
+    min-height: 4px !important;
+}
+
+/* Đĩa nhỏ gọn ~148px */
+body.ios-compact .album-art-wrap {
+    width: 148px !important;
+    height: 148px !important;
+    margin: 6px auto 8px auto !important;
+    contain: layout style paint;
+}
+
+body.ios-compact .album-art {
+    width: 148px !important;
+    height: 148px !important;
+    border-radius: 50%;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22) !important;
+}
+
+body.ios-compact .album-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    animation-duration: 28s !important;
+    will-change: transform;
+    -webkit-transform: translate3d(0,0,0);
+    transform: translate3d(0,0,0);
+}
+
+/* Vòng tên: ẩn trên iOS compact (mượt hơn) */
+body.ios-compact .art-name-ring,
+body.ios-compact .album-art-wrap::before {
+    display: none !important;
+    animation: none !important;
+}
+
+body.ios-compact .song-info-main {
+    padding: 0 4px 4px 4px !important;
+    gap: 2px !important;
+}
+
+body.ios-compact .song-title {
+    font-size: 1.05rem !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+    animation: none !important;
+    /* gradient tĩnh, không animate */
+    background-size: 100% 100% !important;
+}
+
+body.ios-compact .artist-name {
+    font-size: 0.78rem !important;
+    margin: 0 !important;
+    animation: none !important;
+    opacity: 0.85;
+}
+
+body.ios-compact .lyric-container {
+    min-height: 36px !important;
+    padding: 8px 14px !important;
+    margin-top: 8px !important;
+    border-radius: 999px;
+}
+
+body.ios-compact .current-lyric {
+    font-size: 13px !important;
+}
+
+body.ios-compact .lyric-progress-spacer {
+    height: 6px !important;
+    min-height: 6px !important;
+}
+
+body.ios-compact .controls-bar {
+    padding: 0 16px 12px 16px !important;
+}
+
+body.ios-compact .progress-wrapper {
+    margin-bottom: 16px !important;
+}
+
+body.ios-compact .progress-bar-container {
+    height: 5px !important;
+    margin-top: 10px !important;
+}
+
+body.ios-compact .main-actions {
+    gap: 10px !important;
+    padding: 0 !important;
+}
+
+body.ios-compact .main-actions .btn-icon {
+    width: 40px !important;
+    height: 40px !important;
+}
+
+body.ios-compact .main-actions .play-btn {
+    width: 52px !important;
+    height: 52px !important;
+}
+
+body.ios-compact .top-bar-icons .btn-icon,
+body.ios-compact .top-left-action .btn-icon,
+body.ios-compact .top-right-action .btn-icon {
+    width: 36px !important;
+    height: 36px !important;
+}
+
+body.ios-compact .top-bar-icons {
+    gap: 4px !important;
+}
+
+/* Modal full-height thoải mái trên iPhone */
+body.ios-compact .playlist,
+body.ios-compact .shop-modal,
+body.ios-compact .timer-modal,
+body.ios-compact .checkin-modal {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border-radius: 20px 20px 0 0;
+}
+
+/* iPhone SE / nhỏ */
+@media (max-width: 390px) {
+    body.ios-compact .album-art-wrap,
+    body.ios-compact .album-art {
+        width: 128px !important;
+        height: 128px !important;
+    }
+    body.ios-compact .song-title {
+        font-size: 0.95rem !important;
+    }
+}
+
+/* iPhone Pro Max ngang vẫn gọn */
+@media (min-width: 430px) and (max-width: 899px) {
+    body.ios-compact .album-art-wrap,
+    body.ios-compact .album-art {
+        width: 160px !important;
+        height: 160px !important;
+    }
+}
