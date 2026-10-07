@@ -5597,3 +5597,71 @@ body.ios-compact .checkin-modal {
         height: 160px !important;
     }
 }
+
+
+/* ========== Audio format switcher (MP3 / WAV / FLAC) ========== */
+.audio-format-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 8px 12px 8px;
+    user-select: none;
+}
+.audio-format-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #888);
+    margin-right: 4px;
+}
+.audio-fmt-btn {
+    border: 1px solid var(--border-color, rgba(128,128,128,0.35));
+    background: var(--card-bg, rgba(0,0,0,0.04));
+    color: var(--text-primary, #222);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.audio-fmt-btn:hover:not(:disabled) {
+    border-color: var(--accent-color, #888);
+}
+.audio-fmt-btn.active {
+    background: var(--accent-color, #111);
+    color: #fff;
+    border-color: transparent;
+}
+body:not(.dark) .audio-fmt-btn.active {
+    background: #111;
+    color: #fff;
+}
+body.dark .audio-fmt-btn.active {
+    background: #f0f0f0;
+    color: #111;
+}
+.audio-fmt-btn:disabled,
+.audio-fmt-btn.unavailable {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.audio-format-current {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-secondary, #888);
+    margin-left: 4px;
+    min-width: 2.2em;
+    text-align: center;
+}
+body.ios-compact .audio-format-bar {
+    padding-bottom: 8px;
+}
+body.ios-compact .audio-fmt-btn {
+    padding: 4px 8px;
+    font-size: 0.62rem;
+}
