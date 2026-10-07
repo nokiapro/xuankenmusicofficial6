@@ -1044,11 +1044,6 @@
                         <small class="upload-hint">Ưu tiên file .wav (không nén). Safari/iOS hỗ trợ tốt.</small>
                     </div>
                     <div class="full">
-                        <label>Link FULL chất lượng FLAC (sau khi mua — tuỳ chọn)</label>
-                        <input id="s-audio-flac" placeholder="https://.../full.flac — player chọn định dạng FLAC">
-                        <small class="upload-hint">File .flac lossless. Một số trình duyệt (Safari cũ) có thể không phát được → tự fallback MP3.</small>
-                    </div>
-                    <div class="full">
                         <label>Lịch đăng bài (để trống = hiện ngay)</label>
                         <input id="s-publish-at" type="datetime-local">
                     </div>
@@ -1902,21 +1897,12 @@
                         song.audioFull2 = f.audioFull2;
                     }
                     const wavEl = document.getElementById('s-audio-wav');
-                    const flacEl = document.getElementById('s-audio-flac');
-                    if (wavEl) {
-                        wavEl.value = f.audioWav || '';
-                        if (f.audioWav) song.audioWav = f.audioWav;
-                    }
-                    if (flacEl) {
-                        flacEl.value = f.audioFlac || '';
-                        if (f.audioFlac) song.audioFlac = f.audioFlac;
-                    }
+
                     const inCache = songsCache.find(x => x.id === song.id);
                     if (inCache) {
                         if (f.audioFull) inCache.audioFull = f.audioFull;
                         if (f.audioFull2) inCache.audioFull2 = f.audioFull2;
                         if (f.audioWav) inCache.audioWav = f.audioWav;
-                        if (f.audioFlac) inCache.audioFlac = f.audioFlac;
                     }
                 } catch (e) {
                     console.warn('fillSongForm fulls', e);
@@ -1926,7 +1912,7 @@
 
         function clearSongForm() {
             editingSongId = null;
-            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-audio-wav','s-audio-flac','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
+            ['s-id','s-name','s-artist','s-audio','s-audio-full','s-audio-full-2','s-audio-wav','s-art','s-lrc1','s-lrc2','s-rent-price','s-publish-at'].forEach(id => {
                 document.getElementById(id).value = '';
             });
             const sidEl = document.getElementById('s-id');
@@ -2163,7 +2149,6 @@
             const audioFull = document.getElementById('s-audio-full').value.trim();
             const audioFull2 = document.getElementById('s-audio-full-2').value.trim();
             const audioWav = (document.getElementById('s-audio-wav') && document.getElementById('s-audio-wav').value.trim()) || '';
-            const audioFlac = (document.getElementById('s-audio-flac') && document.getElementById('s-audio-flac').value.trim()) || '';
             const rentRaw = document.getElementById('s-rent-price').value.trim();
             const pubLocal = document.getElementById('s-publish-at').value.trim();
             let publishAt = null;
@@ -2210,13 +2195,12 @@
             const fullPayload = {
                 audioFull: audioFull || null,
                 audioFull2: audioFull2 || null,
-                audioWav: audioWav || null,
-                audioFlac: audioFlac || null
+                audioWav: audioWav || null
             };
 
             await db().ref(dataPath('songs') + '/' + id).set(payload);
             // Ghi songFulls: có link thì set; form trống thì GIỮ full cũ (không xóa nhầm)
-            if (audioFull || audioFull2 || audioWav || audioFlac) {
+            if (audioFull || audioFull2 || audioWav) {
                 let prev = {};
                 try {
                     const ps = await db().ref(dataPath('songFulls') + '/' + id).once('value');
@@ -2225,8 +2209,7 @@
                 await db().ref(dataPath('songFulls') + '/' + id).set({
                     audioFull: audioFull || prev.audioFull || null,
                     audioFull2: audioFull2 || prev.audioFull2 || null,
-                    audioWav: audioWav || prev.audioWav || null,
-                    audioFlac: audioFlac || prev.audioFlac || null
+                    audioWav: audioWav || prev.audioWav || null
                 });
             }
             // Dọn link full cũ nếu còn sót trong node songs

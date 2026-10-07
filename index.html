@@ -160,15 +160,6 @@
                             <span id="time-total">00:00</span>
                         </div>
                     </div>
-
-                    <div class="audio-format-bar" id="audio-format-bar" style="display:none;" title="Chọn định dạng nghe (sau khi mua)">
-                        <span class="audio-format-label">Định dạng</span>
-                        <button type="button" class="audio-fmt-btn active" data-audio-fmt="auto">AUTO</button>
-                        <button type="button" class="audio-fmt-btn" data-audio-fmt="mp3">MP3</button>
-                        <button type="button" class="audio-fmt-btn" data-audio-fmt="wav">WAV</button>
-                        <button type="button" class="audio-fmt-btn" data-audio-fmt="flac">FLAC</button>
-                        <span class="audio-format-current" id="audio-format-current" title="Đang phát">—</span>
-                    </div>
                     <div class="main-actions">
                         <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
                             <i data-lucide="shuffle"></i>
@@ -312,6 +303,17 @@
                         <button type="button" class="extras-action-btn" data-x="chat"><i data-lucide="message-circle"></i><span>Chat toàn web</span></button>
                         <button type="button" class="extras-action-btn" data-x="checkin"><i data-lucide="calendar-check"></i><span>Điểm danh</span></button>
                     </div>
+                </div>
+
+                <div class="extras-section" id="audio-format-extras">
+                    <label class="extras-label">Định dạng nghe (sau khi mua)</label>
+                    <p class="extras-hint" style="margin:0 0 8px 0;font-size:0.72rem;opacity:0.75;">Chọn MP3 hoặc WAV — chỉ áp dụng khi bài đã mua và có link tương ứng</p>
+                    <div class="audio-fmt-group extras-audio-fmt" id="audio-fmt-group-extras">
+                        <button type="button" class="audio-fmt-btn active" data-audio-fmt="auto">AUTO</button>
+                        <button type="button" class="audio-fmt-btn" data-audio-fmt="mp3">MP3</button>
+                        <button type="button" class="audio-fmt-btn" data-audio-fmt="wav">WAV</button>
+                    </div>
+                    <div class="extras-hint" id="audio-format-current" style="margin-top:8px;font-size:0.72rem;"></div>
                 </div>
                 <div class="extras-section">
                     <label class="extras-label">Vòng tên quanh art</label>

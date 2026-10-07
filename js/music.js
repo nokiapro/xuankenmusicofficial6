@@ -185,13 +185,14 @@ function applyIOSCompactPlayer() {
     }
 }
 try { applyIOSCompactPlayer(); } catch (e) {}
-try { if (document.readyState !== 'loading') setupAudioFormatBar(); else document.addEventListener('DOMContentLoaded', setupAudioFormatBar); } catch (e) {}
+function __initAudioFmtBar(){ try { setupAudioFormatBar(); } catch(e){} }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', __initAudioFmtBar);
+else __initAudioFmtBar();
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { try { applyIOSCompactPlayer(); } catch (e) {}
-try { if (document.readyState !== 'loading') setupAudioFormatBar(); else document.addEventListener('DOMContentLoaded', setupAudioFormatBar); } catch (e) {} });
+ });
 } else {
     try { applyIOSCompactPlayer(); } catch (e) {}
-try { if (document.readyState !== 'loading') setupAudioFormatBar(); else document.addEventListener('DOMContentLoaded', setupAudioFormatBar); } catch (e) {}
 }
 
 const STORAGE_DEVICE_ID = 'xuanken_device_id';
@@ -591,14 +592,15 @@ const STORAGE_AUDIO_FORMAT = 'xuanken_audio_format';
 function getPreferredAudioFormat() {
     try {
         const v = (localStorage.getItem(storageKey(STORAGE_AUDIO_FORMAT)) || 'auto').toLowerCase();
-        if (v === 'mp3' || v === 'wav' || v === 'flac' || v === 'auto') return v;
+        if (v === 'mp3' || v === 'wav' || v === 'auto') return v;
+        if (v === 'flac') return 'auto'; // FLAC đã bỏ
     } catch (e) {}
     return 'auto';
 }
 
 function setPreferredAudioFormat(fmt) {
     const v = String(fmt || 'auto').toLowerCase();
-    const ok = (v === 'mp3' || v === 'wav' || v === 'flac' || v === 'auto') ? v : 'auto';
+    const ok = (v === 'mp3' || v === 'wav' || v === 'auto') ? v : 'auto';
     try { localStorage.setItem(storageKey(STORAGE_AUDIO_FORMAT), ok); } catch (e) {}
     updateAudioFormatUI();
     // Đổi định dạng đang phát
@@ -690,12 +692,9 @@ function pickFullAudioUrl(song, preferOtherThan) {
     const by = getFullAudioByFormat(song);
     const pref = getPreferredAudioFormat();
     let ordered = [];
-    if (pref === 'wav') ordered = by.wav.concat(by.mp3, by.flac);
-    else if (pref === 'flac') ordered = by.flac.concat(by.mp3, by.wav);
-    else if (pref === 'mp3') ordered = by.mp3.concat(by.wav, by.flac);
-    else ordered = by.all.length ? by.all : [];
-    // auto: ưu tiên mp3 (nhẹ), rồi wav, flac
-    if (pref === 'auto') ordered = by.mp3.concat(by.wav, by.flac);
+    if (pref === 'wav') ordered = by.wav.concat(by.mp3);
+    else if (pref === 'mp3') ordered = by.mp3.concat(by.wav);
+    else ordered = by.mp3.concat(by.wav); // auto
     if (!ordered.length) return song.audio || '';
     if (preferOtherThan) {
         const p = normalizeAudioUrl(preferOtherThan);
@@ -730,43 +729,45 @@ function getPlayableAudio(song) {
 
 function updateAudioFormatUI() {
     try {
-        const bar = document.getElementById('audio-format-bar');
-        if (!bar) return;
         const pref = getPreferredAudioFormat();
+        const root = document.getElementById('audio-fmt-group-extras') || document.getElementById('audio-format-extras');
+        if (!root) return;
         const song = (typeof songs !== 'undefined' && songs[index]) ? songs[index] : null;
-        const owned = song && isSongOwned(song.id);
-        const by = owned ? getFullAudioByFormat(song) : { mp3: [], wav: [], flac: [], all: [] };
-        const hasAnyFull = by.all.length > 0;
-        bar.style.display = (owned && hasAnyFull) ? 'flex' : 'none';
-        bar.querySelectorAll('[data-audio-fmt]').forEach(btn => {
+        const owned = !!(song && typeof isSongOwned === 'function' && isSongOwned(song.id));
+        const by = (owned && song) ? getFullAudioByFormat(song) : { mp3: [], wav: [], flac: [], all: [] };
+
+        root.querySelectorAll('[data-audio-fmt]').forEach(btn => {
             const f = btn.getAttribute('data-audio-fmt');
             btn.classList.toggle('active', f === pref);
             let available = true;
-            if (f === 'mp3') available = by.mp3.length > 0 || by.all.length > 0;
             if (f === 'wav') available = by.wav.length > 0;
-            if (f === 'flac') available = by.flac.length > 0;
-            if (f === 'auto') available = hasAnyFull;
-            btn.disabled = !available && f !== 'auto';
+            else if (f === 'mp3') available = by.mp3.length > 0 || by.all.length > 0;
+            else if (f === 'auto') available = true;
             btn.classList.toggle('unavailable', !available && f !== 'auto');
-            btn.title = available
-                ? ('Nghe ' + f.toUpperCase())
-                : (f.toUpperCase() + ' chưa có link');
+            btn.title = available ? ('Phát ' + f.toUpperCase()) : (f.toUpperCase() + ' chưa có link');
         });
         const badge = document.getElementById('audio-format-current');
-        if (badge && audio && audio.src) {
-            const cur = detectAudioFormat(audio.src) || '—';
-            badge.textContent = cur.toUpperCase();
+        if (badge) {
+            let cur = '';
+            try { if (audio && audio.src) cur = detectAudioFormat(audio.src); } catch (e) {}
+            const bits = ['Ưu tiên: ' + pref.toUpperCase()];
+            if (cur) bits.push('Đang phát: ' + cur.toUpperCase());
+            if (owned && by.wav.length) bits.push('Có WAV');
+            if (owned && by.mp3.length) bits.push('Có MP3');
+            badge.textContent = bits.join(' · ');
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('updateAudioFormatUI', e);
+    }
 }
 
 function setupAudioFormatBar() {
-    const bar = document.getElementById('audio-format-bar');
-    if (!bar || bar._bound) return;
-    bar._bound = true;
-    bar.addEventListener('click', (e) => {
+    const root = document.getElementById('audio-fmt-group-extras') || document.getElementById('audio-format-extras');
+    if (!root || root._bound) return;
+    root._bound = true;
+    root.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-audio-fmt]');
-        if (!btn || btn.disabled) return;
+        if (!btn) return;
         setPreferredAudioFormat(btn.getAttribute('data-audio-fmt'));
     });
     updateAudioFormatUI();

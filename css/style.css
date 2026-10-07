@@ -144,7 +144,7 @@ body.dark .player-container {
     body { padding: 8px; }
     .player-container { border-radius: 24px; }
     .header-section { padding: 10px 16px 14px 16px; }
-    .album-art-wrap { width: 156px; height: 156px; margin-top: 4px; }
+    .album-art-wrap { width: 168px; height: 168px; margin-top: 10px; margin-bottom: 6px; }
     .album-art { width: 116px; height: 116px; margin-top: 0; }
     .art-name-text { font-size: 9px; letter-spacing: 0; }
     .header-section { gap: 14px; }
@@ -154,7 +154,7 @@ body.dark .player-container {
 
 @media (min-width: 361px) and (max-width: 480px) {
     .header-section { padding: 10px 16px 14px 16px; }
-    .album-art-wrap { width: 180px; height: 180px; margin-top: 4px; }
+    .album-art-wrap { width: 196px; height: 196px; margin-top: 10px; margin-bottom: 6px; }
     .album-art { width: 136px; height: 136px; margin-top: 0; }
     .art-name-text { font-size: 9.5px; letter-spacing: 0; }
     .header-section { gap: 16px; }
@@ -205,8 +205,8 @@ body.dark .player-container {
 /* Spacer cố định — không bị margin-collapse / flex-shrink */
 .header-top-spacer {
     width: 100%;
-    height: 20px !important;
-    min-height: 20px !important;
+    height: 36px !important;
+    min-height: 36px !important;
     flex-shrink: 0 !important;
     flex-grow: 0 !important;
     pointer-events: none;
@@ -222,15 +222,15 @@ body.dark .player-container {
     display: block;
 }
 @media (max-width: 480px) {
-    .header-top-spacer { height: 16px !important; min-height: 16px !important; }
-    .lyric-progress-spacer { height: 32px !important; min-height: 32px !important; }
+    .header-top-spacer { height: 32px !important; min-height: 32px !important; }
+    .lyric-progress-spacer { height: 28px !important; min-height: 28px !important; }
 }
 
 .top-right-action {
     position: absolute;
     top: 15px;
     right: 15px;
-    z-index: 110;
+    z-index: 200;
     display: flex;
     align-items: flex-start;
     gap: 8px;
@@ -246,7 +246,7 @@ body.dark .player-container {
     position: absolute;
     top: 15px;
     left: 15px;
-    z-index: 110;
+    z-index: 200;
     display: flex;
     align-items: flex-start;
     gap: 8px;
@@ -264,7 +264,7 @@ body.dark .player-container {
     top: auto;
     left: auto;
     right: auto;
-    z-index: 110;
+    z-index: 200;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -515,15 +515,16 @@ body.dark .top-bar-icons .btn-icon {
 
 .album-art-wrap {
     position: relative;
-    /* Art 170 + 2×(gap ~12px + chữ) */
+    /* Art 170 + vòng chữ — không đụng header icons */
     width: 216px;
     height: 216px;
-    margin: 4px auto 0;
+    margin: 12px auto 8px auto;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     contain: layout style;
+    z-index: 1;
 }
 
 .album-art {
@@ -801,23 +802,28 @@ body:not(.dark) .current-lyric { color: #333; }
 body.dark .current-lyric { color: #e8e8ed; }
 
 .controls-bar {
-    padding: 0 24px 14px 24px; /* đáy ~14px — sát mép dưới như header */
+    padding: 0 18px 14px 18px;
     background: var(--card-bg);
     transition: background 0.3s ease;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .progress-wrapper {
     margin-top: 0;
-    margin-bottom: 28px; /* progress cao hơn, nút play xuống gần đáy */
+    margin-bottom: 22px;
     padding-top: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .progress-bar-container {
-    height: 6px;
+    height: 10px;
+    width: 100%;
     background: var(--progress-bg);
     cursor: pointer;
     position: relative;
-    border-radius: 10px;
+    border-radius: 999px;
     margin-top: 14px; /* chừa chỗ nửa thumb (28px) phía trên, không đè lyric */
     margin-bottom: 10px;
     transition: background 0.3s ease;
@@ -5454,8 +5460,8 @@ body.ios-compact .header-section {
 }
 
 body.ios-compact .header-top-spacer {
-    height: 4px !important;
-    min-height: 4px !important;
+    height: 28px !important;
+    min-height: 28px !important;
 }
 
 /* Đĩa nhỏ gọn ~148px */
@@ -5601,67 +5607,103 @@ body.ios-compact .checkin-modal {
 
 /* ========== Audio format switcher (MP3 / WAV / FLAC) ========== */
 .audio-format-bar {
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 0 8px 12px 8px;
+    gap: 10px;
+    padding: 2px 12px 10px 12px;
     user-select: none;
 }
-.audio-format-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-secondary, #888);
-    margin-right: 4px;
+.audio-fmt-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 3px;
+    border-radius: 999px;
+    background: rgba(128, 128, 128, 0.12);
+    border: 1px solid rgba(128, 128, 128, 0.18);
+}
+body.dark .audio-fmt-group {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 .audio-fmt-btn {
-    border: 1px solid var(--border-color, rgba(128,128,128,0.35));
-    background: var(--card-bg, rgba(0,0,0,0.04));
-    color: var(--text-primary, #222);
-    font-size: 0.68rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, #999);
+    font-size: 0.65rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 5px 10px;
+    letter-spacing: 0.05em;
+    padding: 6px 11px;
     border-radius: 999px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
+    line-height: 1;
 }
-.audio-fmt-btn:hover:not(:disabled) {
-    border-color: var(--accent-color, #888);
+.audio-fmt-btn:hover:not(:disabled):not(.unavailable) {
+    color: var(--text-primary, #eee);
 }
 .audio-fmt-btn.active {
-    background: var(--accent-color, #111);
-    color: #fff;
-    border-color: transparent;
-}
-body:not(.dark) .audio-fmt-btn.active {
-    background: #111;
-    color: #fff;
-}
-body.dark .audio-fmt-btn.active {
-    background: #f0f0f0;
-    color: #111;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 .audio-fmt-btn:disabled,
 .audio-fmt-btn.unavailable {
-    opacity: 0.35;
+    opacity: 0.28;
     cursor: not-allowed;
 }
 .audio-format-current {
-    font-size: 0.65rem;
-    font-weight: 700;
+    font-size: 0.62rem;
+    font-weight: 600;
     color: var(--text-secondary, #888);
-    margin-left: 4px;
-    min-width: 2.2em;
-    text-align: center;
+    opacity: 0.85;
+    white-space: nowrap;
+}
+.audio-format-current:empty {
+    display: none;
 }
 body.ios-compact .audio-format-bar {
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 body.ios-compact .audio-fmt-btn {
-    padding: 4px 8px;
-    font-size: 0.62rem;
+    padding: 5px 9px;
+    font-size: 0.6rem;
+}
+
+
+/* ring vs header fix */
+.top-left-action,
+.top-right-action,
+.top-bar-icons {
+    z-index: 200 !important;
+    pointer-events: auto;
+}
+.art-name-ring {
+    z-index: 2;
+    pointer-events: none;
+}
+.header-section {
+    overflow: visible;
+}
+/* Progress bar đủ rộng + đủ dày */
+.progress-bar-container {
+    min-height: 10px;
+}
+.progress-filled {
+    border-radius: 999px;
+    min-height: 10px;
+}
+
+.extras-audio-fmt {
+    display: inline-flex !important;
+    margin-top: 4px;
+}
+.extras-section .audio-fmt-group {
+    width: 100%;
+    justify-content: stretch;
+}
+.extras-section .audio-fmt-btn {
+    flex: 1;
+    text-align: center;
 }
