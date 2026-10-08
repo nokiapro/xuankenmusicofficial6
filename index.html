@@ -160,6 +160,7 @@
                             <span id="time-total">00:00</span>
                         </div>
                     </div>
+
                     <div class="main-actions">
                         <div class="btn-icon" id="shuffle-btn" title="Phát ngẫu nhiên">
                             <i data-lucide="shuffle"></i>
@@ -304,17 +305,6 @@
                         <button type="button" class="extras-action-btn" data-x="checkin"><i data-lucide="calendar-check"></i><span>Điểm danh</span></button>
                     </div>
                 </div>
-
-                <div class="extras-section" id="audio-format-extras">
-                    <label class="extras-label">Định dạng nghe (sau khi mua)</label>
-                    <p class="extras-hint" style="margin:0 0 8px 0;font-size:0.72rem;opacity:0.75;">Chọn MP3 hoặc WAV — chỉ áp dụng khi bài đã mua và có link tương ứng</p>
-                    <div class="audio-fmt-group extras-audio-fmt" id="audio-fmt-group-extras">
-                        <button type="button" class="audio-fmt-btn active" data-audio-fmt="auto">AUTO</button>
-                        <button type="button" class="audio-fmt-btn" data-audio-fmt="mp3">MP3</button>
-                        <button type="button" class="audio-fmt-btn" data-audio-fmt="wav">WAV</button>
-                    </div>
-                    <div class="extras-hint" id="audio-format-current" style="margin-top:8px;font-size:0.72rem;"></div>
-                </div>
                 <div class="extras-section">
                     <label class="extras-label">Vòng tên quanh art</label>
                     <div class="art-ring-settings">
@@ -337,6 +327,14 @@
                             <button type="button" id="art-ring-save-btn" class="extras-btn-primary">Lưu</button>
                         </div>
                     </div>
+                </div>
+                <div class="extras-section">
+                    <label class="extras-label">Định dạng nghe (bài đã mua/thuê)</label>
+                    <div class="extras-actions-grid extras-rank-grid extras-rank-compact" id="audio-format-pref-group">
+                        <button type="button" class="extras-action-btn audio-format-btn is-active" data-audio-fmt="mp3" id="audio-format-mp3"><i data-lucide="music"></i><span>Nghe MP3</span></button>
+                        <button type="button" class="extras-action-btn audio-format-btn" data-audio-fmt="wav" id="audio-format-wav"><i data-lucide="waveform"></i><span>Nghe WAV</span></button>
+                    </div>
+                    <p class="extras-chat-hint" style="margin:6px 0 0;">WAV chỉ phát khi admin đã thêm link WAV cho bài. Không có WAV → tự dùng MP3.</p>
                 </div>
                 <div id="extras-result" class="extras-result"></div>
             </div>

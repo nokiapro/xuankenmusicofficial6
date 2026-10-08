@@ -1039,9 +1039,17 @@
                         <small class="upload-hint" id="s-audio-full-2-upload-status"></small>
                     </div>
                     <div class="full">
-                        <label>Link FULL chất lượng WAV (sau khi mua — tuỳ chọn)</label>
-                        <input id="s-audio-wav" placeholder="https://.../full.wav — player chọn định dạng WAV">
-                        <small class="upload-hint">Ưu tiên file .wav (không nén). Safari/iOS hỗ trợ tốt.</small>
+                        <label>Link audio WAV (full — tùy chọn nghe chất lượng cao)</label>
+                        <div class="upload-row">
+                            <input id="s-audio-wav" placeholder="https://.../full.wav — để trống = chỉ dùng MP3" style="flex:1;min-width:160px;">
+                            <select id="s-audio-wav-folder" class="upload-folder-select" title="Folder Cloudinary">
+                                <option value="DEMO">DEMO</option>
+                                <option value="MUSIC" selected>MUSIC</option>
+                            </select>
+                            <input type="file" id="s-audio-wav-file" accept="audio/*,.wav,.flac" style="display:none;">
+                            <button type="button" class="btn btn-info" id="s-audio-wav-upload-btn" title="Upload file lên Cloudinary"><i class="fa-solid fa-cloud-arrow-up"></i> Upload</button>
+                        </div>
+                        <small class="upload-hint" id="s-audio-wav-upload-status"></small>
                     </div>
                     <div class="full">
                         <label>Lịch đăng bài (để trống = hiện ngay)</label>
@@ -1404,7 +1412,7 @@
                     <input type="file" id="import-songs-file" accept=".json,application/json" style="display:none;">
                 </div>
                 <label style="display:block;font-size:0.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Hoặc dán JSON vào đây</label>
-                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","audioFull2":"","albumArt":"","lrc1":"","lrc2":"","price":10}]'></textarea>
+                <textarea id="import-songs-textarea" placeholder='[{"id":"ABR","name":"...","artist":"...","audio":"https://...","audioFull":"","audioFull2":"","audioWav":"","albumArt":"","lrc1":"","lrc2":"","price":10}]'></textarea>
                 <div class="row-actions form-actions" style="margin-top:12px;">
                     <button class="btn btn-primary" id="import-songs-paste-btn"><i class="fa-solid fa-paste"></i> Nhập từ ô trên</button>
                 </div>
@@ -1584,17 +1592,18 @@
 
         async function fetchSongFullById(id) {
             const key = String(id || '');
-            if (!key) return { audioFull: '', audioFull2: '' };
+            if (!key) return { audioFull: '', audioFull2: '', audioWav: '' };
             try {
                 const snap = await db().ref(dataPath('songFulls') + '/' + key).once('value');
                 const v = snap.val() || {};
                 return {
                     audioFull: (v.audioFull || '') || '',
-                    audioFull2: (v.audioFull2 || '') || ''
+                    audioFull2: (v.audioFull2 || '') || '',
+                    audioWav: (v.audioWav || '') || ''
                 };
             } catch (e) {
                 console.warn('fetchSongFullById', key, e && (e.code || e.message));
-                return { audioFull: '', audioFull2: '' };
+                return { audioFull: '', audioFull2: '', audioWav: '' };
             }
         }
 
@@ -1616,7 +1625,7 @@
                     const slice = ids.slice(i, i + chunk);
                     await Promise.all(slice.map(async (id) => {
                         const f = await fetchSongFullById(id);
-                        if (f.audioFull || f.audioFull2) fulls[id] = f;
+                        if (f.audioFull || f.audioFull2 || f.audioWav) fulls[id] = f;
                     }));
                 }
             }
@@ -1631,6 +1640,7 @@
                     audio: s.audio || '',
                     audioFull: (f.audioFull || s.audioFull || '') || '',
                     audioFull2: (f.audioFull2 || s.audioFull2 || '') || '',
+                    audioWav: (f.audioWav || s.audioWav || '') || '',
                     albumArt: s.albumArt || '',
                     listenCount: Number(s.listenCount) || 0,
                     lrc1: s.lrc1 || '',
@@ -1871,6 +1881,7 @@
             document.getElementById('s-audio').value = song.audio || '';
             document.getElementById('s-audio-full').value = song.audioFull || '';
             document.getElementById('s-audio-full-2').value = song.audioFull2 || '';
+            document.getElementById('s-audio-wav').value = song.audioWav || '';
             document.getElementById('s-art').value = song.albumArt || '';
             document.getElementById('s-lrc1').value = song.lrc1 || '';
             document.getElementById('s-lrc2').value = song.lrc2 || '';
@@ -1896,8 +1907,10 @@
                         document.getElementById('s-audio-full-2').value = f.audioFull2;
                         song.audioFull2 = f.audioFull2;
                     }
-                    const wavEl = document.getElementById('s-audio-wav');
-
+                    if (f.audioWav) {
+                        document.getElementById('s-audio-wav').value = f.audioWav;
+                        song.audioWav = f.audioWav;
+                    }
                     const inCache = songsCache.find(x => x.id === song.id);
                     if (inCache) {
                         if (f.audioFull) inCache.audioFull = f.audioFull;
@@ -2148,7 +2161,7 @@
             }
             const audioFull = document.getElementById('s-audio-full').value.trim();
             const audioFull2 = document.getElementById('s-audio-full-2').value.trim();
-            const audioWav = (document.getElementById('s-audio-wav') && document.getElementById('s-audio-wav').value.trim()) || '';
+            const audioWav = document.getElementById('s-audio-wav').value.trim();
             const rentRaw = document.getElementById('s-rent-price').value.trim();
             const pubLocal = document.getElementById('s-publish-at').value.trim();
             let publishAt = null;
@@ -2214,7 +2227,7 @@
             }
             // Dọn link full cũ nếu còn sót trong node songs
             try {
-                await db().ref(dataPath('songs') + '/' + id).update({ audioFull: null, audioFull2: null });
+                await db().ref(dataPath('songs') + '/' + id).update({ audioFull: null, audioFull2: null, audioWav: null });
             } catch (e) {}
 
             if (isRename) {
@@ -2226,9 +2239,10 @@
                     const newFull = newFullSnap.val() || {};
                     const mergedFull = {
                         audioFull: newFull.audioFull || audioFull || oldFull.audioFull || null,
-                        audioFull2: newFull.audioFull2 || audioFull2 || oldFull.audioFull2 || null
+                        audioFull2: newFull.audioFull2 || audioFull2 || oldFull.audioFull2 || null,
+                        audioWav: newFull.audioWav || audioWav || oldFull.audioWav || null
                     };
-                    if (mergedFull.audioFull || mergedFull.audioFull2) {
+                    if (mergedFull.audioFull || mergedFull.audioFull2 || mergedFull.audioWav) {
                         await db().ref(dataPath('songFulls') + '/' + id).set(mergedFull);
                     }
                 } catch (e) { console.warn('migrate songFulls', e); }
@@ -2461,6 +2475,7 @@
                 audio: s.audio || '',
                 audioFull: s.audioFull || '',
                 audioFull2: s.audioFull2 || '',
+                audioWav: s.audioWav || '',
                 albumArt: s.albumArt || '',
                 lrc1: s.lrc1 || '',
                 lrc2: s.lrc2 || '',
@@ -2519,6 +2534,7 @@
                     audio: String(item.audio || '').trim(),
                     audioFull: String(item.audioFull || '').trim() || null,
                     audioFull2: String(item.audioFull2 || '').trim() || null,
+                    audioWav: String(item.audioWav || '').trim() || null,
                     albumArt: String(item.albumArt || '').trim(),
                     lrc1: String(item.lrc1 || ''),
                     lrc2: String(item.lrc2 || ''),
@@ -2544,19 +2560,21 @@
                     const snap = await db().ref(dataPath('songs') + '/' + song.id + '/listenCount').once('value');
                     liveCount = Number(snap.val()) || 0;
                 } catch (e) {}
-                const { audioFull, audioFull2, ...publicFields } = song;
+                const { audioFull, audioFull2, audioWav, ...publicFields } = song;
                 const payload = {
                     ...publicFields,
                     listenCount: Math.max(liveCount, Number(song.listenCount) || 0)
                 };
                 delete payload.audioFull;
                 delete payload.audioFull2;
+                delete payload.audioWav;
                 const existed = songsCache.some(s => s.id === song.id);
                 await db().ref(dataPath('songs') + '/' + song.id).set(payload);
-                if (audioFull || audioFull2) {
+                if (audioFull || audioFull2 || audioWav) {
                     await db().ref(dataPath('songFulls') + '/' + song.id).set({
                         audioFull: audioFull || null,
-                        audioFull2: audioFull2 || null
+                        audioFull2: audioFull2 || null,
+                        audioWav: audioWav || null
                     });
                 } else {
                     try { await db().ref(dataPath('songFulls') + '/' + song.id).remove(); } catch (e) {}
@@ -3176,6 +3194,7 @@
         }
         bindCloudinaryUpload('s-audio-upload-btn', 's-audio-file', 's-audio', 's-audio-upload-status', 's-audio-folder');
         bindCloudinaryUpload('s-audio-full-2-upload-btn', 's-audio-full-2-file', 's-audio-full-2', 's-audio-full-2-upload-status', 's-audio-full-2-folder');
+        bindCloudinaryUpload('s-audio-wav-upload-btn', 's-audio-wav-file', 's-audio-wav', 's-audio-wav-upload-status', 's-audio-wav-folder');
 
         async function loadGiftCodes() {
             const el = document.getElementById('gift-list');

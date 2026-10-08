@@ -185,12 +185,8 @@ function applyIOSCompactPlayer() {
     }
 }
 try { applyIOSCompactPlayer(); } catch (e) {}
-function __initAudioFmtBar(){ try { setupAudioFormatBar(); } catch(e){} }
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', __initAudioFmtBar);
-else __initAudioFmtBar();
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { try { applyIOSCompactPlayer(); } catch (e) {}
- });
+    document.addEventListener('DOMContentLoaded', () => { try { applyIOSCompactPlayer(); } catch (e) {} });
 } else {
     try { applyIOSCompactPlayer(); } catch (e) {}
 }
@@ -449,6 +445,7 @@ function songsObjectToArray(obj) {
             // Không lấy audioFull từ node public songs — chỉ từ cache songFulls
             audioFull: (cached && cached.audioFull) || '',
             audioFull2: (cached && cached.audioFull2) || '',
+            audioWav: (cached && cached.audioWav) || '',
             albumArt: s.albumArt || '',
             listenCount: Number(s.listenCount) || 0,
             lrc1: s.lrc1 || '',
@@ -489,7 +486,6 @@ function applyFullCacheToSongs() {
             s.audioFull = f.audioFull || '';
             s.audioFull2 = f.audioFull2 || '';
             s.audioWav = f.audioWav || '';
-            s.audioFlac = f.audioFlac || '';
             fullAudioCache[sid] = f;
         }
     });
@@ -504,7 +500,7 @@ async function fetchSongFull(songId) {
     // Cache hit qua id hoặc alias
     for (let i = 0; i < candidates.length; i++) {
         const c = String(candidates[i] || '');
-        if (c && fullAudioCache[c] && (fullAudioCache[c].audioFull || fullAudioCache[c].audioFull2 || fullAudioCache[c].audioWav || fullAudioCache[c].audioFlac)) {
+        if (c && fullAudioCache[c] && (fullAudioCache[c].audioFull || fullAudioCache[c].audioFull2 || fullAudioCache[c].audioWav)) {
             fullAudioCache[id] = fullAudioCache[c];
             return fullAudioCache[id];
         }
@@ -517,13 +513,8 @@ async function fetchSongFull(songId) {
             if (!tryId) continue;
             const snap = await db.ref(dataPath('songFulls') + '/' + tryId).once('value');
             const v = snap.val();
-            if (v && (v.audioFull || v.audioFull2 || v.audioWav || v.audioFlac)) {
-                const entry = {
-                    audioFull: v.audioFull || '',
-                    audioFull2: v.audioFull2 || '',
-                    audioWav: v.audioWav || '',
-                    audioFlac: v.audioFlac || ''
-                };
+            if (v && (v.audioFull || v.audioFull2 || v.audioWav)) {
+                const entry = { audioFull: v.audioFull || '', audioFull2: v.audioFull2 || '', audioWav: v.audioWav || '' };
                 fullAudioCache[id] = entry;
                 fullAudioCache[tryId] = entry;
                 return entry;
@@ -535,13 +526,8 @@ async function fetchSongFull(songId) {
             if (!tryId) continue;
             const leg = await db.ref(dataPath('songs') + '/' + tryId).once('value');
             const ls = leg.val() || {};
-            if (ls.audioFull || ls.audioFull2 || ls.audioWav || ls.audioFlac) {
-                const entry = {
-                    audioFull: ls.audioFull || '',
-                    audioFull2: ls.audioFull2 || '',
-                    audioWav: ls.audioWav || '',
-                    audioFlac: ls.audioFlac || ''
-                };
+            if (ls.audioFull || ls.audioFull2 || ls.audioWav) {
+                const entry = { audioFull: ls.audioFull || '', audioFull2: ls.audioFull2 || '', audioWav: ls.audioWav || '' };
                 fullAudioCache[id] = entry;
                 fullAudioCache[tryId] = entry;
                 return entry;
@@ -568,108 +554,39 @@ async function ensureFullAudioForOwned() {
     applyFullCacheToSongs();
 }
 
-function detectAudioFormat(url) {
-    if (!url) return '';
+function getAudioFormatPref() {
     try {
-        let path = String(url).split('?')[0].split('#')[0].toLowerCase();
-        // Cloudinary / CDN đôi khi thêm đuôi ảo: file.mp3.wav — lấy extension cuối
-        const m = path.match(/\.([a-z0-9]{2,5})$/);
-        if (!m) return '';
-        const ext = m[1];
-        if (ext === 'mp3' || ext === 'mpeg') return 'mp3';
-        if (ext === 'wav' || ext === 'wave') return 'wav';
-        if (ext === 'flac') return 'flac';
-        if (ext === 'm4a' || ext === 'aac' || ext === 'mp4') return 'mp3'; // coi như lossy stream
-        if (ext === 'ogg' || ext === 'opus') return 'mp3';
-        return ext;
-    } catch (e) {
-        return '';
-    }
-}
-
-const STORAGE_AUDIO_FORMAT = 'xuanken_audio_format';
-
-function getPreferredAudioFormat() {
-    try {
-        const v = (localStorage.getItem(storageKey(STORAGE_AUDIO_FORMAT)) || 'auto').toLowerCase();
-        if (v === 'mp3' || v === 'wav' || v === 'auto') return v;
-        if (v === 'flac') return 'auto'; // FLAC đã bỏ
+        const v = localStorage.getItem('xuanken_audio_format');
+        if (v === 'wav' || v === 'mp3') return v;
     } catch (e) {}
-    return 'auto';
+    return 'mp3';
 }
 
-function setPreferredAudioFormat(fmt) {
-    const v = String(fmt || 'auto').toLowerCase();
-    const ok = (v === 'mp3' || v === 'wav' || v === 'auto') ? v : 'auto';
-    try { localStorage.setItem(storageKey(STORAGE_AUDIO_FORMAT), ok); } catch (e) {}
-    updateAudioFormatUI();
-    // Đổi định dạng đang phát
-    try {
-        if (typeof songs !== 'undefined' && songs[index] && isSongOwned(songs[index].id)) {
-            const wasPlaying = audio && !audio.paused;
-            const t = audio ? (audio.currentTime || 0) : 0;
-            lastTriedFullUrl[String(songs[index].id)] = '';
-            const url = getPlayableAudio(songs[index]);
-            if (url && audio && !isSameAudioSrc(audio.src, url)) {
-                audio.src = url;
-                audio.load();
-                if (t > 0.5) {
-                    audio.addEventListener('loadedmetadata', function once() {
-                        audio.removeEventListener('loadedmetadata', once);
-                        try { audio.currentTime = t; } catch (e) {}
-                        if (wasPlaying) audio.play().catch(() => {});
-                    });
-                } else if (wasPlaying) {
-                    audio.play().catch(() => {});
-                }
-            }
-            showNotification('ĐỊNH DẠNG:', ok.toUpperCase() + (url ? (' · ' + (detectAudioFormat(url) || '?').toUpperCase()) : ''), '#60a5fa', 'music');
-        }
-    } catch (e) {}
-}
-
-function getFullAudioByFormat(song) {
-    if (!song) return { mp3: [], wav: [], flac: [], all: [] };
-    const id = String(song.id || '');
-    const cached = fullAudioCache[id] || {};
-    const mp3 = [];
-    const wav = [];
-    const flac = [];
-    const push = (u) => {
-        if (!u) return;
-        const f = detectAudioFormat(u);
-        if (f === 'wav') wav.push(u);
-        else if (f === 'flac') flac.push(u);
-        else mp3.push(u); // mặc định / mp3 / m4a
-    };
-    // Link chuyên dụng
-    const aw = song.audioWav || cached.audioWav || '';
-    const af = song.audioFlac || cached.audioFlac || '';
-    if (aw) wav.push(aw);
-    if (af) flac.push(af);
-    // FULL 1/2 — phân loại theo đuôi file
-    push(song.audioFull || cached.audioFull || '');
-    push(song.audioFull2 || cached.audioFull2 || '');
-    const uniq = (arr) => {
-        const seen = new Set();
-        return arr.filter(u => {
-            const n = normalizeAudioUrl(u);
-            if (seen.has(n)) return false;
-            seen.add(n);
-            return true;
-        });
-    };
-    return {
-        mp3: uniq(mp3),
-        wav: uniq(wav),
-        flac: uniq(flac),
-        all: uniq([].concat(mp3, wav, flac))
-    };
+function setAudioFormatPref(fmt) {
+    const v = (fmt === 'wav') ? 'wav' : 'mp3';
+    try { localStorage.setItem('xuanken_audio_format', v); } catch (e) {}
+    return v;
 }
 
 function getFullAudioCandidates(song) {
     if (!song) return [];
-    return getFullAudioByFormat(song).all;
+    const id = String(song.id || '');
+    const cached = fullAudioCache[id];
+    const list = [];
+    const preferWav = getAudioFormatPref() === 'wav';
+    const wav = (song.audioWav || (cached && cached.audioWav) || '');
+    const a1 = (song.audioFull || (cached && cached.audioFull) || '');
+    const a2 = (song.audioFull2 || (cached && cached.audioFull2) || '');
+    if (preferWav && wav) {
+        list.push(wav);
+        // fallback MP3 nếu WAV lỗi
+        if (a1) list.push(a1);
+        if (a2) list.push(a2);
+    } else {
+        if (a1) list.push(a1);
+        if (a2) list.push(a2);
+    }
+    return list.filter(Boolean);
 }
 
 function normalizeAudioUrl(u) {
@@ -689,19 +606,15 @@ function isSameAudioSrc(a, b) {
 }
 
 function pickFullAudioUrl(song, preferOtherThan) {
-    const by = getFullAudioByFormat(song);
-    const pref = getPreferredAudioFormat();
-    let ordered = [];
-    if (pref === 'wav') ordered = by.wav.concat(by.mp3);
-    else if (pref === 'mp3') ordered = by.mp3.concat(by.wav);
-    else ordered = by.mp3.concat(by.wav); // auto
-    if (!ordered.length) return song.audio || '';
+    const cands = getFullAudioCandidates(song);
+    if (!cands.length) return song.audio || '';
     if (preferOtherThan) {
-        const p = normalizeAudioUrl(preferOtherThan);
-        const alt = ordered.find(u => normalizeAudioUrl(u) !== p);
+        const pref = normalizeAudioUrl(preferOtherThan);
+        const alt = cands.find(u => normalizeAudioUrl(u) !== pref);
         if (alt) return alt;
     }
-    return ordered[0];
+    if (cands.length === 1) return cands[0];
+    return cands[Math.floor(Math.random() * cands.length)];
 }
 
 function getPlayableAudio(song) {
@@ -710,14 +623,15 @@ function getPlayableAudio(song) {
         const cands = getFullAudioCandidates(song);
         if (!cands.length) return song.audio || '';
         const id = String(song.id);
-        const pref = getPreferredAudioFormat();
-        const by = getFullAudioByFormat(song);
-        // Sticky chỉ giữ nếu đúng preference (hoặc auto)
         const sticky = lastTriedFullUrl[id];
         if (sticky && cands.some(c => isSameAudioSrc(c, sticky))) {
-            const sf = detectAudioFormat(sticky);
-            if (pref === 'auto' || pref === sf || (!sf && pref === 'mp3')) {
-                return sticky;
+            return sticky;
+        }
+        if (typeof audio !== 'undefined' && audio && audio.src) {
+            const match = cands.find(c => isSameAudioSrc(audio.src, c));
+            if (match) {
+                lastTriedFullUrl[id] = match;
+                return match;
             }
         }
         const picked = pickFullAudioUrl(song);
@@ -726,53 +640,6 @@ function getPlayableAudio(song) {
     }
     return song.audio || '';
 }
-
-function updateAudioFormatUI() {
-    try {
-        const pref = getPreferredAudioFormat();
-        const root = document.getElementById('audio-fmt-group-extras') || document.getElementById('audio-format-extras');
-        if (!root) return;
-        const song = (typeof songs !== 'undefined' && songs[index]) ? songs[index] : null;
-        const owned = !!(song && typeof isSongOwned === 'function' && isSongOwned(song.id));
-        const by = (owned && song) ? getFullAudioByFormat(song) : { mp3: [], wav: [], flac: [], all: [] };
-
-        root.querySelectorAll('[data-audio-fmt]').forEach(btn => {
-            const f = btn.getAttribute('data-audio-fmt');
-            btn.classList.toggle('active', f === pref);
-            let available = true;
-            if (f === 'wav') available = by.wav.length > 0;
-            else if (f === 'mp3') available = by.mp3.length > 0 || by.all.length > 0;
-            else if (f === 'auto') available = true;
-            btn.classList.toggle('unavailable', !available && f !== 'auto');
-            btn.title = available ? ('Phát ' + f.toUpperCase()) : (f.toUpperCase() + ' chưa có link');
-        });
-        const badge = document.getElementById('audio-format-current');
-        if (badge) {
-            let cur = '';
-            try { if (audio && audio.src) cur = detectAudioFormat(audio.src); } catch (e) {}
-            const bits = ['Ưu tiên: ' + pref.toUpperCase()];
-            if (cur) bits.push('Đang phát: ' + cur.toUpperCase());
-            if (owned && by.wav.length) bits.push('Có WAV');
-            if (owned && by.mp3.length) bits.push('Có MP3');
-            badge.textContent = bits.join(' · ');
-        }
-    } catch (e) {
-        console.warn('updateAudioFormatUI', e);
-    }
-}
-
-function setupAudioFormatBar() {
-    const root = document.getElementById('audio-fmt-group-extras') || document.getElementById('audio-format-extras');
-    if (!root || root._bound) return;
-    root._bound = true;
-    root.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-audio-fmt]');
-        if (!btn) return;
-        setPreferredAudioFormat(btn.getAttribute('data-audio-fmt'));
-    });
-    updateAudioFormatUI();
-}
-
 
 let lastTriedFullUrl = {};
 let preloadAudioEl = null;
@@ -2122,13 +1989,11 @@ async function loadSong(i) {
                 song.audioFull = full.audioFull || '';
                 song.audioFull2 = full.audioFull2 || '';
                 song.audioWav = full.audioWav || '';
-                song.audioFlac = full.audioFlac || '';
             }
         } catch (e) {}
     }
     const playUrl = getPlayableAudio(song);
     if (isSongOwned(song.id) && playUrl) lastTriedFullUrl[String(song.id)] = playUrl;
-    try { updateAudioFormatUI(); } catch (e) {}
     if (!isSameAudioSrc(audio.src, playUrl)) {
         audio.pause();
         audio.src = playUrl || '';
@@ -3169,6 +3034,51 @@ function bindArtRingSettingsUI() {
         };
     }
     updateArtNameRing();
+}
+
+function bindAudioFormatPrefUI() {
+    const group = document.getElementById('audio-format-pref-group');
+    if (!group || group._audioFmtBound) return;
+    group._audioFmtBound = true;
+    const pref = getAudioFormatPref();
+    group.querySelectorAll('.audio-format-btn').forEach(btn => {
+        const fmt = btn.getAttribute('data-audio-fmt') || 'mp3';
+        if (fmt === pref) btn.classList.add('is-active');
+        else btn.classList.remove('is-active');
+        btn.addEventListener('click', () => {
+            const next = setAudioFormatPref(fmt);
+            group.querySelectorAll('.audio-format-btn').forEach(b => {
+                if ((b.getAttribute('data-audio-fmt') || 'mp3') === next) b.classList.add('is-active');
+                else b.classList.remove('is-active');
+            });
+            // Đổi format → reload src bài đang phát nếu đang sở hữu
+            try {
+                if (typeof songs !== 'undefined' && songs[index] && isSongOwned(songs[index].id)) {
+                    const sid = String(songs[index].id);
+                    if (typeof lastTriedFullUrl === 'object') delete lastTriedFullUrl[sid];
+                    const newUrl = getPlayableAudio(songs[index]);
+                    if (newUrl && typeof audio !== 'undefined' && audio && !isSameAudioSrc(audio.src, newUrl)) {
+                        const wasPlaying = !audio.paused;
+                        const t = audio.currentTime || 0;
+                        audio.src = newUrl;
+                        audio.load();
+                        const resume = () => {
+                            try { audio.currentTime = t; } catch (e) {}
+                            if (wasPlaying) audio.play().catch(() => {});
+                        };
+                        if (audio.readyState >= 1) resume();
+                        else audio.addEventListener('loadedmetadata', function once() {
+                            audio.removeEventListener('loadedmetadata', once);
+                            resume();
+                        });
+                    }
+                }
+            } catch (e) {}
+            if (typeof showNotification === 'function') {
+                showNotification('ĐỊNH DẠNG:', next === 'wav' ? 'Nghe WAV (nếu có)' : 'Nghe MP3', '#4ade80', 'music');
+            }
+        });
+    });
 }
 
 function escapeHtml(str) {
@@ -5024,6 +4934,7 @@ function rentSong(songId, days) {
                 if (full && songs[index] && String(songs[index].id) === String(songId)) {
                     songs[index].audioFull = full.audioFull || '';
                     songs[index].audioFull2 = full.audioFull2 || '';
+                    songs[index].audioWav = full.audioWav || '';
                 }
             } catch (e) {}
             const fullUrl = getPlayableAudio(songs[index]);
@@ -5337,6 +5248,7 @@ function buySong(songId) {
                 if (full && songs[index] && String(songs[index].id) === String(songId)) {
                     songs[index].audioFull = full.audioFull || '';
                     songs[index].audioFull2 = full.audioFull2 || '';
+                    songs[index].audioWav = full.audioWav || '';
                 }
             } catch (e) {}
             const fullUrl = getPlayableAudio(songs[index]);
@@ -6718,6 +6630,7 @@ window.getDb = getDb;
     try { bindArtRingSettingsUI(); } catch (e) {}
     try { updateArtNameRing(); } catch (e) {}
     try { bindArtRingResize(); } catch (e) {}
+    try { bindAudioFormatPrefUI(); } catch (e) {}
 })();
 
 if (document.readyState === 'loading') {
@@ -6725,9 +6638,11 @@ if (document.readyState === 'loading') {
         try { bindArtRingSettingsUI(); } catch (e) {}
         try { updateArtNameRing(); } catch (e) {}
         try { bindArtRingResize(); } catch (e) {}
+        try { bindAudioFormatPrefUI(); } catch (e) {}
     });
 } else {
     try { bindArtRingSettingsUI(); } catch (e) {}
     try { updateArtNameRing(); } catch (e) {}
     try { bindArtRingResize(); } catch (e) {}
+    try { bindAudioFormatPrefUI(); } catch (e) {}
 }
