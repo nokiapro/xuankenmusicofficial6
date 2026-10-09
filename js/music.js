@@ -735,7 +735,7 @@ async function checkForUpdates() {
                     const head = wasScheduled ? 'ADMIN ĐÃ ĐĂNG BÀI MỚI:' : 'BÀI HÁT MỚI:';
                     showNotification(
                         head,
-                        '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
+                        sid,
                         '#4ade80',
                         'sparkles'
                     );
@@ -1199,7 +1199,7 @@ function showToastMsg(msg, isListen = false) {
         const match = msg.match(/\+1 LISTEN: "(.+)" \((.+)\)/);
         if (match) {
             const songId = match[2] || match[1];
-            showNotification('+1 LISTEN:', '<i class="fa-regular fa-star"></i> ' + songId + ' <i class="fa-regular fa-star"></i>', '#4ade80', 'fa-headphones');
+            showNotification('+1 LISTEN:', songId, '#4ade80', 'fa-headphones');
         } else {
             showNotification('THÔNG BÁO:', msg, '#4ade80', 'info');
         }
@@ -1412,7 +1412,7 @@ async function incrementListenCount(songId, songName, source = 'normal') {
         try {
             showNotification(
                 '+1 LISTEN:',
-                '<i class="fa-regular fa-star"></i> ' + sid + ' <i class="fa-regular fa-star"></i>',
+                sid,
                 '#4ade80',
                 'fa-headphones'
             );
@@ -4915,7 +4915,7 @@ function rentSong(songId, days) {
     });
     showNotification(
         wasRented ? ('GIA HẠN +24H:') : ('THUÊ 24H:'),
-        '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
+        String(songId),
         '#4ade80',
         'clock'
     );
@@ -5224,7 +5224,7 @@ function buySong(songId) {
     markPendingOwned(songId);
     showNotification(
         'MUA THÀNH CÔNG:',
-        '<i class="fa-regular fa-star"></i> ' + String(songId) + ' <i class="fa-regular fa-star"></i>',
+        String(songId),
         '#4ade80',
         'shopping-bag'
     );

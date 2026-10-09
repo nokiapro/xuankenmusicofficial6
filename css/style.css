@@ -2105,23 +2105,6 @@ body.dark .hint-decoration {
     -webkit-text-fill-color: transparent;
 }
 
-.notification-message i.fa-star,
-.notification-message .fa-star {
-    font-size: 0.95em;
-    margin: 0 4px;
-    vertical-align: middle;
-    background: none !important;
-    -webkit-background-clip: unset !important;
-    background-clip: unset !important;
-    color: #ffd89b !important;
-    -webkit-text-fill-color: #ffd89b !important;
-}
-body:not(.dark) .notification-message i.fa-star,
-body:not(.dark) .notification-message .fa-star {
-    color: #e11d48 !important;
-    -webkit-text-fill-color: #e11d48 !important;
-}
-
 body.dark .notification {
     background: rgba(30, 30, 35, 0.98);
     border-bottom-color: #4ade80;
